@@ -38,8 +38,8 @@ The application is built with Flask and provides a simple web interface for uplo
 
 1.  **Clone the repository:**
     ```bash
-    git clone <repository-url>
-    cd <repository-folder>
+    git clone https://github.com/nbhansen/silly_PDF2WAV
+    cd silly_PDF2WAV
     ```
 
 2.  **Create and activate a Python virtual environment:**
