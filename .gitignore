@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.so
+*.log
+
+# Virtual environment
+venv/
+venv_tts_py311/ # Or whatever you named your venv
+.env
+
+# IDE / Editor specific
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+nbproject/ # NetBeans
+*.swp
+*~
+
+# User-generated files & downloaded models
+uploads/
+audio_outputs/
+# Coqui TTS models are typically cached in ~/.local/share/tts/
+# but if you download them manually to the project, you might want to ignore that folder.
+# Example: tts_models_local/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Other
+*.bak

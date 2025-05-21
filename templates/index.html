@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nicolais PDF to Audio Converter</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px; /* Added some padding to the body */
+            background-color: #222222; /* Very dark gray background */
+            color: #FFFF00; /* Strong yellow text */
+            line-height: 1.6;
+            display: flex; /* For centering content */
+            flex-direction: column;
+            align-items: center;
+            min-height: 90vh; /* Ensure it takes most of the screen height */
+        }
+        .container {
+            background-color: #333333; /* Slightly lighter dark gray for the main content box */
+            border: 1px solid #FFD700; /* Yellow border */
+            color: #FFFF00; 
+            padding: 30px; 
+            border-radius: 8px; 
+            box-shadow: 0 0 15px rgba(255, 255, 0, 0.1); /* Subtle yellow glow */
+            width: 90%; 
+            max-width: 600px; /* Max width for the form container */
+            text-align: center; /* Center text inside the container */
+        }
+        h1 { 
+            color: #FFFF00; /* Yellow heading */
+            border-bottom: 2px solid #FFD700; /* Yellow underline */
+            padding-bottom: 10px; 
+            margin-bottom: 20px; /* Space below heading */
+        }
+        label {
+            display: block; /* Make label take full width */
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        input[type="file"] {
+            display: block;
+            margin: 0 auto 20px auto; /* Center the file input */
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #FFD700;
+            background-color: #444444; /* Darker background for input */
+            color: #FFFFE0; /* Lighter yellow for input text */
+            width: 80%; /* Make file input take more width */
+        }
+        /* Style the file input button (browser specific) */
+        input[type="file"]::file-selector-button {
+            background-color: #FFD700;
+            color: #222222;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        input[type="file"]::file-selector-button:hover {
+            background-color: #FFFF00;
+        }
+        input[type="submit"] {
+            display: inline-block; 
+            padding: 12px 25px; 
+            background-color: #FFD700; /* Yellow button background */
+            color: #222222; /* Dark text on yellow button */
+            text-decoration: none; 
+            border-radius: 5px; 
+            transition: background-color 0.3s ease; 
+            font-size: 1em; 
+            font-weight: bold;
+            border: 1px solid #FFFF00;
+            cursor: pointer; /* Add pointer cursor */
+        }
+        input[type="submit"]:hover {
+            background-color: #FFFF00; /* Brighter yellow on hover */
+            color: #111111;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Nicolais silly PDF to WAV Converter</h1>
+        <form action="/upload" method="post" enctype="multipart/form-data">
+            <label for="pdf_file">Choose a PDF file:</label>
+            <input type="file" id="pdf_file" name="pdf_file" accept=".pdf" required>
+            <input type="submit" value="Upload and Process">
+        </form>
+    </div>
+</body>
+</html>
