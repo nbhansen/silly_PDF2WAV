@@ -104,21 +104,18 @@ The application is built with Flask and provides a simple web interface for uplo
 * The application will print messages to the console indicating whether it's using CPU or GPU for TTS.
 
 ## File Structure
-
-
 your_project_folder/
-├── app.py                 # Main Flask application file
-├── ocr_utils.py           # OCRProcessor class
-├── llm_utils.py           # LLMProcessor class
-├── tts_utils.py           # TTSProcessor class (using Coqui TTS)
+├── app.py               # Main Flask application file
+├── ocr_utils.py         # OCRProcessor class
+├── llm_utils.py         # LLMProcessor class
+├── tts_utils.py         # TTSProcessor class (using Coqui TTS)
 ├── templates/
 │   └── index.html
-├── uploads/               # For uploaded PDFs (gitignored by default)
-├── audio_outputs/         # For generated audio (gitignored by default)
-├── requirements.txt       # Python dependencies
-├── README.md              # This file
-└── .gitignore             # Specifies intentionally untracked files
-
+├── uploads/             # For uploaded PDFs (gitignored by default)
+├── audio_outputs/       # For generated audio (gitignored by default)
+├── requirements.txt     # Python dependencies
+├── README.md            # This file
+└── .gitignore           # Specifies intentionally untracked files
 
 ## Troubleshooting
 
