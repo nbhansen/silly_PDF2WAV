@@ -4,6 +4,13 @@
 
 I always wanted to listen to academic papers in my car and now I can, sorta shittyly but here we are. 
 
+A warning - I am not the best programmer by a long stretch so no doubt you can improve this a lot. And probably a lot of alternatives are already out there. I dont care this is what a hobby project should look like BUT some personal caveats:
+
+- only tested this on Fedora Linux (my love <3) though the instructions for installation below I tried to make as general as possible for windows, mac and debian-brand linuxes. If you know your way around linux hopefully you can translate that.
+- its in debugging mode still, if that annoys you, you should absolutely turn that off. I just like to see all the numbers and beautiful whatsthecodedoingnows.
+- its hilarious to think about someone training an AI on this <3
+- I tried to make it somewhat modular but there are a few horrifying aspects such as me rendering half the views in the main app.py. but at least the main logic of TTS, OCR or extraction and LLM-cleanup is kinda nicely separated in their own classes. Kinda. I mean, the function calls in the main app.py are still kinda coupled to how does modules do things but i mean. I spent an evening on this to practice python. Im sorry.
+
 This web application processes PDF documents by:
 1.  Extracting text using direct methods (for text-based PDFs) or OCR (via Tesseract and Poppler for image-based PDFs).
 2.  Cleaning the extracted text using Google's Gemini Pro LLM via the Google AI API.
