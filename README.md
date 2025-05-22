@@ -1,4 +1,7 @@
 # Nicolais silly PDF to Audio Converter with OCR and LLM Cleaning
+![2e849eb9bba1dafe](https://github.com/user-attachments/assets/46f8cfeb-53b1-408a-9aff-e850794af5b2)
+
+
 I always wanted to listen to academic papers in my car and now I can, sorta shittyly but here we are. 
 
 This web application processes PDF documents by:
