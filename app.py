@@ -3,17 +3,40 @@ from flask import Flask, render_template, request, redirect, url_for, send_from_
 from werkzeug.utils import secure_filename
 import html
 
-# Import the refactored processors
+# Import the refactored processors and the factory
 from ocr_utils import OCRProcessor
 from llm_utils import LLMProcessor 
-from tts_utils import TTSProcessor # This should be the Coqui TTS version from tts_utils.py
+from tts_utils import get_tts_processor 
 
 # --- Configuration ---
 UPLOAD_FOLDER = 'uploads'
 AUDIO_FOLDER = 'audio_outputs'
 ALLOWED_EXTENSIONS = {'pdf'}
 # !! IMPORTANT !! Replace "YOUR_GOOGLE_AI_API_KEY" with your actual API key STRING (in quotes).
-GOOGLE_AI_API_KEY = "YOUR_GOOGLE_AI_API_KEY" 
+GOOGLE_AI_API_KEY = "YOUR_GOOGLE_AI_API_KEY"  # Set to None if not using LLM features
+
+# --- TTS Engine Configuration ---
+# Choose your desired TTS engine: "coqui", "gtts", or "bark"
+SELECTED_TTS_ENGINE = "coqui" 
+TTS_ENGINE_KWARGS = {}
+
+if SELECTED_TTS_ENGINE.lower() == "coqui":
+    TTS_ENGINE_KWARGS = {
+        "model_name": "tts_models/en/vctk/vits", 
+        "use_gpu_if_available": True,
+        "speaker_idx_to_use": None 
+    }
+elif SELECTED_TTS_ENGINE.lower() == "gtts":
+    TTS_ENGINE_KWARGS = {
+        "lang": "en",
+        "tld": "co.uk"
+    }
+elif SELECTED_TTS_ENGINE.lower() == "bark": 
+    TTS_ENGINE_KWARGS = {
+        "use_gpu_if_available": False,
+        "use_small_models": True, # <<< CHANGED TO True to address OOM
+        "history_prompt": None    
+    }
 
 
 # --- Flask App Setup ---
@@ -28,14 +51,12 @@ os.makedirs(AUDIO_FOLDER, exist_ok=True)
 print("Initializing processors...")
 ocr_processor = OCRProcessor() 
 llm_processor = LLMProcessor(api_key=GOOGLE_AI_API_KEY) 
-# Initialize TTSProcessor, explicitly stating GPU preference
-# This will use the new .to(device) method inside TTSProcessor
-tts_processor = TTSProcessor(use_gpu_if_available=True) 
-# You can also specify a speaker here if you know one you like, e.g.:
-# tts_processor = TTSProcessor(use_gpu_if_available=True, speaker_idx_to_use='p228', model_name="tts_models/en/vctk/vits") 
-# Or for LJSpeech:
-# tts_processor = TTSProcessor(use_gpu_if_available=True, model_name="tts_models/en/ljspeech/tacotron2-DDC")
 
+tts_processor = get_tts_processor(engine_name=SELECTED_TTS_ENGINE, **TTS_ENGINE_KWARGS)
+if tts_processor is None:
+    print("CRITICAL: TTS Processor could not be initialized. Audio generation will fail.")
+else:
+    print(f"Successfully initialized TTS Processor: {tts_processor.__class__.__name__}")
 
 print("Processors initialized.")
 
@@ -47,7 +68,6 @@ def allowed_file(filename):
 # --- Flask Routes ---
 @app.route('/')
 def index():
-    # The templates/index.html file should have its own styling for consistency
     return render_template('index.html')
 
 @app.route('/audio_outputs/<filename>')
@@ -56,7 +76,11 @@ def serve_audio(filename):
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
+    if tts_processor is None: 
+        return "Error: Text-to-Speech engine is not available. Please check server logs."
+
     if request.method == 'POST':
+        # ... (file handling logic remains the same) ...
         if 'pdf_file' not in request.files:
             return "No file part in the request."
         file = request.files['pdf_file']
@@ -91,26 +115,29 @@ def upload_file():
                 )
             
             audio_section_html = ""
+            output_extension = tts_processor.get_output_extension() if tts_processor else "unknown"
+            audio_mime_type = "audio/wav" if output_extension == "wav" else "audio/mpeg" 
+
             if audio_filename:
                 audio_url = url_for('serve_audio', filename=audio_filename)
                 audio_section_html = f"""
                 <div class="content-section">
-                    <h2>Generated Audio (Coqui TTS)</h2>
-                    <audio controls src="{audio_url}" type="audio/wav">
+                    <h2>Generated Audio ({SELECTED_TTS_ENGINE.upper()})</h2>
+                    <audio controls src="{audio_url}" type="{audio_mime_type}">
                         Your browser does not support the audio element.
                     </audio>
                     <p style="margin-top: 10px; text-align: center;">
-                        <a href="{audio_url}" download="{html.escape(audio_filename)}" class="button">Download Audio File (.wav)</a>
+                        <a href="{audio_url}" download="{html.escape(audio_filename)}" class="button">Download Audio File (.{output_extension})</a>
                     </p>
                 </div>"""
             else:
-                audio_section_html = """
+                audio_section_html = f"""
                 <div class="content-section">
-                    <h2>Audio Generation</h2>
+                    <h2>Audio Generation ({SELECTED_TTS_ENGINE.upper()})</h2>
                     <p>Audio could not be generated or was skipped (e.g., due to issues in OCR or LLM steps, or empty text).</p>
                 </div>"""
             
-            # Styling for dark background and yellow text for the results page
+            # ... (HTML rendering remains the same) ...
             return f"""
             <!DOCTYPE html>
             <html lang="en">
@@ -123,8 +150,8 @@ def upload_file():
                         font-family: Arial, sans-serif; 
                         margin: 0; 
                         padding: 0; 
-                        background-color: #222222; /* Very dark gray background */
-                        color: #FFFF00; /* Strong yellow text */
+                        background-color: #222222; 
+                        color: #FFFF00; 
                         line-height: 1.6;
                     }}
                     .main-container {{ 
@@ -134,37 +161,37 @@ def upload_file():
                         padding: 20px; 
                     }}
                     .content-section {{ 
-                        background-color: #333333; /* Slightly lighter dark gray for sections */
-                        border: 1px solid #FFD700; /* Yellow border */
-                        color: #FFFF00; /* Ensure text within sections is also yellow */
+                        background-color: #333333; 
+                        border: 1px solid #FFD700; 
+                        color: #FFFF00; 
                         padding: 20px; 
                         border-radius: 8px; 
-                        box-shadow: 0 0 15px rgba(255, 255, 0, 0.1); /* Subtle yellow glow */
+                        box-shadow: 0 0 15px rgba(255, 255, 0, 0.1); 
                         margin-bottom: 20px; 
                         width: 90%; 
                         max-width: 800px; 
                     }}
                     h1 {{ 
-                        color: #FFFF00; /* Yellow heading */
-                        border-bottom: 2px solid #FFD700; /* Yellow underline */
+                        color: #FFFF00; 
+                        border-bottom: 2px solid #FFD700; 
                         padding-bottom: 10px; 
                         text-align: center; 
                     }}
                     h2 {{ 
-                        color: #FFFF00; /* Yellow subheading */
+                        color: #FFFF00; 
                         margin-top: 0; 
                     }}
                     pre {{ 
                         white-space: pre-wrap; 
                         word-wrap: break-word; 
-                        background-color: #1c1c1c; /* Even darker for pre blocks */
+                        background-color: #1c1c1c; 
                         border: 1px solid #FFD700; 
                         padding: 15px; 
                         border-radius: 5px; 
                         font-size: 0.95em; 
                         max-height: 30vh; 
                         overflow-y: auto;
-                        color: #FFFFE0; /* Slightly lighter yellow for pre text for readability */
+                        color: #FFFFE0; 
                     }}
                     audio {{ 
                         width: 100%; 
@@ -187,8 +214,8 @@ def upload_file():
                     a.button {{ 
                         display: inline-block; 
                         padding: 10px 15px; 
-                        background-color: #FFD700; /* Yellow button background */
-                        color: #222222; /* Dark text on yellow button */
+                        background-color: #FFD700; 
+                        color: #222222; 
                         text-decoration: none; 
                         border-radius: 5px; 
                         transition: background-color 0.3s ease; 
@@ -197,7 +224,7 @@ def upload_file():
                         border: 1px solid #FFFF00;
                     }}
                     a.button:hover {{ 
-                        background-color: #FFFF00; /* Brighter yellow on hover */
+                        background-color: #FFFF00; 
                         color: #111111;
                     }}
                 </style>

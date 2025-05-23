@@ -13,8 +13,8 @@ The application is built with Flask and provides a simple web interface for uplo
 * Handles both text-based and image-based PDFs.
 * Prioritizes direct text extraction for speed; falls back to OCR.
 * Utilizes Google Gemini Pro for advanced text cleaning (removal of headers, footers, artifacts, etc.).
-* Generates natural-sounding speech using Coqui TTS (VITS model).
-* Allows for GPU acceleration for Coqui TTS if an NVIDIA GPU and CUDA are available.
+* Generates natural-sounding speech using Coqui TTS (VITS model) - if thats too light, it also has support for Bark (requires a beefy gpu/cpu) or gTTS (lightweight but kinda crappy)
+* Allows for GPU acceleration for Coqui TTS + Bark TTS if an NVIDIA GPU and CUDA are available. I have not looked into acceleration on AMD or Intel Arc though I would like to.
 * Simple web interface for file upload and audio playback/download.
 
 ## Setup & Installation
