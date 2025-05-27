@@ -13,7 +13,7 @@ UPLOAD_FOLDER = 'uploads'
 AUDIO_FOLDER = 'audio_outputs'
 ALLOWED_EXTENSIONS = {'pdf'}
 # !! IMPORTANT !! Replace "YOUR_GOOGLE_AI_API_KEY" with your actual API key STRING (in quotes).
-GOOGLE_AI_API_KEY = "AIzaSyC_rDGDv8tD_QL3YJWKHinDeSKasTvSE6s" 
+GOOGLE_AI_API_KEY = "AIzaSyC_rDGDvSE6s" 
 # This global variable will be set based on TTS_ENGINE_KWARGS or default in __main__
 # It's used for display purposes in the HTML template.
 SELECTED_TTS_ENGINE = "TTS" # Default placeholder
@@ -114,4 +114,46 @@ def upload_file():
         
         if file and allowed_file(file.filename):
             original_filename = secure_filename(file.filename)
-            base_filename_no_ext = os.path.splitext(original_filename)
+            base_filename_no_ext = os.path.splitext(original_filename)[0]
+            
+            # Save uploaded file
+            pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], original_filename)
+            file.save(pdf_path)
+            
+            # Process PDF: OCR -> LLM -> TTS
+            print(f"Processing PDF: {original_filename}")
+            
+            # Step 1: Extract text using OCR
+            extracted_text = ocr_processor.extract_text_from_pdf(pdf_path)
+            
+            # Step 2: Clean text using LLM
+            cleaned_text = llm_processor.clean_text(extracted_text)
+            
+            # Step 3: Generate audio using TTS
+            audio_filename = tts_processor.generate_audio_file(
+                cleaned_text, 
+                base_filename_no_ext, 
+                app.config['AUDIO_FOLDER']
+            )
+            
+            if audio_filename:
+                # Clean up uploaded PDF
+                try:
+                    os.remove(pdf_path)
+                except:
+                    pass
+                
+                return render_template('result.html', 
+                                     audio_file=audio_filename,
+                                     original_filename=original_filename,
+                                     tts_engine=current_tts_engine_display_name)
+            else:
+                return "Error: Failed to generate audio file."
+        else:
+            return "Invalid file type. Please upload a PDF file."
+    
+    return redirect(url_for('index'))
+
+if __name__ == '__main__':
+    print("Starting Flask development server...")
+    app.run(debug=True, host='0.0.0.0', port=5000)
