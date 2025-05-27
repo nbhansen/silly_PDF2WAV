@@ -1,6 +1,6 @@
 import os
 import torch # For checking CUDA availability and setting device
-import numpy # For the add_safe_globals fix
+import numpy # For Bark's add_safe_globals fix
 
 # --- Base Class for TTS Processors ---
 class BaseTTSProcessor:
@@ -14,7 +14,7 @@ class BaseTTSProcessor:
         Initializes the base processor.
         kwargs can be used to pass engine-specific configurations.
         """
-        print(f"Initializing {self.__class__.__name__}...")
+        print(f"Initializing {self.__class__.__name__} with args: {kwargs}")
         pass
 
     def generate_audio_file(self, text_to_speak, output_filename_no_ext, audio_dir):
@@ -34,19 +34,20 @@ class BaseTTSProcessor:
         Raises:
             NotImplementedError: If the subclass does not implement this method.
         """
-        raise NotImplementedError("Subclasses must implement generate_audio_file.")
+        raise NotImplementedError(f"{self.__class__.__name__} must implement generate_audio_file.")
 
     def get_output_extension(self):
         """
         Returns the expected audio file extension (e.g., "wav", "mp3").
         This method SHOULD be implemented by subclasses.
         """
-        raise NotImplementedError("Subclasses must implement get_output_extension.")
+        raise NotImplementedError(f"{self.__class__.__name__} must implement get_output_extension.")
 
 # --- Coqui TTS Implementation ---
 try:
     from TTS.api import TTS as CoquiTTS_API
     COQUI_TTS_AVAILABLE = True
+    print("Coqui TTS library (TTS.api) found and imported successfully.")
 except ImportError:
     print("TTS (Coqui TTS) library not found. CoquiTTSProcessor will not be available.")
     COQUI_TTS_AVAILABLE = False
@@ -85,19 +86,25 @@ if COQUI_TTS_AVAILABLE:
                 if self.tts_model.is_multi_speaker:
                     self.is_multi_speaker = True
                     print("CoquiTTSProcessor: Model is multi-speaker.")
-                    available_speakers = self.tts_model.speakers
-                    print("Available speakers:", available_speakers)
-                    if self.speaker_to_use is None and available_speakers:
-                        self.speaker_to_use = available_speakers[0] 
+                    available_speakers_raw = self.tts_model.speakers
+                    available_speakers_cleaned = [spk.strip() for spk in available_speakers_raw if isinstance(spk, str)]
+                    
+                    print("Available Coqui speakers (raw):", available_speakers_raw)
+                    print("Available Coqui speakers (cleaned):", available_speakers_cleaned)
+
+                    if not available_speakers_cleaned:
+                        print("CoquiTTSProcessor: ERROR - No valid speaker IDs found after cleaning.")
+                        self.is_multi_speaker = False 
+                    elif self.speaker_to_use is None: 
+                        self.speaker_to_use = available_speakers_cleaned[0] 
                         print(f"CoquiTTSProcessor: Defaulting to speaker: {self.speaker_to_use}")
-                    elif self.speaker_to_use and self.speaker_to_use not in available_speakers:
-                        print(f"CoquiTTSProcessor: WARNING - Specified speaker '{self.speaker_to_use}' not found.")
-                        self.speaker_to_use = available_speakers[0] if available_speakers else None
-                        if self.speaker_to_use:
-                             print(f"CoquiTTSProcessor: Now using speaker (fallback): {self.speaker_to_use}")
-                        else:
-                            print("CoquiTTSProcessor: ERROR - No speakers available in multi-speaker model.")
-                    elif self.speaker_to_use:
+                    elif self.speaker_to_use.strip() not in available_speakers_cleaned: 
+                        requested_speaker_cleaned = self.speaker_to_use.strip()
+                        print(f"CoquiTTSProcessor: WARNING - Specified speaker '{requested_speaker_cleaned}' not found. Defaulting to first available.")
+                        self.speaker_to_use = available_speakers_cleaned[0] 
+                        print(f"CoquiTTSProcessor: Now using speaker (fallback): {self.speaker_to_use}")
+                    else: 
+                        self.speaker_to_use = self.speaker_to_use.strip() 
                         print(f"CoquiTTSProcessor: Using specified speaker: {self.speaker_to_use}")
                 else:
                     print(f"CoquiTTSProcessor: Model '{self.model_name}' is single-speaker.")
@@ -109,7 +116,6 @@ if COQUI_TTS_AVAILABLE:
             if not self.tts_model:
                 print("CoquiTTSProcessor: Coqui TTS model not available. Skipping audio generation.")
                 return None
-            # ... (rest of CoquiTTSProcessor.generate_audio_file method from previous version) ...
             print(f"CoquiTTSProcessor: Attempting Coqui TTS audio generation for {output_filename_no_ext}.{self.output_extension}")
             if not text_to_speak or text_to_speak.strip() == "" or \
                text_to_speak.startswith("LLM cleaning skipped") or text_to_speak.startswith("Error:") or \
@@ -141,6 +147,7 @@ if COQUI_TTS_AVAILABLE:
 try:
     from gtts import gTTS
     GTTS_AVAILABLE = True
+    print("gTTS library found and imported successfully.")
 except ImportError:
     print("gTTS library not found. GTTSProcessor will not be available.")
     GTTS_AVAILABLE = False
@@ -156,7 +163,6 @@ if GTTS_AVAILABLE:
             print(f"GTTSProcessor: Initialized for lang='{lang}', tld='{tld}'.")
 
         def generate_audio_file(self, text_to_speak, output_filename_no_ext, audio_dir):
-            # ... (GTTSProcessor.generate_audio_file method from previous version) ...
             print(f"GTTSProcessor: Attempting gTTS audio generation for {output_filename_no_ext}.{self.output_extension} ({self.lang}, {self.tld})")
             if not text_to_speak or text_to_speak.strip() == "" or \
                text_to_speak.startswith("LLM cleaning skipped") or text_to_speak.startswith("Error:") or \
@@ -185,7 +191,7 @@ try:
     BARK_AVAILABLE = True
     print("Bark library found and imported successfully.")
 except ImportError:
-    print("Bark library (suno-bark) not found or scipy.io.wavfile not available. BarkTTSProcessor will not be available.")
+    print("Bark library (suno-bark) or scipy.io.wavfile not found. BarkTTSProcessor will not be available.")
     BARK_AVAILABLE = False
 
 if BARK_AVAILABLE:
@@ -197,20 +203,12 @@ if BARK_AVAILABLE:
             self.history_prompt = history_prompt 
             self.models_loaded = False
 
-            # Attempt to fix "Unsupported global: numpy.core.multiarray.scalar"
-            # This needs to be done before any model loading that might trigger the error.
-            # It's a bit of a global hack, but suggested by PyTorch's error.
             try:
                 if hasattr(torch, 'serialization') and hasattr(torch.serialization, 'add_safe_globals'):
                     torch.serialization.add_safe_globals([numpy.core.multiarray.scalar])
                     print("BarkTTSProcessor: Added numpy.core.multiarray.scalar to PyTorch safe globals.")
-                else: # Fallback for older PyTorch versions if add_safe_globals isn't there
-                    # This might not be needed if PyTorch is new enough to have the error,
-                    # but old enough not to have add_safe_globals. Unlikely.
-                    print("BarkTTSProcessor: torch.serialization.add_safe_globals not found. Skipping.")
             except Exception as e:
                 print(f"BarkTTSProcessor: Error trying to add_safe_globals: {e}")
-
 
             text_use_gpu = False
             coarse_use_gpu = False
@@ -245,30 +243,23 @@ if BARK_AVAILABLE:
                 print(f"BarkTTSProcessor: Error preloading Bark models: {e}")
                 self.models_loaded = False
 
-
         def generate_audio_file(self, text_to_speak, output_filename_no_ext, audio_dir):
             if not self.models_loaded:
                 print("BarkTTSProcessor: Bark models not loaded. Skipping audio generation.")
                 return None
-
             print(f"BarkTTSProcessor: Attempting Bark audio generation for {output_filename_no_ext}.{self.output_extension}")
-            
             if not text_to_speak or text_to_speak.strip() == "" or \
                text_to_speak.startswith("LLM cleaning skipped") or text_to_speak.startswith("Error:") or \
                text_to_speak.startswith("Could not convert") or text_to_speak.startswith("No text could be extracted"):
                 print("BarkTTSProcessor: Skipping audio generation due to empty or error text.")
                 return None
-            
             try:
                 print(f"BarkTTSProcessor: Generating audio for text: \"{text_to_speak[:100]}...\"")
-                # Ensure history_prompt is None or a valid speaker prompt string
                 current_history_prompt = self.history_prompt if isinstance(self.history_prompt, str) else None
                 audio_array = generate_audio(text_to_speak, history_prompt=current_history_prompt)
-                
                 os.makedirs(audio_dir, exist_ok=True)
                 audio_filename = f"{output_filename_no_ext}.{self.output_extension}"
                 audio_filepath = os.path.join(audio_dir, audio_filename)
-                
                 write_wav(audio_filepath, self.sample_rate, audio_array)
                 print(f"BarkTTSProcessor: Audio file saved: {audio_filepath}")
                 return audio_filename
@@ -310,12 +301,12 @@ def get_tts_processor(engine_name="coqui", **kwargs):
     
     # Fallback logic
     print(f"TTSFactory: Engine '{engine_name_lower}' not found or not available.")
-    if GTTS_AVAILABLE:
+    if GTTS_AVAILABLE: # Primary fallback
         print("TTSFactory: Defaulting to gTTS.")
-        return GTTSProcessor()
-    elif COQUI_TTS_AVAILABLE: 
+        return GTTSProcessor() # Use gTTS default kwargs
+    elif COQUI_TTS_AVAILABLE: # Secondary fallback
         print("TTSFactory: Defaulting to CoquiTTS (as gTTS not available).")
-        return CoquiTTSProcessor() 
+        return CoquiTTSProcessor() # Use CoquiTTS default kwargs
         
     print("TTSFactory: CRITICAL - No TTS engines available or specified engine not found and no fallback available.")
     return None
