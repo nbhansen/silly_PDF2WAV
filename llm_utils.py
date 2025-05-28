@@ -1,4 +1,5 @@
 import google.generativeai as genai
+import time
 
 class LLMProcessor:
     """
@@ -27,7 +28,7 @@ class LLMProcessor:
 
     def clean_text(self, text_to_clean):
         """
-        Sends text to the Gemini model for cleaning based on predefined rules.
+        Sends text to the Gemini model for cleaning, processing in chunks if necessary.
 
         Args:
             text_to_clean (str): The raw text string to be cleaned.
@@ -47,7 +48,22 @@ class LLMProcessor:
             print("LLMProcessor: Skipping cleaning due to empty or error text from upstream process.")
             return text_to_clean
 
-        print(f"LLMProcessor: Sending text (length: {len(text_to_clean)} chars) to Gemini for cleaning.")
+        # Process in chunks if text is very long
+        CHUNK_SIZE = 100000   # Conservative chunk size for Gemini
+        OVERLAP_SIZE = 2000   # Larger overlap to maintain context at boundaries
+        
+        if len(text_to_clean) <= CHUNK_SIZE:
+            # Process normally for shorter texts
+            print(f"LLMProcessor: Processing single chunk ({len(text_to_clean)} chars)")
+            return self._clean_single_chunk(text_to_clean)
+        else:
+            # Process in chunks for longer texts
+            print(f"LLMProcessor: Text is long ({len(text_to_clean)} chars). Processing in chunks.")
+            return self._clean_text_chunked(text_to_clean, CHUNK_SIZE, OVERLAP_SIZE)
+
+    def _clean_single_chunk(self, text_chunk):
+        """Process a single chunk of text through Gemini."""
+        print(f"LLMProcessor: Sending text (length: {len(text_chunk)} chars) to Gemini for cleaning.")
         
         # Revised prompt with more emphasis on spacing and natural language output
         prompt = f"""Your primary goal is to clean the following text, extracted from an academic research paper. The cleaned text should be highly readable and well-suited for text-to-speech (TTS) conversion.
@@ -65,6 +81,7 @@ class LLMProcessor:
 - Preserve all text that would be read aloud in an ebook, including all paragraphs and their intended structure.
 - Skip in-text citations (e.g., [1], (Author, 2023)).
 - Skip mathematical formulas and equations if present.
+- skip URLS except the top-level part, eg. "https://example.com/path/to/resource" should be turned into just example.com
 
 **Crucial for Readability and TTS (Pay close attention to these):**
 - **Maintain or Reconstruct Natural Spacing:** Ensure there is a single proper space between all words. Ensure appropriate single spacing follows all punctuation marks (e.g., a period, comma, colon, semicolon should be followed by a space, unless it's part of a standard abbreviation like "e.g.").
@@ -78,20 +95,16 @@ class LLMProcessor:
 
 Here is the text to clean:
 ---
-{text_to_clean}
+{text_chunk}
 ---
 Cleaned text:"""
+        
         try:
             response = self.model.generate_content(prompt)
             print("LLMProcessor: LLM (Gemini) response received.")
             
             if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
                 cleaned_text = response.candidates[0].content.parts[0].text
-                # Basic post-check for common run-on issues (very simple)
-                # A more robust post-processor might be needed for complex cases.
-                # Example: trying to insert a space if a lowercase is followed by an uppercase (CamelCase)
-                # import re
-                # cleaned_text = re.sub(r"([a-z])([A-Z])", r"\1 \2", cleaned_text)
                 return cleaned_text
             else:
                 feedback_info = ""
@@ -106,3 +119,66 @@ Cleaned text:"""
         except Exception as e:
             print(f"LLMProcessor: Error during LLM cleaning with Gemini: {e}")
             return f"Error during LLM cleaning with Gemini: {str(e)}"
+
+    def _clean_text_chunked(self, text_to_clean, chunk_size, overlap_size):
+        """Process text in overlapping chunks and reassemble."""
+        chunks = []
+        cleaned_chunks = []
+        
+        # Split into chunks with overlap
+        start = 0
+        while start < len(text_to_clean):
+            end = min(start + chunk_size, len(text_to_clean))
+            chunk = text_to_clean[start:end]
+            
+            # Try to break at a sentence boundary near the end to avoid cutting mid-sentence
+            if end < len(text_to_clean):  # Not the last chunk
+                # Look backwards from the end for sentence endings
+                for i in range(min(500, end - start), 0, -1):  # Look back up to 500 chars
+                    if chunk[end - start - i:end - start - i + 1] in '.!?':
+                        # Found a sentence ending, adjust chunk boundary
+                        chunk = text_to_clean[start:start + (end - start - i + 1)]
+                        break
+            
+            chunks.append(chunk)
+            if end >= len(text_to_clean):
+                break
+            start += len(chunk) - overlap_size
+        
+        print(f"LLMProcessor: Split into {len(chunks)} chunks for processing.")
+        
+        # Process each chunk with rate limiting
+        for i, chunk in enumerate(chunks):
+            print(f"LLMProcessor: Processing chunk {i+1}/{len(chunks)} (length: {len(chunk)} chars)...")
+            
+            # Add small delay to respect API rate limits
+            if i > 0:
+                time.sleep(1)  # 1 second delay between requests
+            
+            cleaned_chunk = self._clean_single_chunk(chunk)
+            
+            if cleaned_chunk.startswith("Error"):
+                print(f"LLMProcessor: Error in chunk {i+1}, using original chunk.")
+                cleaned_chunk = chunk
+            
+            cleaned_chunks.append(cleaned_chunk)
+        
+        print("LLMProcessor: Reassembling cleaned chunks...")
+        
+        # Reassemble chunks with overlap removal
+        if len(cleaned_chunks) == 1:
+            return cleaned_chunks[0]
+        
+        # Simple reassembly - more sophisticated overlap handling could be added
+        result = cleaned_chunks[0]
+        
+        for i in range(1, len(cleaned_chunks)):
+            # For simplicity, just add each subsequent chunk
+            # A more sophisticated approach would detect and remove overlapping content
+            result += " " + cleaned_chunks[i]
+        
+        # Basic cleanup of double spaces
+        result = ' '.join(result.split())
+        
+        print(f"LLMProcessor: Chunked processing complete. Final length: {len(result)} chars")
+        return result

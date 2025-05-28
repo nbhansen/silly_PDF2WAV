@@ -13,7 +13,7 @@ UPLOAD_FOLDER = 'uploads'
 AUDIO_FOLDER = 'audio_outputs'
 ALLOWED_EXTENSIONS = {'pdf'}
 # !! IMPORTANT !! Replace "YOUR_GOOGLE_AI_API_KEY" with your actual API key STRING (in quotes).
-GOOGLE_AI_API_KEY = "AIzaSyC_rDGDvSE6s" 
+GOOGLE_AI_API_KEY = "allltheleavesarebrownandtheskyisgrey" # Replace with your actual API key
 # This global variable will be set based on TTS_ENGINE_KWARGS or default in __main__
 # It's used for display purposes in the HTML template.
 SELECTED_TTS_ENGINE = "TTS" # Default placeholder
@@ -28,7 +28,7 @@ if _SELECTED_TTS_ENGINE_CONFIG.lower() == "coqui":
     TTS_ENGINE_KWARGS = {
         "model_name": "tts_models/en/vctk/vits", 
         "use_gpu_if_available": True,
-        "speaker_idx_to_use": None 
+        "speaker_idx_to_use": "p227"
     }
     SELECTED_TTS_ENGINE = "Coqui TTS" # More descriptive name
 elif _SELECTED_TTS_ENGINE_CONFIG.lower() == "gtts":
@@ -125,9 +125,14 @@ def upload_file():
             
             # Step 1: Extract text using OCR
             extracted_text = ocr_processor.extract_text_from_pdf(pdf_path)
+            # debugging output 
+            print(f"OCR extracted text length: {len(extracted_text)} characters")
             
             # Step 2: Clean text using LLM
             cleaned_text = llm_processor.clean_text(extracted_text)
+            print(f"LLM cleaned text length: {len(cleaned_text)} characters")
+            print(f"First 200 chars of cleaned text: {cleaned_text[:200]}")
+            print(f"Last 200 chars of cleaned text: {cleaned_text[-200:]}")
             
             # Step 3: Generate audio using TTS
             audio_filename = tts_processor.generate_audio_file(
