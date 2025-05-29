@@ -87,19 +87,20 @@ class TextCleaner:
             print(f"TextCleaner: Failed to initialize Gemini: {e}")
             return None
 
-    def clean(self, text: str) -> str:
-        """Clean the extracted text"""
+    def clean(self, text: str) -> List[str]:  # Changed return type!
+        """Clean the extracted text, returns list of cleaned chunks"""
         if not self.model or not text.strip():
             print("TextCleaner: Skipping cleaning (no model or empty text)")
-            return text
+            return [text]  # Return as single-item list
             
         if text.startswith("Error") or text.startswith("Could not convert"):
             print("TextCleaner: Skipping cleaning due to upstream error")
-            return text
+            return [text]  # Return as single-item list
             
         # Simple chunking for large texts
         if len(text) <= self.max_chunk_size:
-            return self._clean_chunk(text)
+            cleaned = self._clean_chunk(text)
+            return [cleaned]  # Return as single-item list
         
         print(f"TextCleaner: Text is large ({len(text)} chars), splitting into chunks")
         chunks = self._smart_split(text, self.max_chunk_size)
@@ -111,18 +112,18 @@ class TextCleaner:
                 time.sleep(1)  # Rate limiting
             cleaned_chunk = self._clean_chunk(chunk)
             cleaned_chunks.append(cleaned_chunk)
-        
-        result = " ".join(cleaned_chunks)
-        
-        # Write debug file
-        try:
-            with open("llm_cleaned_debug.txt", "w", encoding="utf-8") as f:
-                f.write(result)
-            print("TextCleaner: Debug file written")
-        except Exception as e:
-            print(f"TextCleaner: Failed to write debug file: {e}")
             
-        return result
+            # Write individual debug files
+            try:
+                debug_path = f"llm_cleaned_chunk_{i+1}_debug.txt"
+                with open(debug_path, "w", encoding="utf-8") as f:
+                    f.write(cleaned_chunk)
+                print(f"TextCleaner: Wrote chunk {i+1} to {debug_path}")
+            except Exception as e:
+                print(f"TextCleaner: Failed to write debug file: {e}")
+        
+        print(f"TextCleaner: Processed {len(cleaned_chunks)} chunks")
+        return cleaned_chunks  # Return list of chunks, no combination!
 
     def _clean_chunk(self, text_chunk: str) -> str:
         """Clean a single chunk of text"""
@@ -146,8 +147,8 @@ class TextCleaner:
 - **Maintain or Reconstruct Natural Spacing:** Ensure there is a single proper space between all words. Ensure appropriate single spacing follows all punctuation marks.
 - **Handle Hyphenated Words:** If words are hyphenated across line breaks in the input (e.g., "effec-\\ntive"), correctly join them into single words (e.g., "effective") in the output.
 - **Avoid Run-on Words:** The final output must be composed of clearly separated words and sentences. Do not merge words that should be distinct.
-- The output must be grammatically correct, well-formed English text, structured into natural paragraphs suitable for reading aloud.
-
+- The output must be **grammatically correct**, well-formed English text, structured into natural paragraphs suitable for reading aloud.
+- **URLS**if URLS are present they should be cleaned to just say for instance "example.com" instead of "https://example.com/this/is/a/very/long/url/that/should/not/be/read/aloud".
 Here is the text to clean:
 ---
 {text_chunk}

@@ -12,7 +12,7 @@ AUDIO_FOLDER = 'audio_outputs'
 ALLOWED_EXTENSIONS = {'pdf'}
 
 # !! IMPORTANT !! Replace with your actual API key
-GOOGLE_AI_API_KEY = "NOTREALLYBROTHERMAN"  # Your key
+GOOGLE_AI_API_KEY = "damngirl"  # Your key
 
 # --- TTS Engine Configuration ---
 _SELECTED_TTS_ENGINE_CONFIG = "coqui"  # or "gtts", "bark"
@@ -100,7 +100,7 @@ def upload_file():
             
             print(f"Processing PDF: {original_filename}")
             
-            # Use the new processor (much simpler!)
+            # Use the new processor
             result = pdf_processor.process_pdf(pdf_path, base_filename_no_ext)
             
             # Clean up uploaded PDF
@@ -111,9 +111,11 @@ def upload_file():
             
             if result.success:
                 return render_template('result.html', 
-                                     audio_file=result.audio_path,
+                                     audio_files=result.audio_files,           # List of files
+                                     audio_file=result.audio_files[0],         # First file for compatibility  
                                      original_filename=original_filename,
-                                     tts_engine=SELECTED_TTS_ENGINE)
+                                     tts_engine=SELECTED_TTS_ENGINE,
+                                     file_count=len(result.audio_files))
             else:
                 return f"Error: {result.error}"
         else:

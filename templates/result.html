@@ -118,18 +118,30 @@
         </div>
 
         <div class="audio-player">
-            <h3>🎵 Listen to Your Audio</h3>
-            <audio controls preload="metadata">
-                <source src="{{ url_for('serve_audio', filename=audio_file) }}" type="audio/{{ 'mpeg' if audio_file.endswith('.mp3') else 'wav' }}">
-                Your browser does not support the audio element.
-            </audio>
-        </div>
-
-        <div class="download-section">
-            <a href="{{ url_for('serve_audio', filename=audio_file) }}" download="{{ audio_file }}" class="download-btn">
-                📥 Download Audio File
-            </a>
-        </div>
+    <h3>🎵 Listen to Your Audio</h3>
+    {% if file_count > 1 %}
+        <p><strong>Note:</strong> Your PDF was split into {{ file_count }} parts due to its length.</p>
+        {% for i in range(file_count) %}
+            <div style="margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px;">
+                <h4>Part {{ i + 1 }} of {{ file_count }}</h4>
+                <audio controls preload="metadata" style="width: 100%;">
+                    <source src="{{ url_for('serve_audio', filename=audio_files[i]) }}" type="audio/{{ 'mpeg' if audio_files[i].endswith('.mp3') else 'wav' }}">
+                    Your browser does not support the audio element.
+                </audio>
+                <div style="margin-top: 10px;">
+                    <a href="{{ url_for('serve_audio', filename=audio_files[i]) }}" download="{{ audio_files[i] }}" class="download-btn" style="font-size: 0.9em; padding: 8px 16px;">
+                        📥 Download Part {{ i + 1 }}
+                    </a>
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <audio controls preload="metadata">
+            <source src="{{ url_for('serve_audio', filename=audio_file) }}" type="audio/{{ 'mpeg' if audio_file.endswith('.mp3') else 'wav' }}">
+            Your browser does not support the audio element.
+        </audio>
+    {% endif %}
+</div>
 
         <div class="instructions">
             <h4>💡 Tips:</h4>

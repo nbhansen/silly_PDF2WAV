@@ -14,7 +14,7 @@ A warning - I am not the best programmer by a long stretch so no doubt you can i
 This web application processes PDF documents by:
 1.  Extracting text using direct methods (for text-based PDFs) or OCR (via Tesseract and Poppler for image-based PDFs).
 2.  Cleaning the extracted text using Google's Gemini Pro LLM via the Google AI API.
-3.  Generating an audio version of the cleaned text using Coqui TTS for natural-sounding speech.
+3.  Generating an audio version of the cleaned text using Coqui TTS (as default) for natural-sounding speech.
 
 The application is built with Flask and provides a simple web interface for uploading PDFs and listening to/downloading the generated audio.
 
@@ -106,13 +106,14 @@ The application is built with Flask and provides a simple web interface for uplo
 ## File Structure
 your_project_folder/
 ├── app.py               # Main Flask application file
-├── ocr_utils.py         # OCRProcessor class
-├── llm_utils.py         # LLMProcessor class
-├── tts_utils.py         # TTSProcessor class (using Coqui TTS)
+├── processors.py        # Main PDFProcessor orchestrator  
+├── text_processing.py   # OCRExtractor and TextCleaner classes
+├── audio_generation.py  # TTSGenerator class
+├── tts_utils.py         # TTS engine implementations
 ├── templates/
 │   └── index.html
-├── uploads/             # For uploaded PDFs (gitignored by default)
-├── audio_outputs/       # For generated audio (gitignored by default)
+├── uploads/             # For uploaded PDFs (gitignored by default app will create a new one)
+├── audio_outputs/       # For generated audio (gitignored by default app will create a new one)
 ├── requirements.txt     # Python dependencies
 ├── README.md            # This file
 └── .gitignore           # Specifies intentionally untracked files
@@ -121,7 +122,7 @@ your_project_folder/
 
 * **`TTSProcessor: Error initializing Coqui TTS model...`**:
     * Ensure you have an internet connection for the first run to download models.
-    * Make sure `espeak` or `espeak-ng` is installed and accessible.
+    * Make sure `espeak` or `espeak-ng` (dependent on your OS) is installed and accessible.
     * Check for any specific error messages related to PyTorch or CUDA if GPU is enabled.
 * **`OCRProcessor: Tesseract OCR engine not found...`**:
     * Verify Tesseract is installed and its installation directory is in your system's PATH.
@@ -131,7 +132,7 @@ your_project_folder/
 
 ## Known Issues / Future Enhancements
 
-* The default Coqui TTS VCTK model might mispronounce certain uncommon words or acronyms. Experimenting with different Coqui TTS models or fine-tuning might be necessary for specific needs.
+* The default Coqui TTS VCTK model might mispronounce certain uncommon words or acronyms. Experimenting with different Coqui TTS models or fine-tuning might be necessary for specific needs. 
 * Error handling could be more granular for user feedback in the web UI.
 * Consider moving API keys and sensitive configurations to environment variables for better security. Please do not throw this on your website or whatever and allow people to jack your google api key.
 * Implement asynchronous task processing (e.g., with Celery) for long-running OCR/TTS tasks to prevent web request timeouts and improve user experience.
