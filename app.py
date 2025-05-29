@@ -2,6 +2,10 @@ import os
 from flask import Flask, render_template, request, redirect, url_for, send_from_directory
 from werkzeug.utils import secure_filename
 import html
+import re
+import tempfile
+import shutil
+from pydub import AudioSegment
 
 # Import the refactored processors and the factory
 from ocr_utils import OCRProcessor
@@ -13,7 +17,7 @@ UPLOAD_FOLDER = 'uploads'
 AUDIO_FOLDER = 'audio_outputs'
 ALLOWED_EXTENSIONS = {'pdf'}
 # !! IMPORTANT !! Replace "YOUR_GOOGLE_AI_API_KEY" with your actual API key STRING (in quotes).
-GOOGLE_AI_API_KEY = "allltheleavesarebrownandtheskyisgrey" # Replace with your actual API key
+GOOGLE_AI_API_KEY = "whyyounowork" # Replace with your actual API key
 # This global variable will be set based on TTS_ENGINE_KWARGS or default in __main__
 # It's used for display purposes in the HTML template.
 SELECTED_TTS_ENGINE = "TTS" # Default placeholder
@@ -87,6 +91,57 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def split_text_for_tts(text, max_chars=1500):
+    """Split text into chunks for TTS, trying to break at sentence boundaries."""
+    import re
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    chunks = []
+    current = ""
+    for s in sentences:
+        if len(current) + len(s) + 1 > max_chars:
+            if current:
+                chunks.append(current.strip())
+            current = s
+        else:
+            current += " " + s
+    if current:
+        chunks.append(current.strip())
+    return chunks
+
+def generate_audio_from_chunks(cleaned_text, base_filename_no_ext, tts_processor, audio_dir, max_chars=1500):
+    """
+    Splits cleaned_text into chunks, generates audio for each, and concatenates them.
+    Returns the final audio filename or None on failure.
+    """
+    tts_chunks = split_text_for_tts(cleaned_text, max_chars=max_chars)
+    temp_audio_files = []
+    for idx, chunk in enumerate(tts_chunks):
+        temp_filename = f"{base_filename_no_ext}_part{idx}.{tts_processor.get_output_extension()}"
+        temp_path = os.path.join(audio_dir, temp_filename)
+        result = tts_processor.generate_audio_file(chunk, f"{base_filename_no_ext}_part{idx}", audio_dir)
+        if result:
+            temp_audio_files.append(temp_path)
+        else:
+            print(f"Warning: Failed to generate audio for chunk {idx}")
+
+    # Concatenate audio files
+    if temp_audio_files:
+        combined = AudioSegment.empty()
+        for audio_file in temp_audio_files:
+            combined += AudioSegment.from_file(audio_file)
+        final_audio_filename = f"{base_filename_no_ext}_full.{tts_processor.get_output_extension()}"
+        final_audio_path = os.path.join(audio_dir, final_audio_filename)
+        combined.export(final_audio_path, format=tts_processor.get_output_extension())
+        # Optionally, clean up chunk files
+        for audio_file in temp_audio_files:
+            try:
+                os.remove(audio_file)
+            except Exception:
+                pass
+        return final_audio_filename
+    else:
+        return None
+
 # --- Flask Routes ---
 @app.route('/')
 def index():
@@ -134,13 +189,15 @@ def upload_file():
             print(f"First 200 chars of cleaned text: {cleaned_text[:200]}")
             print(f"Last 200 chars of cleaned text: {cleaned_text[-200:]}")
             
-            # Step 3: Generate audio using TTS
-            audio_filename = tts_processor.generate_audio_file(
-                cleaned_text, 
-                base_filename_no_ext, 
-                app.config['AUDIO_FOLDER']
+            # Step 3: Generate audio using TTS (chunked, via util)
+            audio_filename = generate_audio_from_chunks(
+                cleaned_text,
+                base_filename_no_ext,
+                tts_processor,
+                app.config['AUDIO_FOLDER'],
+                max_chars=1500
             )
-            
+
             if audio_filename:
                 # Clean up uploaded PDF
                 try:

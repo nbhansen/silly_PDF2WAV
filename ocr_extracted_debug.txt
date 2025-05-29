@@ -1,0 +1,2416 @@
+Designing for Emotion Regulation Interventions: An Agenda
+for HCI Theory and Research
+PETRSLOVAK∗,King’sCollegeLondon
+ALISSAANTLE∗,SimonFraserUniversity
+NIKKITHEOFANOPOULOUandCLAUDIADAUDÉNROQUET,King’sCollegeLondon
+JAMESGROSS,StanfordUniversity
+KATHERINEISBISTER,UCSantaCruz
+There is a growing interest in human-computer interaction (HCI) to envision, design, and evaluate
+technology-enabledinterventionsthatsupportusers’emotionregulation.Thisintereststemsinpartfrom
+increasedrecognitionthattheabilitytoregulateemotionsiscriticaltomentalhealth,andthatalackofef-
+fectiveemotionregulationisatransdiagnosticfactorformentalillness.However,thepotentialtocombine
+innovativeHCIdesignswiththetheoreticalgroundingandstate-of-the-artinterventionsfrompsychology
+hasyettobefullyrealised.Inthisarticle,wesynthesiseHCIworkonemotionregulationinterventionsand
+proposeathree-partframeworktoguidetechnologydesignersinmaking:(i)theory-informeddecisionsabout
+interventiontargets;(ii)strategicdecisionsregardingthetechnology-enabledinterventionmechanismstobe
+includedinthesystem;and(iii)practicaldecisionsaroundpreviousimplementationsoftheselectedinter-
+ventioncomponents.WeshowhowthisframeworkcanbothsystematiseHCIworktodateandsuggesta
+researchagendaforfuturework.
+CCSConcepts:•Human-centeredcomputing→HCItheory,conceptsandmodels;
+Additional Key Words and Phrases: Emotion regulation, mental health, technology-enabled intervention,
+review
+ACMReferenceformat:
+PetrSlovak,AlissaAntle,NikkiTheofanopoulou,ClaudiaDaudénRoquet,JamesGross,andKatherineIsbister.
+13
+2023.DesigningforEmotionRegulationInterventions:AnAgendaforHCITheoryandResearch.ACMTrans.
+Comput.-Hum.Interact.30,1,Article13(March2023),51pages.
+https://doi.org/10.1145/3569898
+ThisworkwassupportedinpartbyaUKRIFutureLeadersFellowshipMR/T041897/1(PetrSlovak),NSERCDiscovery
+Grants611474and831538(AlissaAntle),andEPSRCDTPStudentship(NikkiTheofanopoulou).
+Authors’addresses:P.Slovak,N.Theofanopoulou,andC.DaudénRoquet,King’sCollegeLondon;emails:{petr.slovak,
+nikki.theofanopoulou,claudia.dauden_roquet}@kcl.ac.uk;A.Antle,SimonFraserUniversity;email:alissa_antle@sfu.ca;J.
+Gross,StanfordUniversity;email:gross@stanford.edu;K.Isbister,UCSantaCruz;email:katherine.isbister@ucsc.edu.com.
+Permissiontomakedigitalorhardcopiesofpartorallofthisworkforpersonalorclassroomuseisgrantedwithoutfee
+providedthatcopiesarenotmadeordistributedforprofitorcommercialadvantageandthatcopiesbearthisnoticeand
+thefullcitationonthefirstpage.Copyrightsforthird-partycomponentsofthisworkmustbehonored.Forallotheruses,
+contacttheowner/author(s).
+©2023Copyrightheldbytheowner/author(s).
+1073-0516/2023/03-ART13$15.00
+https://doi.org/10.1145/3569898
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 1 End (Direct) ---
+
+13:2 P.Slovaketal.
+1 INTRODUCTION
+Over the past decade, the human-computer interaction (HCI) literature has seen a growing in-
+terest in technology-enabled interventions to support emotion regulation [3–5, 23, 61, 88]. This
+rapid growth is fuelled by several factors, including an increased interest in the possibilities of
+technology-supportinthecontextofmentalhealth[41,62,80,98],theproliferationoflow-cost
+wearablesensorsenablingpotentiallywidelydeployablebio-feedbacksystems(e.g.,[4,75]),and
+the associated focus on combining affective computing and personal informatics agendas (e.g.,
+emotionawarenesssystems[7,42])—seealso[29,80]fortworecentreviews.Anevenmoredra-
+maticexplosionofinterestinemotionregulationishappeningoutsideofHCI.Researchconcerning
+emotionregulationisoneofthefastestgrowingareasinpsychology[39],andemotionregulation
+is now widely understood to be a key protective factor supporting personal well-being [1, 19].
+Indeed,inrecentyears,emotionregulationhasbeguntobeseenasalikelytrans-diagnosticinter-
+ventionacrossarangeofmentalhealthdisorders[17,68,79,83,84].
+MuchoftheexistingHCIworkhasfocusedonexploringthepotentialdesignspaceandestablish-
+ingthepromiseofdigitalemotionregulationsupportacrossarangeofcontextsandpopulations.
+Sofar,however,thepotentialtocombinetheinnovativeHCIinterventionapproachesandstate-
+of-the-art psychological interventions has not yet been fully realised (cf., also [11]). We see this
+asapartofanaturalprogressioncommontomanyemergingHCIfields(e.g.,behaviouralchange
+systems [40], affective computing [13], or personal informatics [29]) whereby the HCI research
+communityprogressivelymovesfromtechnology-ledexplorationsandinteraction-focusedstud-
+iesofproofofconcepts,towardsthedevelopmentofrobustsystemsandevaluationofinterven-
+tionsmeasuringlarge-scale,real-worldimpacts.ThismorematurestageofHCIresearchrequires
+establishingsupportsforaninterdisciplinarycommunityinorderforsuchsystemstobedesigned,
+evaluated,anddeployedwithefficacy.Ouraiminwritingthisarticleistoputforwardoneofthese
+supports.
+In this article, we aim to take stock of the HCI work on emotion regulation so far, synthesise
+and make accessible the breadth of existing work on emotion regulation in psychology, as well
+as suggest promising directions for future research on technology-enabled emotion regulation
+interventionsthattheHCIcommunitycanengageinasthefieldmatures.
+Whilewefocusspecificallyontechnology-enabledemotionregulationinterventionsystemsonly,
+thisreviewandagenda-settingworkshouldbeseenwithinthecontextofotherdiscussionsinthe
+field:theseinclude,forexample,arecentreviewofaffectivehealthandHCI[80],ananalysisof
+howdigitaltechnologiesthatarenotspecifically designedasinterventionsareusedforemotion
+regulation[101],aswellasbroaderanalysesofHCIinthecontextofwell-being[12],behaviour
+change [29], socio-emotional learning [86], and complements a series of recent workshops on
+emotionsandHCIatUbiComp[94]andatCHI[100].Finally,asemotionregulationplaysacrucial
+roleinarangeofmentalhealthaswellasneurocognitivedifferences(suchassensoryprocessing
+and attention deficit hyperactivity disorder (ADHD), see, e.g., [58, 93]), many HCI technologies
+aiming to augment users’ experience in these settings can be seen also as emotion regulation
+interventions(cf.,[16,92]);and,viceversa,researchonemotionregulationinterventioncouldbe
+viewedasdevelopmentofassistivetechnologies(see[55]forthereviewofaccessibilityworkin
+HCItodate).
+In the rest of the article, we encapsulate the synthesis of current—and potential future—HCI
+work on emotion regulation interventions in a three-part framework (see Figure 1), aiming to
+help technology designers separate out decisions on three inter-related aspects of intervention
+development:
+(1) Theory-informed decisions about intervention targets from psychology: i.e., ‘what’ are the
+emotionregulationinterventiongoalsthedesignedsystemcouldaimtoimpact.
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 2 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:3
+Fig.1. Overviewofthethree-partframework,includingkeyquestionsandtherolecomponentscanplayin
+theinterventiondesignprocess.
+(2) Keystrategicdecisionsabouttheinterventiondeliverymechanismsthatshouldbeincludedin
+theirsystem:i.e.,‘how’and‘when/where’caninteractiondesignplayaroleintheinterven-
+tionprocess.Specifically,wehighlightthedifferencesindesigningfordifferentapproaches
+tohowemotionregulationskillscanbedeveloped(experientialvs.didactic);andwhen/where
+suchsupportisoffered(on-the-spotvsoffline).
+(3) Practical decisions around the commonly used design components that represent specific
+implementationsofselectedinterventiondeliverymechanisms(experiential,didactic,offline,
+on-the-spot),e.g.,drawingonorextendingthecurrentbestdesignpracticeasidentifiedacross
+HCIworksofar.
+Each aspect of the framework brings a different contribution to the HCI literature: The the-
+oryaspect aimstoreframeandbringtogetherimportanttheoriesneededtounderpinthedesign
+of technology-enabled interventions from across psychology, in ways that are easily accessible
+toHCIresearchers.Thestrategicaspect introducesfourcomplementarydeliverymechanismap-
+proaches,groundedinpsychology.Thisaimstoorientdesignerstoconsiderdecisionsaroundthe
+rolethattechnologyshouldplayintheinterventionsystem—i.e.,how,when,andwheretechnol-
+ogycomponentscouldaffectusers,ratherthanimmediatelyfocusingonthespecifictechnologies
+thatcanbeusedtodeliverpsychologicalimpact.Finally,thepracticalaspectprovidesasnapshotof
+thecurrentlycommoninterventiondesigncomponentswhichsynthesiseshowsupportforeach
+deliverymechanismisimplementedinexistingwork(bothtechnologicallyandmethodologically),
+andthusalsoallowsustoidentifygapsandpotentialnewresearchareasinthisexcitingspace.
+EXECUTIVESUMMARY
+Given the length of this article—resulting from synthesis across a range of domains and an in-
+depthreviewofexistingHCIwork—westartwithan‘executivesummary’ofourfullargument,
+whilereferringtotherespectivesectionsfordetails.Ouraimisthattheinterestedreadercanpick
+andchoosewheremoredetailisneeded(andreadthecorrespondingsection)andwhereasimple
+overviewissufficient(andthusrelyontheexecutivesummaryonlyforthatpartoftheargument).
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 3 End (Direct) ---
+
+13:4 P.Slovaketal.
+Inparticular,
+—Section2providesanoverviewofthepsychologicalmodelsunderpinningthetheoretical
+partoftheframework.
+—Section3buildsonthesemodelsaswellasthelearningsciencesliteraturetoderivethestrat-
+egypartoftheframework,i.e.,the‘hows’(experientialvsdidactic)andthe‘whens/wheres’
+(on-the-spotvs.offline)ofpossibledeliverymechanisms.
+—Section 4 then outlines a scoping review of existing HCI work on emotion regulation to
+date, to ground the practical component of the framework. We identify and categorise all
+theinteractiondesignsusedforeachindividualdeliverymechanismandthenanalysehow
+theseindividualdesigncomponentsarecommonlycombinedinto‘interventions’inexisting
+HCIwork.
+—Section5finallyhighlightsthegapsweidentifythroughthescopingreviewandshowcases
+howanHCIresearchercouldpickdifferentaspectsofthethreecomponentsoftheframe-
+work(theoretical,strategic,practical)toguidetheirresearchatdifferentlevels,whetherthat
+issupportforaspecificinterventiondesign,anindividualresearchprogramme,orbroader
+fieldbuilding.
+TheoryPartSummary(Section2)
+Psychologyliteratureprovidesausefulsetoftheory-driveninterventiontargets:i.e.,welldefined
+conceptual processes that technology-enabled interventions could aim to affect. We highlight
+Gross’ProcessModelofEmotionRegulation[38],whichallowsdesignerstothinksystematically
+about how emotions are generated from ‘person-situation’ interactions, the approaches users might
+taketoimpacttheiremotions,andprovidesasetofclearinterventionpointstotarget.
+Inparticular,theProcessModeldifferentiatestheintertwinedprocessesofemotiongeneration
+and emotion regulation. Emotion generation is a result of: people encountering, consciously or
+subconsciously attending to, evaluating, and responding to internal (e.g., a memory/thought) or
+external (e.g., workplace disagreement) situations. In contrast, emotion regulation occurs when
+peopleevaluatetheircurrentemotionalstaterelativetotheirgoalsanddecidetomodifythem(or
+not).Specifically:
+—The process of emotion regulation is seen as proceeding in four stages: identification (of
+theneedtoregulateone’semotion),strategyselection(fromthefivefamiliesbelow),imple-
+mentation(ofaparticularinstanceofastrategywithinthecurrentcontext),andmonitoring
+(whethertocontinue,stop,orchangeERstrategy).
+—ThefivefamiliesofspecificERstrategiesthensynthesisethecommonapproachesthatpeo-
+plecandrawontoup-/down-regulateanemotionatagivenmoment,eachcorresponding
+toanappropriatestepintheemotiongenerationmodel(situationselection,situationmodifi-
+cation,attentionaldeployment,cognitivechange,responsemodulation).
+Individualtechnology-enabledinterventioncomponentscanthusfocusoneitherprovidingsup-
+portforanyspecificstrategy(e.g.,cognitivechange)and/ortheoverarchingemotionregulation
+stages(e.g.,supportingemotionalawarenesstoenhancetheidentification/monitoringstage).We
+note, however, that the evidence from existing clinical programmes suggests interventions are
+mostlikelytobeeffectiveiftheysupportarangeofemotion-regulatoryprocesses(ratherthanasin-
+glesetofisolatedinteractionsorstrategies),suggestingtheneedtocombinemultiple(technology-
+enabled) intervention components into a broader intervention package if real-world impact on
+users’ERcapabilitiesisakeyconcern.
+Another important implication from the psychological literature is that learning to regulate
+emotionsisbestthoughtofassupportingthedevelopmentofanembodiedskill(ratherthan,say,an
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 4 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:5
+‘informationdelivery’problem).Fromtheinteractiondesignperspectivethismeansthattheability
+ofthesystemtoeitherhelpelicittargetemotionsthroughaninteractiveexperience,ortosupport
+users during everyday emotional situations is often crucial to help users develop their emotion
+regulationcapabilitiesfully,andtosuccessfullytransferthenewknowledgetoeverydaysettings.
+StrategicPartSummary(Section3)
+Itisunlikelythat—asHCIresearchers—wewouldaimatcontributingtothefundamentalunder-
+standing of intervention targets or psychology of emotion. Instead, our main contribution will
+likelylieinenvisioningnewwaysinwhichthesetheory-driveninterventiontargetscanbescaf-
+foldedthroughinnovativeinterventiondeliverymechanisms.
+The strategic component of the proposed framework thus aims at helping guide designers in
+decidinghow,when,andwheretheinterventionsupport couldbemosteffectivelyofferedthrough
+technology.Inparticular,webasethestrategycomponentsonlearningsciencesliteraturetoen-
+courage HCI designers to think about delivery mechanisms in the context of their role in the
+interventionprocess(i.e.,when,where,andhowthedesignscaffoldsparticipants’learning),rather
+thandefiningtheinterventionapproachesinthecontextofspecifictechnologiesorinterface-level
+characteristics:
+—The hows partof the framework distinguishes thetype of skills acquisitionapproach an in-
+terventioncomponentsupports:ithighlightsthedifferencebetweendidacticlearning(such
+as the information delivery based approach commonly used in school and delivered e.g.,
+through reminders) and experiential learning (such as the trial & feedback approach com-
+monlyusedinmindfulnessanddelivered,forexample,throughbiofeedback).
+—Thewhens/wherespartoftheframeworkthenhelpsthedesignersthinkabouttimingandcon-
+textsinwhichinterventionsupportisprovided throughtechnology:distinguishingbetween
+‘offline’training(suchasinterventionsupportinatherapistofficeoranonlinemodule);and
+‘on-the-spot’ learning (i.e., intervention support provided during everyday emotional situa-
+tionsin-situ).
+Wenotethatanyresultinginterventioncouldbecomposedofmultiplecomplementarydeliv-
+erymechanismcomponents:forexample,agame-basedbio-feedbackintervention(suchas[51])
+canbeseenasutilisingan‘offline’deliverymechanismthroughthegame(whichisusedtogen-
+erateemotionsoutsideofeverydaysituations),andan‘experiential’mechanism(byinvolvingthe
+biofeedbackloop),aswellasperhapsa‘didactic’component(if,forexample,theparticipantsfirst
+engageinpsychoeducationbeforethegamestarts).
+AsarguedinmoredepthinSection5,weproposethatthisconceptualstructurecanenablea
+modular thinking about intervention design (including a ‘dictionary’ of common design compo-
+nents outlined in the next section) which provides a framework for the community to develop
+anempiricallygroundedunderstandingof‘whatworks’foreachtypeofdeliverymechanismand
+promotescross-projectinspirationacrossHCIandpsychologyresearchteams.
+PracticalPartSummary(Section4)
+Theroleofthepracticalpartistoprovidethedesignerswithasynthesisoftheexistingworkon
+emotionregulationtechnologiesinHCItodatetoguidepracticaldecisionsonpossibleimplemen-
+tationsofselecteddeliverymechanisms,aswellastohelpidentifyareasinwhichcurrentsolutions
+needimprovementoraremissing.Inotherwords,thepracticalcomponentcomprises:
+(1) Asynthesisofthecommonlyusedinterventiondesigncomponentsusedtosupporteachtype
+ofdeliverymechanismwithinexistingHCIwork(i.e.,a‘dictionary’oftechniquesusedso
+farforexperiential,didactic,offline,on-the-spotsupport).
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 5 End (Direct) ---
+
+13:6 P.Slovaketal.
+(2) Anoverviewofhowthesedesigncomponentsarecurrentlycombinedintointerventions(i.e.,
+whichcombinationsofdeliverymechanismsandtheirimplementationsalreadyhavebeen
+exploredintheliterature).
+(3) AnoverviewoftherangeoftheERtargets withinthecurrentwork(i.e.,whichofthefour
+ERstages/fivefamiliesofERstrategieshavebeensupportedsofar).
+Incontrasttothetheoryandstrategicpartsoftheframework,thepracticalpartwillalwaysbe
+justa‘snapshot’intimeandwillrequireongoingupdatestoincorporatenewlypublishedwork.
+The descriptions that follow are based on a scoping review including articles published in HCI
+literature between January 1 2009 and December 8 2021 (cf., [67]), as primarily indexed across
+ACMdigitallibraryandIEEE,andcomplementedwithanadditionalGoogleScholarsearch.
+NOTE-Theauthors(i)willupdatethereviewforcamerareadyversion;aswellas(ii)maintainanup-to-date
+databaseofarticlesforatleast5yearsafterthepublicationonOSF(aspartofSlovak’sFLFfellowship).
+Design Components. Overall, the analysis shows that the existing work in HCI is, so far, rela-
+tivelycoherentwithonlyasmallnumberofinteractiondesignapproachessupportingeitherthe
+typeofskillacquisitionapproach(didacticvsexperiential;i.e.,‘hows’)ortheinterventiondelivery
+(on-the-spotvsoffline,i.e.,‘whens/wheres’).
+—Forthe‘hows’,experientialdesigncomponentsfocuspredominantlyonbio-feedbackorim-
+plicittargetfeedback (i.e.,nudgingtheusers(sub-)consciouslytowardparticularphysiolog-
+icalstatesthroughhapticinteraction).Incontrast,didacticinterventioncomponentsdraw
+onreminder-recommender systems(i.e.,suggestingspecificERstrategiestousers),facilitate
+emotionawareness(e.g.,promptinguserstothinkabouthowtheyfeeland/orfelt),andrely
+on traditional cognitive models restructuring (often based on established psychoeducation
+approachesfromexistingtherapieswithlimitedadditionaltechnologysupport).
+—For the ‘whens/wheres’, the offline design components aim to use interactivity to create a
+bespokeemotionregulationloop(e.g.,usingavideogametoelicitfeelingsofstresswhile,at
+thesametime,providingothersupportsuchasabiofeedbacklooptodown-regulatethose
+feelings);tofacilitaterelaxationtrainingsupport (similartoabovebutwithouttheemotion
+generationcomponent);andtoscaffoldusers’reflectionbyvisualisingpatternsofemotions
+overtime (e.g.,byshowingatimelineofphysicallocationsandemotionsfeltateach).The
+on-the-spotcomponentsthendrawonarangeofinterventiontriggers(tostartand/orsupport
+users’ in-the-moment emotion regulation process), and can offer either single-point (e.g.,
+reminder)orongoingsupport(e.g.,hapticfeedbackthroughoutastressfulexperience).
+How are These Combined into Interventions? When looking at how these intervention design
+components are combined into final systems the existing work clearly clusters into three main
+researchareas,asoutlinedbelow.
+—impliciton-the-spotsupport (e.g.,providingatargetbreathingratethroughhapticinput;ex-
+periential+on-the-spot);
+—bio-feedback games (e.g,. embedding a biofeedback component into stressful gaming as a
+visualoverlay;experiential+offline);and
+—reminder-recommenders & awareness systems (e.g., push notifications suggesting ER strate-
+gies;didactic+on-the-spot).
+Interestingly, these approaches are mostly independent from each other as they draw on dif-
+ferent background literature, intervention goals, and technological components. This clustering
+alsoneatlyfollowstheassociatedcombinationofuseddeliverymechanismapproachesaswellas
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 6 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:7
+consistentcombinationsofcomponentswithineachcluster(i.e.,designcomponentsusedinone
+cluster,e.g.,implicitfeedbackorrecommenders,arerarelyutilisedinotherclusters).
+Overall,theseobservationssuggestthattheworksofarhasbeenfragmentedalongtechnology-
+specific sub-domains (e.g., biofeedback, reminders) rather than the focus on ER intervention as-
+pects. This suggests an under-utilised opportunity to combine and build on existing knowledge.
+Additionally—asistraditionalinHCI—thecontributionofmanyofthearticlestodateisaimedat
+earlystageexplorationofinnovativedesignspaces,ratherthanlargescaledeploymentsorexperi-
+mental/randomisedcontrolledtrialsthatwouldberequiredtotesttheeffectsofdesignedsystems
+on changes in emotion regulation skills (cf., [80]). As such, while we are starting to develop an
+understandingofwhichinteractiondesignmechanismsareengagingfortheusers,thefieldstill
+lackssubstantivedataonlong-termefficacyoftheindividualtechniquesandtheirimpactonusers’
+everydayemotionregulation/well-being.
+CommonERTargets. ThereisasimilarlackofdiversityoffocuswhenlookingattheERinter-
+vention targets (i.e., the ‘whats’): the majority of work across implicit on-the-spot support and
+bio-feedbackgamesareastargetstheresponsemodulationfamilyofstrategies.AnyadditionalER
+strategiesareintroducedthroughsimplepsychoeducationcomponents(e.g.,basedontraditional
+CBT),mostlywithoutaddedtechnologysupport.Thereminder-recommenderandawarenesssys-
+temsmostlydonotteachorsupportspecificemotionregulationstrategies,butinsteadfocuson
+supportingidentificationand/orsituationselectionasaspecificstrategy,orsimplypointtoarange
+ofpossibleERstrategieswithoutfurtherscaffolding.
+Importantly,themajorityofarticlesacrossourwholesample(31/36)assumethatthedeveloped
+systems have to provide an on-going support for the intervention to be effective; and thus that
+theeffectswoulddisappearifthesystem(suchasawearablefeedbacksystem)wereremoved.In
+other words, most of the existing HCI systems approach emotion regulation as something that
+requireson-goingtechnologicalscaffolding,ratherthanaskillthattheusercoulddevelop(witha
+temporarytechnology-enabledintervention).
+ResearchAgendaandEnvisionedFrameworkUse(Section5)
+Theproposedframeworkisourwayofcommunicatingboththeunderstandingofwhathasbeen
+donesofar(cf.,Section4)andawayofhelpingshapefutureresearchattheintersectionoftheHCI
+andpsychologyfields(Section5).Weshowhowthethreepartsoftheinterventiondevelopment
+framework(theory,strategic,practical)canbeapplied—separatelyortogether—asdesignlensesto
+identifygapsinexistingwork,informnewprojects,andsupportongoingsynthesisofworkacross
+therangeofdisciplinesandpossibleresearchthreads.Section5describesthreesuchapplications:
+ERTargetsGaps. First,wefocusonthegapsintechnologicalsupportforpossibleERtargetsand
+psychologicalimpactofoursystems(theory&practical).Weidentifythreekeythemes:thelack
+oftransfersupport (i.e.,onlyafewsystemssofardesignedtoempoweruserstodevelopemotion
+regulation competence); uneven support for ER strategies (i.e., predominant focus on supporting
+responsemodulation,whilestrategiesinsupportofotherERstrategiesremainunder-researched);
+andlackofefficacydata(i.e.,wehaveonlyverylimitedunderstandingoftheactualpsychological
+impactoftheHCIsystemsdesignedsofar).
+Intervention Mechanism Gaps. Second, we foreground the gaps in our knowledge of effective
+supportforeachinterventiondeliverymechanism(strategyandpractical).Foreachofthefourde-
+liverymechanisms(didactic,experiential,on-the-spot,offline)wesuggest2–3researchquestions
+thathaveyettobeaddressedincurrentworkbutare—inourminds—crucialforfullydeveloping
+thepotentialoftechnology-enabledinterventionsupport(seeSections5.2.1–5.2.4).Forexample,
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 7 End (Direct) ---
+
+13:8 P.Slovaketal.
+theexperientialmechanismquestionspointtothelackofresearchonsupportingperformativeas-
+pectsofwell-knownadaptiveERstrategies(e.g.,cognitivechange,attentionaldeployment);andthe
+limited research on how technology could directly scaffold and/or guide users through the emotion
+regulationexperiencein-situ.
+Connecting Interdisciplinary Communities. Finally, we argue that—within such an inherently
+interdisciplinary space—it is important to support practitioners at varying scales of granularity,
+recognisingtheimportanceofresearchengagementatalllevelsofinterest,resources,andresearch
+goals(e.g.,fromin-labtechnologyinnovationthataimstoshowcaseaproof-of-conceptforanew
+interactionmechanism;toreal-worldlargescaleinterventiondeploymentsthataimtounderstand
+robustinterventionefficacyacrossusercontexts).Weprovideonepossibleoutlineofstructuring
+suchprogressionfrom earlyHCIinnovationworktopsychologicalapplication,andpointtoex-
+amplesfromotherdomainsinwhichsimilarapproacheshavebeensuccessfullyemployed.
+2 THEORYCOMPONENT—EMOTIONREGULATIONMODELS(THE‘WHATS’)
+Emotionregulationisbroadlydefinedas‘thesetofstrategiesthatindividualsmayusetoincrease,
+maintain or decrease their affective experience, including the feelings, behaviours or physiological
+responses thatmake up a given emotion[37]’. The purposeof thissection is not to provide a full
+reviewofallthatisknownaboutemotionregulation,asthatissimplyinfeasiblegiventheincred-
+iblegrowthoftheliteratureofthelasttwodecades;see[19,28,50,82,85,90]forrecentreviews.
+Instead, we aim to synthesise key aspects of the most widely cited1 emotion regulation model—
+Gross’ Process Model of Emotion regulation [36]—especially insofar as these can be generative
+for the design of emotion regulation technologies and help prepare ground for the psychology-
+informedmappingofexistingHCIsystemsinthenextsection.
+ThechoiceoftheProcessModelhasbeenmotivatedbothbyhowwidelyitisusedintheliter-
+aturetodate(cf.,recentoverviewinAnnualReviewofPsychology[82]);aswellasitsfocuson
+theunderlyingmechanismsofemotiongenerationandemotionregulation,whichprovideauseful
+conceptualframeworkforthedesignconsiderations.
+2.1 PsychologicalModelofEmotionRegulation
+Thereisabroadagreementthatemotions:
+(1) involveperson–situationtransactionsthatcompelattention;
+(2) havemeaningtoanindividualinlightofcurrentlyactivegoals,and
+(3) giverisetocoordinatedyetflexible‘fullbody’responses(i.e.,involvingcognitive,behavioural,
+andphysiologicalcomponents)thatmaymodifytheongoingperson–situationtransaction
+incrucialways.
+Gross’smodeldistinguishesbetweenemotiongenerationandemotionregulation[101].During
+emotion generation people encounter, attend to, appraise and respond to situations. Figure 2
+showshowthesefeaturescanbesynthesisedintoauseful,ifsimplifiedmodelofemotiongeneration
+(cf., [38]): The respective situation must be consciously or unconsciously attended to (attention)
+and then evaluated in light of an individual’s active goals (appraisal), which then gives rise to
+theassociatedchangesinsubjective,behavioural,andphysiologicalresponsethatweperceiveas
+emotion(response).Incontrast,emotionregulationoccurswhenpeopleevaluatetheircurrent
+emotionalstaterelativetotheirgoals,anddecidetomodifythem(ornot).Iftheychoosetomodify
+1Theresearchonthismodelwasreviewedinmajorpsychologyjournals—forexample,PsychologicalInquiry[38]and
+AnnualReviewsofPsychology[82]—andthesetworeviewarticlesalonehavereceivedmorethan3,500citationsbythe
+endof2021.
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 8 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:9
+Fig.2. TheProcessModelofEmotionRegulation,includingemotiongenerationandtheassociatedfamilies
+ofERstrategies(adaptedfrom[59],withpermission).
+theirstatetheyselectaparticularstrategytouse,implementitwithcontext-specifictactics,and
+thenmonitortheprocessandoutcomes,possiblyrepeatingoneormoreofthesesteps[38].
+This model is useful because it describes five families of ER strategies that people can use to
+regulate emotion based on when in the cycle they intervene in the emotion generation process
+(seeSection2.2).Withineachfamily,strategiescanbeadaptiveormal-adaptivewithinthespecific
+context,dependingonanumberoffactorsincludingeffectsofshortandlongtermuse(e.g.,binge
+watchingaYouTubeseriesmightbeadaptiveinitiallyafteranegativelifeevent,butifcontinued
+wouldhavelongertermnegativeimpacts,suchassocialisolation,reducedworkproductivity,and
+lesstimetodevelopotheradaptivestrategies). Wenotethatwhilethe‘psychologicallyrelevant
+situations’mentionedinthemodelcanoftenbespecifiedbyreferringtofeaturesoftheexternal
+environment (e.g., seeing a tree in the middle of the slope at the last moment while skiing; or
+watchingawell-madehorrormovie),itisalsopossibleforpsychologicallyrelevant‘situations’to
+beinternal(e.g.,thesneakingsuspicionthatI’llneveramounttoanything).
+Beforemovingontooutlinetheemotionregulationprocessesinmoredetail,itisimportantto
+highlightakeycharacteristicwhichisembeddedinthedefinitionabove:arisingfromthe‘person–
+situation interchange’, emotions are transient, and thus are often difficult to elicit without rein-
+stating the corresponding situation in full. For example, remembering your last skiing line or a
+roller-coaster ride is very different to actually doing it; which is one of the reasons why skiing
+resortsandadventureparksarestillinbusiness.
+Aswewilldiscussinmoredetaillater(Section3.1),thisexperientialandsituation-dependent
+natureofemotionhascrucialimplicationsforemotionregulationinterventions:learningtoregu-
+lateone’semotionsrequireshavingaccesstotheemotionsthataretoberegulated (inthesameway
+aslearningtoskirequiresbeingontheslopes).Asemotionsarehardto‘re-live’,theneedtoeither
+elicit appropriate emotions during ER training or support in-situ application of ER strategies is
+oneofthekeydifficultiesinterventionprogramsface.Italsosignpoststheintertwinedissuesof
+emotiongenerationandemotionregulation,whichweturntointhenextsection.
+2.2 WhataretheBasicEmotionRegulationProcesses?
+Emotionregulationoccurswhenthereisanactivationofagoalthatrecruitsoneormoreprocesses
+toinfluenceemotiongeneration(cf.,[38,82]).Inwhatfollows,wewillfocusonsituationsinwhich
+thetargetoftheregulatorygoalisthepersonwhoexperiencestheemotions(i.e.,intrinsicemotion
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 9 End (Direct) ---
+
+13:10 P.Slovaketal.
+regulation),ratherthanaimingtoinducechangeinsomeoneelse(i.e.,extrinsicemotionregulation,
+suchaswhenparentsscaffoldachild’semotionalexperiences).Wenotethatsuchregulationcanoc-
+curforavarietyofreasons:peoplemightchoosetoup-regulatepositivestates,down-regulateneg-
+ativeemotions,orgenerallyregulatetheiremotionsforinstrumentalreasons(e.g.,up-regulating
+angerduringaconflictsituation).Finally,animportantdistinctionisbetweenERprocessesthat
+are effortful and consciously enacted (i.e., explicit ER) and ER processes that are automatic and
+occuroutsideofpeople’sawareness(i.e.,implicit ER).Thekeycomponentsoftheprocessmodel
+ofemotionregulationmodelhavebeendescribedindetailinmanyotherarticles—wereferthe
+readerto,e.g.,[39]forafulldescriptiontocomplementthedeliberatelysuccinctoverviewbelow
+andtheillustrationinFigure2.
+2.2.1 Overarching Emotion Regulation Process. In summary, emotion regulation is seen as a
+dynamic,ongoingvaluationprocesscomprisedfourmainstages,whichfeedintoeachother–see
+theouterlayerinFigure2:
+—First is the identification stage, which is involved in making the very general decision of
+whethertostartregulatingornot.
+—Adecisiontochangeanemotionstateleadstotheselectionstage,whichdecideswhichof
+currently available general 5 families of emotion regulation strategies is to be used: situa-
+tion selection, situation modification, attentional deployment, cognitive change, response
+modulation(seethemiddlelayerinFigure2;andthenextsubsectionfordetails).
+—Onceaparticularfamilyofstrategieshasbeenselected,theimplementationstageinvolves
+decidingwhichspecificregulatorytactic(e.g.,distractionwithinattentionaldeployment)to
+activate.
+—Theidentification,selection,andimplementationarecomplementedbythemonitoringsys-
+tem,whichdecideswhethertocontinue,tostopregulating(asthegoalhasbeenachieved),
+ortoswitchregulationtypefollowinginitialimplementation(e.g.,ifthedistractiontacticis
+notworkingandanotherstrategyneedstobetriedout).
+For example, difficulties in identification would relate to lack of emotional awareness and/or
+interoceptiveawarenessofbodilychangesrelatedtorespectiveemotion,resultingintheperson
+either over-regulating even subtle signs of emotional states (such as during an anxiety attack),
+ornotbeingawareoftheneedtoemotionregulate(suchasnotbeingawarethatoneislashing
+outatothers).Issuesinselectionmightincludelimitedrepertoireofavailableemotionstrategies,
+whether this is due to habitual selection of maladaptive approaches (such as suppression) or to
+the lack of knowledge of alternative strategies (e.g., unaware of cognitive reappraisal). Difficul-
+ties in implementation can comprise lack of ability to execute a selected tactic successfully (e.g.,
+attemptingcognitivereappraisalmightfailifnousefulalternativedescriptionofthesituationis
+found),orjustbeingoverwhelmedbytheemotionandabortingtheselectedtechnique(e.g.,inabil-
+itytodistractoneselffromahurtfulmemory).Finally,failureinthemonitoringsystemcaninvolve
+switchingtacticstooearly(whichmighthaveworkedifcontinued),ornotstoppingmaladaptive
+regulatorytacticsearlyenough(suchasengaginginrumination).
+2.2.2 EmotionRegulationStrategiesandTactics. Thefivefamiliesofemotionregulatorystrate-
+giesthatcouldbeimplementedaresituationselection,situationmodification,attentionaldeploy-
+ment,cognitivechange,responsemodulation—seethemiddlerowoflabelsinFigure2.Notethat
+these clearly correspond and are differentiated by the stage in the emotion generation process
+(situation, attention, appraisal, response) that is being targeted by those strategies. Each family
+thencomprisesarangeofpossiblestrategiesthatcanbeutilisedassituation-specifictacticstoad-
+dressthesituationthatapersonfacesataparticularstageinemotiongeneration.Following[39]
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 10 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:11
+and [82], we now briefly describe each of the families of strategies using the definitions and ex-
+amples from prior work for clarity, as well as positioning some of the best established emotion
+regulationstrategieswithineachofthefamilies(cf.,[1]).
+—Situation selection includes efforts to change the full emotional experience at the earliest
+stage,suchasnotchoosingtoengagesituationsthatmightinduceunwantedemotions.Ex-
+amplesincludeavoidingameanco-worker,orarrangingtoseeanupliftingmovie,orchoos-
+ing to scroll on one’s phone rather than engaging with others at a party. One commonly
+usedstrategyforsituationselectionisavoidancewherethepersonischoosingashort-term
+relief through avoiding potentially emotionally risky activities (such as never disagreeing
+with colleagues due to fear of dealing with conflicts). If used excessively, however, avoid-
+ance is seen as an example of a mal-adaptive emotion regulation strategy, with long-term
+costsoutweighingtheshort-termbenefits.
+—Situation modification refers to attempting to change external features of a situation, with
+the goal of changing its emotional impact. Examples include filing away a rejection letter
+ratherthankeepingitfullyinview,orshorteningthetimespentwithacolleaguewhomakes
+youuncomfortable,orblockingatoxiccontactonTwitter.Acommonsituationmodification
+strategyoftenpresentacrossarangeofinterventionsisproblemsolving,whichisseenasa
+consciousefforttochangeastressfulsituationorcontainitsconsequences.
+—Attentional deployment moves from trying to modify external features of the situation to
+modifying early information processing that relies on attention. One common strategy is
+distraction,whichredirectsattentionwithinagivensituation(suchasfocusingonaneutral
+ratherthanemotion-elicitingaspectofamoviescene),orshiftinginternalfocusawayfrom
+thepresentaltogether(e.g.,thinkingaboutyourafternoonplansratherthanengagingina
+frustratingmeeting).Inbothsuchcases,shiftingownattentionawayfromemotionallygen-
+erativeaspectsofthesituationleadstoimpactsthatactveryearlyintheemotiongenerative
+process,beforetheemotionalstatescangainfullstrength.
+—Incontrast,cognitivechangereferstomodifyingone’sownappraisalofthesituationinorder
+toalteritsemotionalimpact,i.e.,themeaningthatweascribetotheimpactofthesituation
+onourgoals.Sometimes,cognitivechangeisappliedtoanexternalsituation(e.g.,“Itisokay
+to fail this interview, I will learn a lot about the industry regardless.”). At other times, the
+cognitivechangetargetsaninternalsituation(e.g.,‘Myracingheartisnotasignofpanic,
+butrathertheexcitementbeforeanimportantpresentation.’).Aparticularlywellresearched
+strategyisreappraisal,whichtargetseitherthemeaningofapotentiallyemotion-eliciting
+situation(e.g.,“Althoughmyfriendistakingalongtimetorespondtoatextmessage,itmust
+bebecausesheisbusyandnotbecausesheisignoringme.”),ortheself-relevanceofapoten-
+tiallyemotion-elicitingsituation(“Thiseventdoesn’tdirectlyinvolvemeoranyoneIlove.”).
+Another well-known strategy is non-judgemental acceptance of emotional states, which is
+based on a present-centred awareness in which thoughts, feelings, and sensations are ac-
+cepted as they are. Acceptance is often hypothesised as a core component of mindfulness
+interventions(see,forexample,[32]).
+—Finally,responsemodulationreferstodirectlyinfluencingexperiential,behavioural,orphys-
+iological components of the emotional response after the emotion is well developed. Ex-
+amples include using alcohol, cigarettes or drugs to alter emotional state, or relying on
+deep breathing and exercise to change one’s physiological responses. A particularly well-
+researchedstrategyinthiscategoryissuppressionwhichreferstoongoingeffortstoinhibit
+one’semotionsandemotion-expressivebehaviourandwhichhasbeenlongseenasamal-
+adaptiveresponsetostressors(cf.,[1,82]).
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 11 End (Direct) ---
+
+13:12 P.Slovaketal.
+Thereissubstantialresearchonthespecificstrategiesbehindeachofthesecategories(cf.,[39]).
+Forexample,muchisknownaboutthedifferentialusageofstrategiesindifferentcontexts:reap-
+praisal(aspartofcognitivechangecategory)ishighlyconstructiveduringlowintensityandlong-
+termER;whereasattentionaldeploymentisoftenmoreeffectiveforhighlyemotionallycharged
+situations[33].Similarly,substantialresearchhasfocusedonthelongertermimpactofadaptive
+and maladaptive strategies (cf., [1] for a review), such as the associations between habitual sup-
+pressionandavoidanceuseandelevatedpsychopathology.
+2.3 ArticulatingtheTheoryFrameworkComponent–The‘Whats’
+ThepsychologicalmodeloutlinedinSection2providesanexcellentstructureforthinkingsystem-
+aticallyabouttheintertwinedprocessesofemotiongenerationandemotionregulation,therange
+of cognitive processes involved in emotion regulation attempts, and the specific strategies that
+couldbesupportedbytechnology.Specifically:
+—Emotiongenerationisaresultof:peopleencounteringaspecificsituation,consciouslyorsub-
+consciouslyattendingtoit(ornot),appraisingitsassumedimpact(i.e.,evaluatingincontrast
+toowngoals),andrespondingtoitbypotentialchangeinperceivedemotion.Theprocesses
+ofemotiongenerationarethekeysubstrateonwhichemotionregulationprocessesoperate,
+by affecting the subsequent emotion generation cycles: situation – attention – appraisal –
+response.
+—The process of emotion regulation is seen as proceeding in four stages: identification (of
+needtoemotionregulate),strategyselection(fromthefivefamiliesdescribedabove),imple-
+mentation(ofaparticularinstanceofastrategywithinthecurrentcontext),andmonitoring
+(whethertocontinue,stop,orchangeERstrategy).Inotherwords,thedistinctionbetween
+identification, selection, implementation and monitoring stages describes how the emotion
+regulationprocessisstarted,executed,andeventuallyceased.
+—Finally,thefivefamilies ofemotionregulationstrategies (situationselection,situationmod-
+ification, attentional deployment, cognitive change, response modulation) then synthesise
+the common approaches that people can implement to up-/down- regulate an emotion
+at a given moment, each corresponding to an appropriate step in the emotion generation
+model.
+3 STRATEGYCOMPONENTS:HOWS,WHENS,ANDWHERESOFEMOTION
+REGULATIONSUPPORT
+Theprocessmodelprovidesaframeworktothinksystematicallyabouttheapproachesonemight
+take to change a person’s emotions and a set of clear intervention targets and strategies. This
+sectionbuildsonthistheoreticalframeworktooutlinehowemotionregulation—asanembodied
+skill—can be trained. For example, what are the intervention approaches that can help a person
+alter theirpredominant strategies(especiallyif theseare already highly habitualised)? How can
+such process be supported externally, i.e., what are the approaches to help people change their
+emotionregulationpracticeandhowcanthesebemanualised(developedintoreplicabletraining
+practices)enoughtoturnintogenerallyapplicableinterventions?
+In what follows, we combine an overview of learning sciences theory with examples of exist-
+ingnon-technologicalERinterventionsfromclinicalpsychologytoarticulatethestrategypartof
+the framework: unpacking the approaches to ‘how’ emotion regulation can be developed (i.e., ex-
+perientialvsdidactic);andwhenandwherelearningsupportcanbeoffered inemotionregulation
+interventions(i.e.,offlinevs.on-the-spot).Theoverallaimofthisframeworkcomponentisthen
+to help guide designers in thinking about the use of technology in the context of its role in the
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 12 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:13
+skillsdevelopmentprocess:i.e.,when,where,andhowthedesignscaffoldsparticipants’learning—or
+applicationof—emotionregulationskills.
+3.1 EmotionRegulationasa‘SkillDevelopment’
+Itisprobablyintuitivelyclearthatlearningtoexplicitlyregulateemotionsrequiresanunderstand-
+ingofwhatstrategiescanbeused(‘knowledge’)aswellashowtoenactthosestrategiesastactics
+inaspecificcontext(‘performance’).Thatis,emotionregulationisnotonlyamatterofhavingthe
+sufficientinformation:tellingsomeoneto‘calmdownandbreathe’duringanangryoutburstisof-
+tennomoreusefulthentellingachildto‘justkeeptheirbalance’whilstsendingthemdownahill
+onafirst-everbikeride.Inotherwords,knowingwhatoneshouldorcoulddoisnotenough;one
+hastobeabletoexecutetheselectedactionssuccessfully.Intheterminologyoflearningsciences,
+emotionregulationisaskill:“anabilitythatallowsagoaltobeachievedwithinsomedomainwith
+anincreasinglikelihoodasaresultofpractice” [78].
+Twoapproachestoskillsdevelopment. Whilemanyofthelearningprocessesapplytoallkinds
+ofskills,traditionalmodelsoflearningdistinguishbetweentwobroadcategories:intellectualand
+performativeskills.Byan‘intellectualskill’theliteratureunderstandsaskillwhosegoalispredom-
+inantlysymbolic(suchasplayingchessorsolvingamathematicsproblem).Incontrast,a‘perfor-
+mativeskill’isaskillwhosegoalisnonsymbolic(suchasplayingamusicalinstrument,cycling,or
+playingtennis).Oneofthekeydifferencesbetweenintellectualandperformativeskillsisinhow
+thenecessaryknowledge—andthusalsotheinstructionsusedtoteachothers—canbeencodedin
+wordsandwell-definedprocedures:Cognitive’didactive’ approaches,includingexplanationand
+workedexamples,areoftenusedfordevelopingsymbolicskills(e.g.,learningthemultiplication
+procedure in math; cf., [2]). In contrast, developing nonsymbolic skills often draws heavily on
+moreexperientialapproaches(e.g.,therepeatedattemptsatforehandshotsintennis,cf.,[105]).
+WheredoesERfit? Positioningemotionregulationalongthesymbolic–nonsymbolicdimension
+is an interesting problem. On one hand, the goal of emotion regulation is clearly nonsymbolic,
+insofar as it is aimed at altering a bodily response to a particular person-situation context; it is
+performative. On the other hand, a substantial part of how such nonsymbolic goal is achieved
+reliesoncognitiveprocesses—includingversionsofcognitivechange(e.g.,re-appraisal),explicit
+attentional deployment, or acceptance—which are often symbolic (using words to re-frame our
+perceptionofthesituation,forexample),andthusitalsorequiresintellectualskillsdevelopment.
+Thisthenhasasubstantialimpactontheprocessofskillacquisition,andthusalsoonhowweas
+designersshouldthinkaboutprovidingtechnology-enabledsupportaspartofemotionregulation
+interventions.
+How is ER trained in existing interventions? In the next section, we showcase two ways of ad-
+dressingthisdualnatureofemotionregulation,drawingonestablishedinterventionprogramsin
+clinical psychology for examples of the learning acquisition approaches. This includes interven-
+tionsthatplaceastrongerfocusonthedidacticlearning traditionallyappliedforsymbolicskills
+(Section3.3);andthosethatrelyonamoredirectexperientialinvolvementandfeedback,tradition-
+allyappliedtononsymbolicskills(Section3.2).Wenotethatananalogoustensionbetweenrelying
+on didactic vs experiential approaches is also mirrored in most of the technological systems we
+willreviewinSection4.
+3.2 ExemplarERInterventions–DidactictoExperiential
+We selected the two exemplars—Emotion Regulation Therapy (ERT) [60] and Unified Protocol
+for Transdiagnostic Treatment of Emotional Disorders (UP) [27, 79]—as two cutting-edge,
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 13 End (Direct) ---
+
+13:14 P.Slovaketal.
+evidence-based interventions that draw on traditional therapy approaches (such as CBT) while
+positioningemotionregulationtechniquesatthecoreoftheprogramme.2
+What is taught? ERT and UP are multi-week programs, with a wide range of interdependent
+skillstaught.Forexample,ERTincludeslessonsonemotionawareness,self-monitoringandcue
+awareness, mindful attention, emotional acceptance (reducing rumination/avoidance), cognitive
+distancing,arangeofreappraisaltechniques(realistic,positive,compassionate),aswellasinclud-
+ing exposure therapy where available (i.e., where the fear stimulus is available within therapy
+sessionsand difficultto avoid, such as specificphobias)—see[60] for details. Each of thesetech-
+niques has a number of associated exercises, often relying on metaphors and psychoeducation.
+InthecontextofGross’model,thetechniquestaughtspanallfivefamiliesofemotionregulatory
+strategies(situationselection,situationmodification,attentionaldeployment,cognitivechange,re-
+sponsemodulation),aswellasalltheregulatorystages(identification,selection,implementation,
+andmonitoring).
+Howaretheseskillstaught? Theseinterventionspredominantlydrawonthedidactic,symbolic
+skillsdevelopmentapproach,whichisthencomplementedwithexperientialpracticewherepos-
+sible:startingfromcognitivepsychoeducation—ideallyleadingtoanovelinsightforthelearner—
+thatisfollowedupbystructuredpracticewithinthetherapeuticsession(e.g.,onrecalledmemories)
+andthenexpectedtogeneralisethrough(oftenunscaffolded)practiceindailylife.Forexample,the
+generalstructureofanytreatmentsessionwithintheUPprotocol(cf.,[57,p.xxiv]showcasesthe
+commonprogressionandskillsdevelopmentparadigm:Thesessionstartsbyreviewinghomework
+assignments theclientsreceivedlasttime;ordoingtheminthesessionby‘generatingevocative
+eventsandinteractionsfromtheweek’ifthepatienthasnotfilledthehomeworkoutpreviously.
+Thetherapistthenintroducesanewskillthroughpsychoeducation(describinghowtheskillswork,
+potentiallyincludingcarefullycraftedmetaphors).Theythenpracticethenewskillsinsession(on
+aneutralhypotheticalexample);continuethepracticebyapplyingittopatient’sownemotional
+expression.3 Finally, the therapist assigns home learning assignments, with the aim to ‘allow the
+clientstoapplyconceptstoreal-lifeexperiencesoutsideofthetherapycontext,whichhelpsgen-
+eraliseskills.’Theexpectationisthattheclientwillbeabletouseandapplyskillslearnedintherapy
+totheirlifethroughprogressivepractice.
+Existing design challenges. Enabling the transfer of skill from in-session practice to everyday
+use is seen as one of the key challenges in existing models, and it is understood that different
+mechanisms and approaches are necessary to support the learners in these two settings. For
+example,ERTexplicitlydistinguishesbetween‘offline’and‘on-the-spot’versionsoftaughtskills
+andtheassociatedscaffolding:thiscorrespondstothenotionofdevelopingskillsduringtherapy
+sessions (“offline”), which relies on psychoeducationand recalling emotional moments from the
+past with the support from the therapist; and the subsequent attempts to apply these skills in
+everydaysettingswherenotherapistsupportisavailable(‘on-the-spot’).Thedistinctionbetween
+‘offline’ (training) and ‘on-the-spot’ (in-the-moment) learning approaches—and the associated
+2Wenotethatemotionregulationapproachesarealsotaughtinananalogouswayinmanyothercommonlyusedtherapies,
+includingCognitiveBehaviouralTherapy(CBT),Dialecticalbehaviourtherapy(DBT),AcceptanceandCommitmentTher-
+apy(ACT),andhavebeensuggestedasoneofthefewknowntrans-diagnostictreatmentsacrossmentalhealthdisorders
+(see[17,26,79,83]forsomeofthelatestreviews).
+3Theguidebookhighlightstheimportanceofemotiongenerationaspartofthesession—“usingasmanypersonallyrele-
+vantexamplesandactivitiestoreinforceskillknowledge,includingtheliberalevocationofemotioninsession,ishighly
+preferred.Notablytheremaybesomemodulesinwhichsuchpersonalizedpracticeoccursinaseparatesessionfromskill
+introduction.”
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 14 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:15
+issueoftransfer duetolackofmechanismsforon-the-spotsupport—seemscommonacrossmany
+oftheexistingin-persontherapiesandprograms.
+3.3 ExemplarERInterventions—ExperientialtoDidactic
+Weselectedtwoexamples—Mindfulness-BasedStressReduction(MBSR)[48]andMindfulAware-
+nessinBody-OrientedTherapy(MABT)[77]—astwobody-orientedandevidencebasedinterven-
+tions that position emotion regulation techniques, specifically stress reduction, at the core of a
+therapeuticapproach.BothstylesofinterventiontargetimprovedERthroughmodificationofper-
+ceptionofphysiologicalsignalsfromthebodyandrelatedcognitiveattributions.Althoughthere
+havebeenmanycriticsofmindfulnessinawesterntherapeuticcontextduetothemultiplicityof
+meaningsandpractices,whatiscoretotheseapproachesisafocusofattentiononbody-oriented
+andfeltexperience,typicallythroughafocusonthebreath,innerbodysensations(interoceptive
+awareness)and/orotherbodilyprocessesorsensations,combinedwithnon-judgementalaware-
+nessoffeelings.
+Whatistaught? InMBSRandMABTinterventions,somatically-basedand/ormeditativestyle
+training is used to improve awareness and tolerance of bodily sensations, typically by practic-
+ing focused attention on the breath, gentle movement and/or body-scans. The goal is to culti-
+vateattentionalskillsandimproveawarenessofthecurrentstateofthebodyandfeltexperience,
+anddevelopanonreactiveawarenessofthosefeelingsandsensationsasameanstoimproveER
+andwell-being[48,77].Bothinterventionstypicallyproceedthroughmulti-weekpractice-based
+sessionsfocusingonenactmentofbody-orientedtechniquesandnon-judgementalassessmentof
+those experiences. These approachesprimarily support ER skills development around enhanced
+awareness,attentionaldeployment,cognitivereappraisalthroughacceptanceandcompassionfor
+one’sfeltexperiences,andmaybeusedineverydaylifeforresponsemodulation.Inthecontextof
+Gross’model,thetechniquestaughtthuspredominantlyfocusonattentionaldeployment,cogni-
+tivechange,andresponsemodulationaswellasalltheregulatorystages(identification,selection,
+implementation,andmonitoring).
+How are skills taught? These interventions draw heavily on experiential, non-symbolic skills
+developmentapproacheswherethefocusisondevelopingbody-basedskillsthroughrepeatedcy-
+clesofcoachedpractice.Interventionsarestructuredaroundstagedattentionalandinteroceptive
+exercises, in individual or group therapeutic sessions, in order to develop more advanced per-
+formanceskillsovertime.Insessionpracticeisinterspersedwithpsychoeducationaltechniques
+andfollowedupwithadditionalhome-basedpractice.Forexample,MBSRfocusesongroupmem-
+bersbeingcoachedinrealtimeonpractisingarangeofexperientialtechniquesincludingbreath-
+focusedmeditation,body-scans,mindfuleating,walkingandyoga/stretching.Layeredontothese
+performativeskillsdevelopmentexercisesarereminderstocultivatenon-judgementalacceptance
+of whatever physical and emotional sensations arise during practice. A variation called MCBT
+(Mindful Cognitive Behavioural Therapy), builds on the MBSR multi-week group program with
+the addition of individual CBT-based sessions, designed to help clients use mindful awareness
+to reduce negative thought patterns (e.g., associated with depression) [95]. Practice sessions are
+oftenstagedtosupportthedevelopmentofskillsslowlyovertime,scaffoldedthroughreal-time
+feedbackand/orcoaching,psychoeducationaldiscussions,andsharingofexperienceseitherindi-
+viduallywiththetherapistorinagrouptherapysetting.
+Existing design challenges. There are two key challenges to body-based emotion regulation
+models used in ER interventions. One challenge is that experiential or embodied skills develop-
+ment focuses on learning to be aware of, attentive to and able to modify different physiological
+and neurological processes. Since these processes are internal body states, they are not easily
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 15 End (Direct) ---
+
+13:16 P.Slovaketal.
+perceived nor articulated and are not directly observable to an external party (e.g., therapist),
+making real-time, accurate external feedback and/or self-reflection both difficult and highly
+subjective; it is often difficult for learners to know when they are ‘getting it right’. The other
+challenge is—again—the lack of support to help learners transfer trained skills into everyday
+life.Mostinterventionsinvolveahomeworkstylecomponentinwhichtheclientpracticeswhat
+they have learned in sessions, however there is still a gap related to support for learners to
+transfer embodied skills, such as mindful nonjudgmental attention or interoceptive awareness,
+intomomentsofheightenedemotionalintensitythatmayoccurineverydaylife.Suchapproaches
+thus highlight an analogous difference between offline vs on-the-spot intervention supports as
+discussedintheERTandUPinterventionsintheprevioussection.
+3.4 ArticulatingtheStrategyFrameworkComponent–Hows,Whens,Wheres
+Thereviewabovehighlightshowemotionregulationinterventionsarebestseenassupportinga
+personin developing an embodied skill. Drawing on these observationsthe strategic framework
+aimstoencourageHCIdesignerstothinkaboutthestructureofthedesignedinterventionfirstin
+thecontextofthedeliverymechanismsthatdigitaltechnologycanbringintotheinterventionpro-
+cess:i.e.,how,when,andwherethedesignissupposedtoscaffoldparticipants’learning–seeFigure3.
+—Thehows partof theframework distinguishes the typeof skills acquisitionapproach an in-
+terventioncomponentsupports:distinguishingbetweendidacticlearning (suchasthepsy-
+choeducation approaches used in UP/ERT and delivered, e.g., by the therapist or through
+reminders/homesheets)andexperientiallearning(suchasthetrial&feedbackapproachcom-
+monlyusedinmindfulnessanddeliverede.g.,throughbiofeedback).
+—Thewhens/wherespartoftheframeworkthenhelpsthedesignersthinkabouttimingandcon-
+textsinwhichinterventionsupportisprovided throughtechnology:distinguishingbetween
+‘offline’training(suchasinterventionsupportinatherapistofficeoranonlinemodule);and
+‘on-the-spot’learning(suchassituatedsupportduringastressfulreal-worldsituation).
+Figure4outlineseachofthedeliverymechanismsin
+moredetail,includingthedefinitionsusedtocategorise
+existing HCI work in the scoping review presented in
+thenext section. As argued in more depth in Section 5,
+we propose that this conceptual structure can enable
+modularthinkingaboutinterventiondesign,providesa
+frameworkforthecommunitytodevelopanempirically
+grounded understanding of ‘what works’ for each type
+ofdeliverymechanism(possiblyacrossarangeoftech-
+nologies),aswellaspromotingcross-projectinspiration
+acrossHCIandpsychologyresearchteams.
+Wenotethatsuchmodularityisalreadyvisibleinall
+of the—non-technological—intervention programmes
+described in this section. These combine a range of
+complementary delivery mechanism components: for
+example, including delivery of didactic (psychoeduca-
+tion&scaffoldedapplicationinsession)andexperiential
+learning opportunities (repeated practice and in-situ
+skills generalisation); with a range of support available
+to the learners as part of ‘offline’ training (guided
+Fig.3. Strategicframeworkcomponent.
+meditation) and ‘on-the-spot’ application contexts (e.g.,
+home-learning assignments). We expect an analogous
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 16 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:17
+Fig.4. Definitionstableforeachofthedeliverymechanismcomponents:experientialvs.didactic;offlinevs.
+on-the-spot.
+situationalsoforanytechnology-enabledinterventions:forexample,agame-basedbio-feedback
+intervention(suchas[51]reviewedinthenextsection)canbeseenasutilising‘offline’delivery
+mechanismthroughthegame(whichisusedtogenerateemotionsoutsideofeverydaysituations),
+‘experiential’mechanism(byinvolvingthebiofeedbackloop),aswellasperhapsa‘didactic’com-
+ponent(if,forexample,theparticipantsfirstengageinpsychoeducationbeforethegamestarts).
+4 PRACTICALCOMPONENT:SCOPINGREVIEWOFHCIWORK
+The role of the practical part of the framework is to support designers in answering questions
+such as How can we provide an experiential/didactic/offline/on-the-spot support to those using my
+interventions? Whataretheestablishedtechnologicalapproachestodoso,andwhereistherestillan
+opportunityforinnovation? Inotherwords,ouraimistoprovidedesignerswithasynthesisofthe
+existing work on emotion regulation technologies in HCI to date into commonly used interven-
+tiondesigncomponentsacrosstheselecteddeliverymechanisms,helpguidepracticaldecisionson
+possibleimplementationsofthese,aswellashelpidentifyareasinwhichcurrentsolutionsneed
+improvementoraremissing.
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 17 End (Direct) ---
+
+13:18 P.Slovaketal.
+Thedescriptionsthatfollowarebasedonascopingreview(cf.,[67])includingarticlespublished
+inHCIbetweenJanuary12009andDecember82021,asprimarilyindexedacrossACMdigitalli-
+braryandIEEE;andcomplementedwithanadditionalGoogleScholarsearch.4Weusethisscoping
+review of recent HCI literature to provide a foundation that enabled us to develop the practical
+partofourframeworkintwoways:
+(1) To develop a ‘dictionary’ of commonly used intervention design components, as identified
+inexistingworkforeachofthedeliverymechanisms(i.e.,whatarethedesignchoicesre-
+searchershavetendedtousesofartoprovideexperiential,didactic,offline,oron-the-spot
+support?);aswellastoprovideanoverviewoftherangeoftheERtargetswithinthecurrent
+work(i.e.,whichofthe4ERstages/5familiesofERstrategieshavebeensupportedsofar,
+andwhichremainunder-studied?).
+(2) Tooutlinehowtheseindividualdesigncomponentshavebeencombinedintointerventions
+(i.e.,whichcombinationsoftheinterventiondesigncomponentshavebeenexploredalready
+intheliterature?Whataretheremaininggaps?).
+Figure5visualiseshowthestrategicandpracticalpartsoftheframeworkconnectandprovides
+an overview of the main intervention design components identified for each of the four delivery
+mechanisms. In the following subsections we provide a summary of our scoping review meth-
+ods and an overview of our review findings as context for exploring how intervention design
+components have been used in each of the delivery mechanisms and have been combined into
+interventions.WeprovidefulldetailsofourscopingreviewmethodsandfindingsinAppendix1.
+4.1 ScopingReviewMethodology
+We conducted a literature review that targeted full articles and notes as well as high quality
+works-in-progress that were published in top venues in HCI. We targeted the ACM digital li-
+brary, IEEE databases and used Google Scholar to search for articles published between Janu-
+ary12009andDecember82021.Ourkeywordsearchcriteriawere“interactivetechnology”and
+oneormoreof ‘emotionregulation’or‘self-regulation’or‘stress’or‘stress-regulation’.Theini-
+tial search resulted in 5,574 articles, out of which 36 articles fit all our criteria: peer reviewed
+articles addressing human emotion-regulation, involving interactive technology, including user
+study, identified one or more intervention mechanisms, and where the end-goal of the research
+wasanemotionregulationintervention(asopposedtosay,e.g.,anemotiondetectionalgorithm)
+[4,5,7,9,14,15,21,25,31,35,44,47,51–54,56,61,63,65,71–74,76,81,87–89,91,102–104,106–108].
+ThereviewmethodsaresummarisedbrieflyhereandprovidedindetailinAppendix1including
+adescriptionoftheselectionandfilteringprocess.
+FollowingfromthetheoreticalreviewinSections2and3,wehaveusedaninductiveanditera-
+tiveapproachtothematicanalysistocreateacodingschemeandidentifyinterventioncomponents
+within each system that supported offline vs on-the-spot training, and didactic vs experiential
+learning.Theanalysisphaseconsistedoftwooftheresearchersworkinginductivelytoiteratively
+developinitialcategoriesandcodingrulesforeachofthefourdeliverymechanisms.Thiswasdone
+duringindividualandsharedanalysissessionsoverasmallsubsetofarticles.Oncecategorieswere
+defined,theresearchersthenindividuallyreviewedandcodedabout25%ofthearticlesacrossthe
+twodimensions,togetherreconciling,revisingandfinalizingdescriptionsofcategoriesandcoding
+rules for each of the categories. This codebook was finalised after the researchers had read and
+analyzedabouthalfthearticles,atwhichpointtheyhadwell-defineddimensioncategoriesand
+4Theauthorswillmaintainanup-to-datedatabaseofarticlesforatleastfiveyearsafterthepublicationonline(aspartof
+Slovak’sFLFfellowship)—thecurrentversionofthedatabaseisavailableonthisAirtablelink.
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 18 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:19
+Fig.5. Overviewoftheconnectionsbetweenstrategicandpracticalpartsoftheframework.
+stablecodingschemesforeachdimension.Theseobservationsformthecorecontributionofthis
+sectionandareoutlinedbelow.
+Aspartoftheinitialscopingreview,theresearcherscodedthesystemsalongamoretraditional
+six dimensions, selected a priori: type of technology; stage of research to, e.g., distinguish early
+HCI explorations of materials from more developed systems; topical focus of HCI research (e.g.,
+efficacyevaluationsversusmodalitydesignexplorations);interventionmechanismunderpinning
+the designed system; level of intervention mechanism specificity; and intended use-case (skills
+developmentvsongoingsupport).Thesedimensionshavebeenderivedfrompriorresearchand
+similarHCIreviewwork,aswellasthetheoreticalgroundingfrompsychology(i.e.,intervention
+mechanismasatheoryofchange,andintendedusecaseasskillslearningvscontinuoussupport).
+Thekeyresultsfromthisanalysisarebrieflysummarisedinthenextsubsectionandreportedin
+fullforallsixdimensionsinAppendix1.
+4.2 OverviewofScopingReviewofHCIWork
+ThearticlesinoursampleshowcaseawidevarietyofHCIresearchinthedesignspaceofcreating
+andevaluatingemotionregulationintervention.AsistraditionalinnewdomainsofHCIresearch
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 19 End (Direct) ---
+
+13:20 P.Slovaketal.
+(cf., e.g., [80]), the stage of research and resulting contribution of many of the articles focused
+on early stage explorations of innovative technologies in design space, presenting user studies
+onproof-of-conceptdevicestoexaminewhetheraparticularapproach/classoftechnologieswas
+viable and warranted future research. Specifically, 13 articles were coded as early stage research,
+focusing on the design of prototypes and formative evaluations [14, 15, 25, 47, 52, 53, 61, 72, 76,
+87, 88, 107, 108]; 14 articles were coded as mid-stage research, focusing on iterative design and
+evaluation of more complex and/or robust prototypes with formative or summative evaluations
+[4, 5, 9, 54, 56, 64, 66, 71, 73, 74, 102–104, 106]; finally, only 9 articles were coded as late stage
+researchinvolvinghi-fidelity,robustresearchsystemsthatwerereadyforwidespreaddeployment
+andsummativeevaluationsinlaborfieldstudies[7,21,31,35,44,51,81,89,91].
+Many of the more exploratory systems did not fully specify the assumed intervention
+mechanism based on a theory-of-change (cf., [24]), i.e., outlining how the proposed design
+decisionsarelikelytoleadtousers’improvedemotionregulation,withabouthalfofthesystems
+being coded as including low (15 articles; [9, 14, 25, 52–54, 56, 63, 65, 72, 73, 76, 102, 106, 108])
+or medium (13 articles; [7, 15, 31, 35, 47, 51, 61, 71, 74, 87, 91, 103, 107]) specificity of the
+theory of change. As a result, the intervention mechanisms were categorised in terms of in-
+teraction design,with most research articles focused on utilising biofeedback components (14
+articles;[4,5,51,53,54,56,63,73,74,81,103,104,107,108]),physiologicalsynchronisation,i.e.,
+providing users with external input that mimics their own biosignals such as “false heart-rate
+feedback” (7 articles; [9, 15, 21, 35, 61, 65, 72]); reminders and recommendations of specific ER
+strategies (6 articles; [25, 31, 71, 76, 89, 91]); awareness systems that help monitor and/or track
+individual emotions (5 articles; [7, 44, 52, 102, 106]); and a smattering of other bespoke systems
+(4 articles; [14, 47, 87, 88]). Interestingly, a unifying characteristic across all these different ap-
+proacheswasthattheirintendedusecasesrarelyshowedafocusoninterventiontransferbeyond
+theeffectsduringtechnologyuse:thestrongmajorityofthearticlesinthecurrentdataset(31arti-
+cles;[7,9,14,15,21,25,31,35,44,47,51–54,56,61,63,65,71–74,76,88,89,91,102–104,106,107])
+werebasedonusecasesinwhichthedevelopedsystemshadtoprovideon-goingsupportforthe
+interventiontobeeffective;andthustheeffectswoulddisappearifthesystem(suchaswearable
+feedback)wasremoved.Incontrast,onlyahandfulofinterventionusecaseswereenvisionedto
+trainskillsinordertoeventuallyreduceend-userdependenceontheinterventiontoenablethe
+end-usertoapplyemotionregulationstrategiesontheirown(5articles;[4,5,81,87,108]).Morede-
+tailsontheresultsforalldimensionsusedintheinitialscopingreviewcanbefoundinAppendix1.
+Wenextpresenttheresultsofourinductiveanalysisthatrevealedwhichinterventiondesigncom-
+ponentswereusedforeachofthefourdeliverymechanismsandhowthesewerecombinedinto
+interventions.
+4.3 WhichInterventionDesignComponentsareusedinEachoftheDelivery
+Mechanisms?
+Our next step was to identify and categorise the design components that have been used in ex-
+isting work so far. The aim was to articulate the established—or at least attempted—approaches
+to supporting each of the four possible delivery mechanisms (e.g., what are all the components
+thathavebeenusedtosupport‘experiential’learninginpriorHCIwork?).Inparticular,eachde-
+liverymechanism—didactic,experiential,offline,on-the-spot—isbrieflycharacterisedintermsof
+theERtargets,narrativeoverviewofhowwesawtherespectivecomponentsusedinthecurrent
+dataset,andthecategoriesofcomponentsidentified.Figures6and7providetheoverviewofthe
+contrastsbetweenexperientialvs.didactic;andofflinevs.on-the-spotcomponents(onpages21
+and22,respectively).
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 20 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:21
+Fig.6. Overviewoftheexperientialanddidacticinterventioncomponents.
+4.3.1 ExperientialInterventionComponents.
+ER targets. The main characteristic of intervention components coded as experiential is their
+focusonmediatingthefirst-handexperienceofapplyingaspecificemotionregulation
+strategy, without necessarily providing a verbal description of the actions to be done – cf., the
+sectiononperformativeskillsdevelopment.Inthecontextofemotionregulation,suchexperien-
+tial support can involve, for example, ongoing real-time feedback on application of specific ER
+strategy(suchasresponsemodulationthroughbiofeedback)orbyguidingthepersonthroughan
+experience(e.g.,atherapistsupportingaclientduringanexposuretherapyexercise).
+HowhavethesebeenusedinHCIwork? Predominantly,experientialcomponentsattempttofacili-
+tatethelearner’son-goingemotionregulationprocess,suchaswhenthelearnerwouldotherwise
+struggle to apply the emotion regulation strategy successfully. Although more than half of the
+reviewedarticlescontainedsomeexperientialcomponents(23articlesintotal),therangeofmech-
+anisms used was limited to the two main categories outlined below. The first provided the user
+withalearningenvironmentthatincludedstructuredfeedbackduringapracticeapplicationofa
+givenERstrategy,suchasembeddingbiofeedbackintovideogames(e.g.,[56,103]).Thisapproach
+wasagoal-drivenorpurposeful,consciousapproachandscaffoldedexperience(s)thatinvolvedex-
+plicit control of emotion regulation. The second approach used on-going non-lingual reminders
+thataimedtosubtlyguidetheparticipanttowardatargetemotionalstate,suchasthroughvibro-
+tactilepatterns(e.g.,[21,61,72,88])oraudiovisualcues(e.g.,[35]).Inthisapproachthegoalwas
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 21 End (Direct) ---
+
+13:22 P.Slovaketal.
+Fig.7. Overviewofofflineandon-the-spotinterventioncomponents.
+notcommunicateddirectlytotheparticipantandinvolvedscaffoldingimplicitemotionregulation
+experiencesthroughunconsciousorautomaticprocesses.
+Interaction design patterns. The two main interaction designs used across the 23 papers—real-
+time tailored biofeedback and implicit target feedback—differed substantially in how, when, and
+through which psychological mechanisms users’ emotion regulation was to be supported. The
+real-timetailoredbiofeedbackcomponentsprovidedtheuserwithinformationabouttheircurrent
+physiologicalstate(s)inaclosed(bio-)feedbackloop,whichthenhelpstolearnand/orpracticeER
+throughoperantconditioning[4,5,47,51,53,54,56,73,74,81,103,107,108].Thiswaspredomi-
+nantlyimplementedthroughvideogamesthatmapone’sphysiologicalresponsetothesystemin
+realtimeusingmetaphoricalrepresentations,eithersubtlychangingthegamemechanics[4,5,51,
+54,73,74,81,103,108]orusinggraphicoverlaysthatmakethegameplaymoredifficultiftheplayer
+isnotcalmenough[54,56,103].Forexample,Mandryket.al[56]insertedadditionalgraphicsover-
+lay(e.g.,mudinaracinggame)togameplayastheplayer’sstressincreased.Incontrast,implicit
+targetfeedback componentsaimedtosubconsciouslyorconsciouslynudgetheusers’physiolog-
+icalstatestowardsaparticulartarget(oftenrelaxationorcalmeddownstate)[9,14,21,35,61,66,
+72,88,104].Predominantly,suchcomponentsutilisevibrotactileinteraction,eitherasaguidefor
+theusers’controllablephysiologicalprocesses,suchastheirbreathingrate[9,35,61,66,72,104],
+by drawing on the false-heart rate feedback literature (e.g., [21]), or by relying on attentional
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 22 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:23
+deploymentstrategieselicitedbythehapticinteraction[88].Forexample,Miriet.al’s[9]system
+provideshapticfeedbacktofacilitatecalmbreathingpatternsofdriversduringacarcommute.
+LinkstotheERprocessmodel. TherangeofERtechniquessupportedbyexperientialcomponents
+was very limited: nearly all of the implicit target and biofeedback components were supporting
+ERstrategiesbelongingtotheresponsemodulationfamily,oftenthroughaffectingthebreathing
+rate.Theexceptionstothispatternwerebio-feedbacksystemsembeddedintraditionaltherapeu-
+tic techniques (mostly CBT—see [5, 51, 54]), which would have introduced other families of ER
+strategiesthroughdifferentcomponents.Eventhere,however,thecorebio-feedbacklooprelied
+mostlyonbreathing-basedexercises.Additionally,manyofthesystems—especiallyintheimplicit
+targetfeedbackcategory—didnotexplicitlyaimtopromoteskillsdevelopment;thesystemwould
+needtobepresentatalltimeswhentheuserneededtodown-regulate.
+4.3.2 DidacticInterventionComponents.
+ERtargets. Themaincharacteristicofinterventioncomponentscodedasdidacticistheirfocus
+onthedeliveryofinformationandsupportingits—conscious—application,evenifitisnot
+immediately done within the targeted social-emotional context. That is, the focus is on either
+remindersorcognitiveexplanationsofemotionregulationstrategiesthataimtobuildparticipants’
+cognitiveunderstandingofhow,why,where,andwhenspecificstrategiescanbeused.
+HowhavethesebeenusedinHCIwork? Didacticinterventioncomponentsrelyonactivecogni-
+tiveprocessingtohelpdevelopnew(orplantoapplyalreadyknown)emotionregulationstrategies.
+ManyexistingexamplesrelyontechnologytoprovideinformationsuggestingspecificERstrate-
+giesthatcanbeappliedtoaparticularemotionregulationneed(e.g.,[25,31,64,71];orscaffold
+understandingofownemotionalstatestoenhanceself-awarenessandmonitoringovertime,for
+instance,viaself-reports(e.g.,[44])orsensingtechnology(e.g.,[64]).Whatisimportanttonoteis
+thattheseinterventioncomponentsdonotscaffoldtheexperientialaspectsofemotionregulation
+(e.g.,applicationofthesuggestedinterventions),althoughtheymightbeexplicitlydescribingthe
+assumedcognitivestepsthatthelearnershouldtakeoncethestrategyistobeapplied.Finally,some
+interventionsrelyontraditionalpsychoeducationapproachestoexplain,suggest,andsupportde-
+velopmentofnewemotionregulatoryapproaches(e.g.,byprovidingverbalexplanationsofhow
+toexecuteemotionregulationstrategies)aswellasincludingroleplaystoprovidelow-intensity
+situationstopracticeon(e.g.,[51,76,81]).
+Interaction design patterns. We saw three main interaction design approaches—reminder-
+recommendersystems,awarenessandreflectionsupport,andcognitivemodelsdevelopment—which
+differed in when, how, and what kind of information was offered to the users. First, reminder-
+recommender components provide the users with in-the-moment suggestions around specific ER
+strategiesthatcouldbeused[25,31,44,71,76,89].Often,theimplementationincludedproviding
+step-by-stepinstructionsonhowtoenactaparticularERstrategyintheformofstaticmaterials
+(i.e.,generaldescriptionofhowto‘do’cognitivereappraisalordeepbreathing,nottailoredtoany
+current experience), or by providing links to external materials. For example, Smyth et. al. [89]
+delivered three reminder prompts daily (e.g., ‘Recall that even a few diaphragmatic breaths can
+reducestress;ifyourcurrentcontextallowsforit,take5mindfulbreaths.’)atasemi-randomtime,
+through a mobile phone notification interface. Second, the awareness and reflection interaction
+mechanisms do not suggest specific activities but rather rely on prompting the users to reflect
+ontheircurrentemotionalstateand/orexpectthemtoanalysea(retrospective)datalogofone’s
+emotional experiences [7, 44, 52, 63, 89, 102]. The reflection support is often reliant on users’
+self-report through ecological momentary assessment (EMA) [7, 44, 89], or automated system
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 23 End (Direct) ---
+
+13:24 P.Slovaketal.
+trackingrelyingonbiosensingdata[52,102].Forexample,Bakkeret.al.[7]usedabespokeapp
+to prompt users to collect their emotional states (12 questions once per day), and then enable
+them to reflect on any patterns visible in the resulting ‘mood diary’. Finally, cognitive model
+developmentcomponentsdonotscaffoldanyongoingengagements,butratherprovideuserswith
+psychoeducation(andpotentiallyrole-play)supporttodevelopanunderstandingofnewemotion
+regulation strategies [4, 5, 51, 76, 81, 87]. This can take place in traditional clinical intervention
+context with a therapist [51, 76], as part of embedding the psychoeducation into the interactive
+experience [81, 87], or as well-selected metaphors incorporated into an interactive game [4, 5].
+Specifically, these components provide in-depth explanations of how the mind transforms
+informationtoarriveatbehaviour(e.g.,how,why,where,whenitisimportanttouseERskills).
+LinkstotheERprocessmodel. Didacticcomponentshavesupportedemotionregulationstrate-
+gies from a range of families, although these were mostly determined by the particular interac-
+tiondesignmechanism.Forexample,thereminder-recommendersystemcomponentsmostlysup-
+portedsomeformofsituationselectionalthoughthereweresomeimplementationsthataimedata
+broaderrange(e.g.,[71,76],whichreferredtocognitivechangeandresponsemodulationstrategies
+aswell).Cognitivemodels’developmentcomponentswerepredominantlyrelyingontraditional
+CBT psychoeducation (e.g., [51, 81]) and thus supported a broad range of strategies similar in
+scopetotheclinicalinterventionsoutlinedinSection2,includingattentionaldeployment,cognitive
+change, response modulation; others have centred more on acceptance approaches ([4, 5]. Finally,
+theAwarenessandReflectionsystemspredominantlyaimedatsupportingsituationselection(by
+helpinglearnersidentifysituationsthatleadtonegativeoutcomes),andpotentiallyalsotheself-
+awarenessmeta-layer.
+4.3.3 OfflineInterventionComponents.
+ERtargets. Themaincharacteristicofofflineinterventioncomponentsisthattheyaimtosup-
+portdevelopmentofemotionregulationstrategiesindeliberatetrainingcontextsratherthan
+indailylife.Thetrainedskillsarethenexpectedtobetransferred intoeverydaysituationswhere
+strongemotionsnaturallyarise.
+How have these been used in HCI work? Offline intervention components can take a num-
+ber of forms. For instance, systems including offline components can aim to elicit strong
+emotions using technology to create an artificial context in which to practice ER strategies
+[54,56,73,74,81,102,108].Thisispredominantlyachievedthroughtrainingcontextsinvolving
+videogamesdesignedtoeithertriggerstrongemotions(suchasfearin[54]orstressin[108])or
+toillustratemetaphoricalrepresentationsthatscaffoldthesuccessfulexecutionoftheERstrategy
+being trained (e.g., [4, 81]). In many instances the existing components predominantly rely on
+forms of biofeedback, i.e. experiential components, to ‘close’ the training loop (cf., Section 4.3.1).
+Alternatively,severalinterventionsuseongoingmonitoringoftrackedemotionsacrosssituations
+to create an overview that is used in a training context to enable reflection on previously
+unnoticed patterns, resulting in insights and an eventual increase in emotional awareness over
+time([7,44,52,102]).Multiplepapersthatinvestigatemechanismsthatenableofflinetrainingalso
+includetheuseofdidactic psycho-education(cf.,cognitivemodelsdevelopmentinSection4.3.2)
+toteachparticipantsaboutwhenandhowemotionregulationstrategiesareusefulandwhento
+usetheminreallife[51,76,81,89,104].Thepsycho-activeinformationisdeliveredtotheusers
+predominantlythroughnon-technologicallymediatedwayssuchasin-persontherapysessionsor
+training[51,76,89,104],with[81]beingtheonlyexceptionwherethepsychoeducationhasbeen
+directly incorporated into the technologically mediated intervention (computer game). Overall,
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 24 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:25
+the psychoeducation approaches are designed to supplement the main technology-enabled
+component(e.g.,tosupporttheteachingsfrombiofeedbackinterventions[5,51,81]).
+Interactiondesignpatterns. Theexistingapproachestoofflinedesigncomponentsdifferprimar-
+ilyinif/howtheemotiongenerationprocessissupportedthroughtechnologicalmediation.Thefirst
+typeofcomponentsaimstobothfacilitatetheemotiongenerationandtheassociatedemotionreg-
+ulation. These are mostly intervention components utilising the ability of video games to elicit
+specificemotions(e.g.,anxiety,stress)butthenalsofacilitatefeedbackontheemotionregulation
+of the player (e.g., using biofeedback about the emotional state of the player). This interaction
+mechanism enables ‘in-vivo’ ER practice as part of the game experience, with the mostly nega-
+tiveemotioneitherpurposefullyelicitedthroughgamedesign(e.g.,[54,81])orgeneratedthrough
+gameplayofcommerciallyavailablegameswhichareinherentlystressful(e.g.[56,103]).Inthesec-
+ond typeof components, thetechnological systems do not attemptto elicit heightenedemotion
+butinsteadproviderelaxationtrainingsupport duringbaselineemotionalstates[4,5,14,51].The
+focushereisoftenonutilisingtechnology-enabledfeedbackmechanisms,againtypicallybiofeed-
+backtoeaseand/ordeepentherelaxationcompetenceoftheplayer(e.g.,[4,53]).Finally,thereare
+offline components that neither generate emotion nor scaffold the resulting emotion regulation.
+Instead,thefocusisontheusers’reflectiononemotiondatabyvisualisingpatternsovertime.In
+these instances the system draws on a history of tracked emotional data (and relevant context)
+withtheexpectationthatvisualisingthisdatatotheuserwillleadtoinsightandincreasedself-
+awareness [7, 44, 52, 102]. Such systems may employ mechanisms that automatically collected
+physiologicaldata(e.g.,[102]),user-entereddata,suchasashortmoodquestionnaire[7];and/or
+a location-based emotion assessment [43] alongside various representational forms for display.
+Forexample,Bakkeret.al.allowtheuserstoinspecta‘mooddiary’toextractpatterns,increase
+self-awarenessoftheiremotions,andpotentiallychangetheirfuturebehaviour[7].
+LinkstotheprocessmodelofER. Themajorityofgame-basedinterventionsarepredominantly
+focused on training response modulation techniques (e.g., control over aspects of breathing).
+Conversely,emotionawarenessinterventionsarenotgroundedinanyspecifictheoryofchange,
+instead relying on the notion that improved awareness of emotions will result in better ER.
+Interventions include a secondary psychoeducation element to focus on cognitive reappraisal or
+simplyincludeexplanationsandreminderstousethetechniquesbeingtaught.
+4.3.4 On-the-spotInterventionComponents.
+ERtargets. Themaincharacteristicofinterventioncomponentscodedason-the-spottrainingis
+thattheyaimtotrainemotionregulationstrategiesduringnaturallyoccurringemotionalsit-
+uations(e.g.,stressfuleventsindailylife).Therefore,theskillspractisedareimmediatelyapplied
+to the specific emotional situation, as mediated by the technological or in-person intervention;
+and—whatiscrucial—nofurthertransferofskillsisexpectedorneeded.
+How have these been used in HCI work? Some of the systems including on-the-spot compo-
+nents target moments when a strong emotion arises, such as: during a stressful work situation
+(e.g.,[61,66,107])orwhilstdrivinginabusycity(e.g.,[72],[9]),oreverydayfeelingsofstressor
+anxiety ([31, 88]). Alternatively, some interventionsdeliver real-time information of thecurrent
+emotionalstate(e.g.,[64],[103])andsomesuggestpotentialERstrategiestobeusedwhenaspe-
+cificemotionisexperiencedorsensedthroughthetechnology(e.g.,[89],[44]).Manyofthepapers
+highlight the focus on investigating mechanisms that enable such on-the-spot delivery of inter-
+ventionalongside otherongoingactivities,mostlyincombinationwithexperiential components,
+cf.,[9,21,35,61,63,65,72,107];seeSection4.3.1).Alternatively,otherpapersusemoredidactic
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 25 End (Direct) ---
+
+13:26 P.Slovaketal.
+approaches,predominantlyintheformofremindersorEMAs([7,25,31,44,63,71,76,89,102];
+seeSection4.3.2).
+Interaction design patterns. The existing approaches differ in two key ways that shape the in-
+teractiondesignsenabledbythecomponents:thesearewhatisusedasthetrigger fordeliveryof
+interventionsupports(userinitiated,systeminitiated,situationspecific);andthetiming/duration
+overwhichthesupportisdelivered(discretepointorongoingsupport).Weoutlineeachofthese
+below,referencingthesystemsthatutilisedsuchinteractiondesignmechanism(s).
+Thedifferencesinapproachestointerventiontriggersareinwho/whatinitiatedtheon-the-spot
+interventiondelivery:Fortheuser-initiated components[31,44,53,63,88,102],theuserswereex-
+pectedtonoticetheneedforemotionregulationsupportandactivatethesystem,withtheon-the-
+spotinterventioncomponentfacilitatingtheireffortsafterwards.Forexample,BioFeedback[53]
+requirestheusertoreachoutfortheinteractivefidgetspinner,whichthenprovidesin-the-moment
+feedback.Forthesystem-initiatedcomponents[21,35,71,76,89],itisthesystemthatdetermines
+theneedforemotionregulationataparticulartime—oftenthroughbio-sensing—andtriggersin-
+terventiondelivery:[76](EDA),[21](HR),[35](breathingrate),[71,89](algorithmicallybasedon
+user’sEMAinput).Forexample,[89]reliesondetectingtheuser’shighstressornegativeaffect(as
+partofapromptedEMA),tothenprovidetailoredreminderstousestressmanagementstrategies
+viaamobileapp.Finally,thesituationspecific componentsprovideongoingsupportthroughout
+predetermined contexts that are deemed as likely stressful (e.g., driving ([9, 72], or information
+work([65,107]).Forexample,CalmCommute[9]providescontinuoushaptic-guidedslowbreath-
+ingexercisesthroughamodifiedcar-seatcover,whiletheuserisdriving.
+Thedifferencesinapproachestotiminganddurationoftheinterventionrefertotheperiodover
+whichthesupportisofferedon-the-spot.Forthediscretepointcomponents,thesystemprovidesthe
+userwithinformationthatisexpectedtofacilitateashiftintheiremotionregulatorytrajectory.
+In present dataset such components relied on either reminding the users of strategies taught in
+priorpsychoeducationmodules[76,89],facilitatingawarenessoftheirstresslevels[102,107],or
+providing users with suggested activities to improve emotional state [44, 71]. For example, [76]
+usedvisualrepresentationofin-the-momentstrategiesonglance-abledisplayspositionedinthe
+hometohelpparentsremindthemselvesofstrategiestheyweretaughtinpriortherapeuticses-
+sions, with the expectations that these strategies could then be put to use (without further scaf-
+folding).Incontrast,withtheongoingsupportcomponentstheusersaresupportedthroughapar-
+ticular emotion regulation strategy until the emotion regulation is complete. In existing work,
+thecomponentspredominantlysupportexplicitERbyguidingtheuserstowardslowerbreathing
+patterns [9, 53, 61, 63, 72], but also by providing cognitive scaffolding [31] and ongoing atten-
+tionaldeploymentintervention[88].OtherworkreliesonimplicitER,whereusersareexpected
+tosubconsciouslyaltertheirongoingbehaviourand/oremotionsinresponsetoa‘targetfeedback’
+deliveredashapticinteraction([15,21,35]).Forexample,BoostMeUp[21]usedAppleWatchto
+giveuserssubtlyperceptiblehaptic‘taps’onthewristwhichwereeither30%sloweror30%faster
+thantheparticipants’baselineheartrate.
+LinkstotheprocessmodelofER. Asthesecomponentsarerelatedtothepointandtypeofsup-
+portoffered,ratherthanthespecificcontent,therearenoin-principleconnectionsbetweenthe
+specificinteractiondesignmechanismcomponents(e.g.,user-initiatedvs.system-initiated),and
+specificemotionregulationfamiliesfromtheProcessmodel,ortheoverarchingstages(identifica-
+tion,selection,implementation,monitoring).Forexample,whileongoingsupportcomponentsare
+nowpredominantlyusedforresponsemodulation(e.g.,throughdeepbreathingorfalseheart-rate
+feedback), there are no principled reasons why a similar approach could not be used to support
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 26 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:27
+otherfamilies(e.g.,attentionaldeployment,orcognitivereappraisal);oracrossthefullgamutof
+theoverarchingstages.
+4.4 HowaretheIdentifiedDesignComponentsCombinedinExistingInterventions?
+TheprevioussectionsynthesisedthedesigncomponentspresentinHCIworksofar,withtheaim
+to decompose existing work and provide us with the ‘dictionary’ of techniques that have been
+utilised for each of the four possible delivery mechanisms (didactic, experiential, offline, on-the-
+spot). This section brings the focus back to the full interventions as presented in prior work to
+provideanoverviewofhowtheidentifiedcomponentsarecombinedintosystemsandidentifyany
+meaningfulpatternsorgapsofsuchcombinationsacrossthecurrentdataset.
+Thekeyargumentisthattheexistingworkis,sofar,clearlyseparatedintothreemainresearch
+directions: implicit on-the-spot support, bio-feedback games, and reminder-recommender & aware-
+nesssystems.Theseclusterscorrespondsurprisinglyneatlytothecombinationofdeliverymech-
+anismsused–seeFigure10.Inaddition,theclustersaremostlyindependentofeachother(draw
+ondifferentbackgroundliterature,interventiongoals,andtechnologicalcomponents),including
+usingconsistentcombinationsofdesigncomponentswithineachcluster(i.e.,componentsusedin
+onecluster—e.g.,implicitfeedbackorrecommenders—arerarelyutilisedinotherclusters).
+Suchlackofcross-clusterresearch5suggestsclearopportunitiesforfutureworkasdescribedin
+detailinSections4.4.2and5:forexample,thereareseveralcombinationsoftypesofintervention
+components that have not been explored at all so far; as well as more intricate combinations of
+componentsthatalreadyexist.
+4.4.1 Three Clusters in the HCI Work so Far. We outline each of the three clusters briefly be-
+low;theAppendix2thenprovidesmoredetailsontheindividualpapersaswellastheemotion
+regulationtargetsaddressedineachoftheclusters.
+Cluster1–impliciton-the-spotsupport(experiential+on-the-spot)−n=12. Thesesystemsex-
+ploreassistive—oftenimplicit—downregulationinterventions,whicharesupposedtobeavailable
+to users alongside other activities. Systems in this category predominantly rely on experiential
+implicittargetcomponents(n=9),drawingonadigitalrepresentationofatargetstate(heartrate,
+breathrate)–cf.,[9,15,21,61,72].Threeadditionalarticlesshowcasethepotentialforusingal-
+ternativecomponentstodeliverexperiential/on-the-spotinterventions,predominantlybymoving
+towardmoreconsciouslyenactedemotionregulationstrategiesthroughphysicalobjects[53,88],
+orbackgroundbiofeedbackvisualisation[107].
+Cluster 2 – bio-feedback in interactive games (experiential + offline +- didactic) − n = 12. The
+papersinthisclusterpredominantlydrawonutilisingexperientialbio-feedbackinterventionsin
+games(n=10),withsomesystems[4,5,51,81]alsoaddingdidacticpsychoeducationcomponents
+inspiredordirectlydrawingontraditionalpsychotherapy(e.g,CBTin-personsessionwithather-
+apistcombinedwithabio-feedbackgame[51]).Mostfocusisonofflinecomponentstobothelicit
+emotionandscaffoldtheassociatedemotionregulation[54,56,73,74,81,103,108]utilisingacombi-
+nationofinteractivegames(usedtoelicitmostlynegativeemotionssuchasstressorfear)andan
+experiential real-time biofeedback loop component to provide feedback scaffolding ER training
+within the game space. The remaining systems drew on some version of relaxation training
+5Whileitisnotknownwhysuchadisconnectedpatternofworkhasemerged,weexpectthatthismaybeduetoacombi-
+nationofseveralfactors,including:thetraditionalHCIfocusontheindividualinteractiondesigntechniques(oftenusing
+emotionregulationasacasestudyratherthanprimaryaim);thepragmaticpushforinnovationandspeedypublicationcy-
+clesinHCI(whichreducethemotivationtobuildinglarger-scalesystemsandvalidationstudies);andfinally,theincreased
+levelsofinterdisciplinarityneededtocombineorworkacrossestablishedHCIandpsychologysubfields.
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 27 End (Direct) ---
+
+13:28 P.Slovaketal.
+Fig.8. Illustrationofhowthereviewedinterventionsareassociatedwiththefourdeliverymechanisms–
+didacticvs.experiential;andofflinevson-the-spot.Numbersandlocationindicatethenumberofsystem
+usingcomponentswithintherespectiveintersectionofdimensions(e.g.,asystemusingcomponentscoded
+asdidactic,on-the-spot,andofflinewouldbeplacedintheappropriateintersectionoftheVenndiagram).
+Theannotationshowstheresultingclusteringofresearchareas,asdescribedbelow.
+components[4,5,51],combiningtraditionalbiofeedbackloopswithsimplegame-likeinteractions
+(e.g.,blowingonavirtualwindmill).
+Cluster 3 – reminder-recommender & awareness systems (didactic + offline || on-the-spot) − n =
+11. Theworkinthisclustercombinestheexistingworkonreminder-recommender andawareness
+and reflection systems, potentially combined with either psycho-education or visualising patterns
+overtime.Thepapersaremorediverseintermsofcomponentsusedandtheircombinationsincon-
+trasttoClusters1&2,butthisalsocomeswithalesswellestablishedgroundworkontheassumed
+theoriesofchange:forexample,only2outofthe11articles[44,89]werecodedasHighoninter-
+ventionmodelspecificity–cf.,Appendix1.Thesystemsincludingaware&reflect[7,44,52,89,102]
+involved monitoring and tracking individuals’ emotions over time as a means to increase users’
+awareness of their emotional state(s); most of this work is akin to—and likely inspired by—HCI
+work on personal informatics systems (cf., [30]). In contrast, the systems relying on reminders
+or recommenders provided the users with on-the-spot suggestions of specific ER strategies to
+use[25, 31, 44, 71, 76, 89]. Conceptually, thesesystems often draw on behaviouralchange inter-
+vention systems, especially the Just-in-time-adaptive-intervention literature (see e.g., [69] for a
+recentreview).Onlytwosystemshavecombinedbothaware&reflectandreminder-recommender
+components[44,89].
+4.4.2 Cluster X: Identifying Missing Design Component Combinations. As illustrated in Fig-
+ure 10, there are three potential combinations of component types that had not been seen in
+the current dataset. Specifically, this involves interventions that would combine all types of
+component(didactic,experiential,on-the-spot,offline)aswellassystemsincludingacombination
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 28 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:29
+of experiential + on-the-spot with either didactic or offline components. While the next section
+(Section5)describeshowthisandotherresearchgapshighlightedbytheproposedframeworkcan
+driveandinspirefutureHCIworkinmoredetail,wewantedtoshareafewobservationsalready
+here,whilethecontextoftheworkpresentedintheclustersaboveisstillfreshinthereader’smind.
+Ononehand,asresearchersthinkingaboutERinterventionsintermsofinterventioncompo-
+nents, we find the lack of specific combinations within the existing intervention systems litera-
+tureinterestingandsomewhatsurprising:Forexample,wecanseenothingthatwouldlogically
+preventbio-feedbackgameinterventionssuchasthosedescribedinCluster2fromincludingan
+additionalon-the-spotrecommendercomponent,especiallyifthegame-basedlearningisalready
+complementedwithdidacticpsychoeducationcomponents(e.g.,talkingtherapy).Infact,suchrec-
+ommendersystemswouldlogicallycomplement—andperhapscouldhelpresolve—thedifficulties
+withtransferringthelearningfromofflinegameexperiencesintoon-the-spotapplications.Simi-
+larly,therearenopsychologicalreasonswhyaCluster1intervention(e.g.,atask-basedbreathing
+scaffoldingdevice)couldnotbecomplementedwithaformofaware&reflectsystem,oradidactic
+psycho-educationcomponentthatmightpromotemindfulattentiontobreathing(which,arguably,
+couldbethenamplifiedon-the-spotbythehapticfeedbackalreadypresentinCluster1systems).
+Ontheotherhand,thelackofcross-pollinationoftechniquesacrossclustersislesssurprising
+ifseenfromtheperspectiveofHCIresearchers,giventhedifferenthistoricalbackgroundthatthe
+existinginterventionsdrawon,therelativelyearlystageofthisresearchareainHCI,andoftenthe
+resulting focus on investigating a particular interaction design technique as the research contri-
+bution(cfAppendix1).Perhapsunsurprisinglythen,whiletheinterventionswithineachcluster
+mightbethoroughinreferencingotherrelatedworkinthatcluster,therearefarfewerreferences
+toworkacrossclusters.Forexample,self-awarenessorrecommendersystemsmaynotappearim-
+mediatelyrelatedtobio-feedbackgameinteraction,especiallyifseenfromtheperspectiveofan
+HCIdesignertryingtodeeplyunderstandtheinteractiondesigncharacteristicthatwouldmake,
+say, a bio-feedback overlay on a game acceptable and effective in communicating the relevant
+psychologicalinformation.
+Itisourhopethattheproposedframework—andmorebroadly,thispaper—canhelphighlight
+theselessimmediateconnectionsacrossclustersandpromoteadeeperinterconnectionofwork
+within HCI and (clinical) psychology collaborators, especially as the technology-enabled ER re-
+searchareamaturesovertheyears.Thenextsectiongoesontooutlinethekeygapsandopportu-
+nitieswesee,basedontheanalysissofar,asparticularlyinterestingfortheHCIandpsychology
+communitiestoaddressinthenextstagesofthework.
+5 DISCUSSIONANDRESEARCHAGENDA
+Ourpurposeinwritingthispaperwastomakesenseofthisrapidlygrowingandinherentlyinter-
+disciplinaryresearcharea.Theproposedframeworkisourwayofcommunicatingtheunderstand-
+ingofwhathasbeendonesofar(assynthesisedinprevioussections),butalsoawayofhelping
+shapewhatcomesnext:wewillshowhowthethreepartsoftheframework(theory,strategy,prac-
+tical)canbeapplied—separatelyortogether—aslensestoidentifygapsinexistingwork,inform
+newprojects,andsupportongoingsynthesisofworkacrosstherangeofdisciplinesandpossible
+researchthreads.
+Inthefollowingsubsections,weaimtomodelhowwethinkaboutusingtheframeworktogen-
+eratively shape questions for the field. We will start by briefly outlining what we see as the core
+remaininggapswhenviewingthefieldfromtheperspectiveoffocusingon(i)thepossibleERtar-
+getsandpsychologicalimpactofoursystems(theory&practical);and(ii)whatweknowaboutthe
+interactiondesignapproachesforeachofthespecificinterventiondeliverymechanisms(strategy
+&practical).
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 29 End (Direct) ---
+
+13:30 P.Slovaketal.
+We then discuss the cross-cutting considerations of how the framework can be applied more
+practicallytoguidethedesignofspecificresearchprojects,acrossallstagesbetweentraditional
+HCIfocus(e.g.,technologicalandinteractiondesigninnovationthroughexcitingprototypes)and
+psychologyfocus(large-scaleefficacytrialsonwell-understood,robust,in-situsystems).Wehope
+thisreflectionwillbeusefulnotjustforindividualresearcherssharpeningtheirresearchquestions
+andapproaches,butalsotoallowus—asacommunity—tohaverichdiscussionofthefield,gapsand
+opportunities,creatingpathwaystowardsadeepercollaborationamongthisrichsetofdisciplines.
+5.1 ResearchGaps—ERTargetsPerspective
+Onewayofidentifyingremaininggapsisthroughforegroundingconsiderationsofthepsycholog-
+icaltargetsourinterventionsaimtoimpact:i.e.,thepsychologicalprocessesnecessarytodevelop-
+ingERskillsandthinkingabouthowtheseare—orarenot—supportedbyany oftheinteraction
+designcomponentsweseeacrosstheliteraturesofar.
+5.1.1 LackofTransferSupport. TransferisacrucialpartofERinterventions.Enablingpeople
+to,e.g.,bettercopewithdailysettingwithoutongoingsupport iscrucialforlong-termimpactand
+sustainabilityofeffectivesystems.Lackoftransfer-enablingsupportin-situisoneofthekeygaps
+inexistingnon-technologicalinterventions(cf.,Section2).However,asdiscussedinSection4.2,
+less than 15% of interventionswere specifically designed to reduce end-user dependenceon the
+interventionsystem,i.e.,toenabletheend-usertodevelopandthenuseemotionregulationstrate-
+giesontheirown([4,5,81,87,108])–andmostofthesereliedonnon-technologicalapproaches
+totransfersupport(e.g.,[4,5, 87]. Theremaining 31interventions(implicitly)assumedthatthe
+developedsystemswouldhavetoprovideongoingsupportfortheinterventiontobeeffective,and
+thustheeffectswoulddisappearifthesystem(suchasawearablefeedbacksystem)wasremoved.
+We expect the questions around supporting transfer and skills development will be a highly
+fruitfulavenueofresearchinthenearfuture:itisachallengewhichinnovativetech-enabledin-
+terventiondeliverymechanismscouldbewellfittedtoaddress,butalsoonewhichhasnotbeen
+exploredsofarand,thus,adirectionwherelikelymanylow-hangingopportunitiesexist.Within
+theframeworkmodelweseetransferasdesigninginnovativeconnectionsbetweencomponents
+sittingattheoppositeendsofthewheres/whensandhowsspectrums:forexample,connectingwhat
+islearnedinanofflinecomponent(e.g.,bio-feedbackgame)withscaffoldingon-the-spotapplica-
+tion(e.g.,reminders,on-goinghapticfeedback,orothernewstrategies)isonepromisingapproach
+toaddressingthiscrucialchallenge.Similarly,envisioningapproachesthatcombinedidacticcom-
+ponents(suchascognitiverestructuring)withexperientialapproaches(suchason-the-spotexpe-
+rientialsupport)arelikelytoleadtoincreasedtransfereffects.
+5.1.2 Uneven Support for ER Strategies. As outlined in Section 4, the support for individual
+ER strategies (situation selection, situation modification, attentional deployment, cognitive
+change, response modulation) is not evenly distributed: across all delivery mechanisms, most
+of the interactive components are targeting response modulation strategies (although these are
+theoretically known to be less effective in the long term), with other well-established strategies
+suchascognitivereappraisal orattentionaldeployment virtuallyunsupported.Thisisparticularly
+pertinent for on-the-spot and experiential components, and the reliance on simple reminders
+and/or non-technological module delivery in others. We also note that recent work suggests
+that digital technologies are already often used by participants for situation selection as part of
+everydayuse(cf.,[101]),buttheseapproachesareyetunder-representedintheinterventionswe
+seeinourstudysample.AsimilarpictureemergeswiththestagesoftheERprocess(identification,
+selection,implementation,monitoring),wheremostsystemspredominantlyfocusonsupporting
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 30 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:31
+implementationofspecificstrategies(i.e.,mostlyresponsemodulation),andtheremainingaspects
+remainunsupported.
+5.1.3 LackofEfficacyDataon(Multi-)ComponentSystems. Todate,thereisalackofdataabout
+efficacyofanyofthefourcomponentsthatwouldprovideevidencethattheseapproachesleadto
+intendedEReffects.Practically,thisislikelyduetoseveralpropertiesoftheexistingstudiesand
+systems:First,giventheearlystageofmostHCIresearchtodate,thereisalackofrobust,hi-fidelity
+prototypesthatcanbedeployedincontrolledorRCTstylestudies.Onlyninearticles(e.g.,[5,21,31,
+51]wereclassifiedaslatestageinwhichsystemswerereadyforwidespreaddeployment.Second,
+ofthe25articlesthatdidhaveafocusoninterventionefficacy,fewhadoutcomemeasuresbased
+onabilitytoselectandimplement(ormonitor)specificERtargets(exceptions[5,31,81]).Other
+measuresoftenincludedpre-posttestratingsrelatedtostress,anxiety,anddepression(e.g.,[5,51,
+54,81]),performanceonfollow-uptasks(e.g.,[108])andsomestudiesalsologgedandanalyzed
+physiologicaldataduringsessions(e.g.,[54,56,103,104]).Lastly,evaluationmethodologiesrarely
+includedexperimentaldesigns,withonly4field-basedexperimentalstudies[4,5,31,51]andtwo
+RCTs[81,104].Instead,themethodologiesreliedonobservational(e.g.,[54,56])orvariousforms
+ofcomparativedesigns(e.g.,[89,103,103]).
+More broadly, moving from innovation to efficacy testing is a common challenge across HCI
+research (cf., [80]), with a combination of two systemic factors seemingly at play: first is the
+difficulty—andcost—ofresourcingafulldevelopmentfrominceptiontoprototypestorobust,large
+scaledeploymentsthatwouldbenecessaryfortestingefficacy.Second,giventhepremiumvalue
+placedoninnovationandquickpublicationcycles,HCIresearchersareperhapslessmotivatedto
+runextensiveandoftenslowvalidationstudies(cf.,theclinicalpsychologyfieldwhereitisnotun-
+commonforstudiestotake2-3yearsbeforeanydataiswrittenup)andoftencanstruggletoreceive
+fundingtoso(assuchstudiesmightbetoo‘mundane’fortechnologyfunderswhilebeingandtoo
+‘risky’andun-tetheredforpsychology).However,asHCImovesintotheclinicalandhealthspace,
+there is a need to address these issues on both practical and systemic levels – see [22] and [12]
+foranalogousargumentsintechnology-enabled(mental)healthinterventionsmorebroadly,and
+thesuggestedopportunitiesforresearchintheemotionalregulationinterventionspaceoutlined
+inSection5.3below.
+Wenotethatfocusonearlysystemevaluationthroughcollectingprocessmeasures isonepos-
+sible approach that can practically address some of the challenges above while fitting into rela-
+tively traditional HCI deployment studies. One of the benefits of including process measures is
+thattheycanbeusedtoassessthevalidityofthetheoryofchangeandrelatedlogicmodelinearly
+deployments,suchasthroughoptimisationandmicro-RCTstudiesusedinbehaviourchangere-
+search[18,49].However,suchapproacheswerestillnoticeablymissingfromtheworksofar(with
+theexceptionof[89]).Inparticular,althoughmanyearlystagestudiesexploredprocessoutcomes
+relatedtointeractionaldesign(e.g.,interpretationofdifferentmodalitiesofdatarepresentation),
+onlyfewincludedanytypeofprocessoutcomesthatmightindicatetoEReffects,suchasperceived
+psychologicalimpactoftheintervention[88]orlearningtrajectories[4].Examinationofbothpsy-
+chologicallyvalidoutcomeandprocessmeasuresrelatedtolearning,mastering,anddeployingER
+strategiesinrealworldsituationsisanotherpromisingareaforfuturework.
+5.2 ResearchGaps–InterventionDeliveryMechanisms&TheirImplementation
+Perspective
+Anotherapproachtoidentifyingpromisingfutureworkdirectionsisinforegroundingthedesign
+considerationsaroundplausibleinterventiondeliverymechanisms:i.e.,whatdowenotyetknow
+aboutthepossiblyinnovativewaysinwhichERinterventioncomponentscouldbedeliveredto
+ourpopulations?Whatarethenovelapproachestosupportingthehows,andthewheres/whens?
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 31 End (Direct) ---
+
+13:32 P.Slovaketal.
+In what follows, we again highlight what we see as the most interesting questions, separated
+according to the delivery mechanism types as identified in the strategy part of the framework
+(cf.,Section3.4).Eachoftheparagraphsstartswithareminderofthedefinitionfortherespective
+components,andfollowsupwiththecorrespondinggapsinexistingliterature.
+5.2.1 Didactic. Thesecomponentsfocusonthedeliveryofinformationandsupportingitscon-
+sciousapplication,evenifitisnotimmediatelydonewithinthetargetedsocial-emotionalcontext.
+(1) Most of the systems focus on information delivery, but far fewer technology-enabled ap-
+proachesare available for supporting usersto put these intopractice, whetherthatis within
+real-worldsituationsorwithinout-of-contextpracticeexamples.Forexample,cantechnol-
+ogyprovidestep-by-step(butstillmeaningful)scaffoldingtopracticenewlytrainedskills?
+Whatwoulditmeantore-designtheexistingreflectionsupporttoprovidemoredirectinter-
+ventionsupport,movingbeyondsimpleself-awarenessorpatterndetection(e.g.,emerging
+EMA-as-interventionapproaches[8])?
+(2) Welackresearchoninnovativeapproachestoinformationdeliverythatwouldembeddidactic
+learning into participants’ lives (rather than relying on traditional module-based delivery
+orsimplereminders).Forexample,howmighttechnologyhelpdecompose/personalisethe
+existingcognitivemodulesintobite-sizedpieces,e.g.,forthelearningtobeaccessedbased
+onimmediateneed?Howmightexisting/newHCItechniquesdrawontraditionalrole-play
+techniquestoamplifythelearningofERskills(e.g.,story-basedlearning,embodiedgames,
+engagingfictionalworlds&narrative)?
+5.2.2 Experiential. Thesecomponentsfocusonmediatingthefirst-handexperienceofapplying
+a specific emotion regulation strategy. In other words, such components provide scaffolding in
+supportoftheperformativeaspectsofskillsdevelopment.
+(1) Wehaveyettoseeresearchonhowperformativeaspectsofwell-knownadaptiveERstrategies
+(suchascognitivechange,attentionaldeploymentorevensituationmodification)couldbe
+experientiallysupportedthroughinteractivetechnologies.Forexample,howmightcognitive
+reappraisalpracticebesupportedthroughadigitalsystem(e.g.,throughscaffoldednarrative
+experiences,ongoingreflection,orotherideas?).Whatwouldbealternativeinteractionde-
+signmechanismstoprovideexperientialsupportbeyondbio-feedbackoron-bodyhaptics?
+(2) Asarelatedaspect,wesofarlackresearchonhowtechnologycoulddirectlyscaffoldand/or
+guide users through the emotion regulation experience. For example, how might we apply
+known(orenvisionnew)interactiondesignmechanismstoguideusersthroughemotional
+experiencetrajectories[10,96],ratherthan‘just’givingfeedbackontheiremotionalstate?
+Howmighttheseopportunitiesbesupportedthroughemerginginteractiontechniquessuch
+asembodiedgames[45,46],digitalarts[10],ormixedrealitydevices?
+5.2.3 Offline. The main characteristic of offline intervention components is that they aim to
+supportdevelopmentofemotionregulationstrategiesindeliberatetrainingcontextsratherthan
+indailylife.Thetrainedskillsarethenexpectedtobetransferredintoeverydaysituationswhere
+strongemotionsnaturallyarise.
+(1) Existingworkdrawsonaverylimitedrangeofinteractivetrainingcontexts:sofar,thesystems
+arelimitedtoeither(stress-inducing)videogamesorrelaxationsupport.Forexample,how
+might we utilise technologies such as VR, tangible devices, or interactive arts to facilitate
+emotionregulationtrainingloopsinabroaderrangeofemotional/socialcontexts(including
+attention/cognitive reappraisal techniques)? What would it mean to draw on multiplayer
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 32 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:33
+experiencestoenablenewwaysofexperiencing/scaffoldingemotionregulationtechniques,
+whetherthatisinagame,virtual/mixedreality,orasanasynchronousinteraction?
+(2) Similarlytomuchofbehaviourchangeliterature,existingsystemslackinnovativetechniques
+toscaffoldeffectivepsychoeducation,beyondthein-persontechniquesthatarealreadywell-
+establishedinclinicalwork.Forexample,howmightofflinedesigncomponentssuchasbio-
+feedbackbeeffectivelycoupledwith(interactive)psychoeducationapproaches?Howcould
+thesebetransformedtodirectlyguidesupportuser’ssensemakingandlearningfromdata
+collected in-situ (as such insights are often at core of psychoeducation approaches)? And
+finally, how might such systems be designed to specifically support training of individual
+stagesoftheERprocessthathavebeensofarunder-representedinthecurrentwork(e.g.,
+identificationormonitoring)?
+5.2.4 On-the-spot. Thesecomponentsaimtotrainemotionregulationstrategiesduringnatu-
+rallyoccurringemotionalsituations(e.g.,stressfuleventsindailylife).Therefore,theskillsprac-
+tisedareimmediatelyappliedtothespecificemotionalsituation,asmediatedbythetechnological
+orin-personintervention;and—whatiscrucial—nofurthertransferofskillsisexpectedorneeded.
+(1) In contrast to the other three delivery mechanisms, we see a large range of potential tech-
+niquesused(user/system/situation-specific;ongoing/discrete)butineffect,noneoftheexisting
+interactiondesignsisexploredindepth.Howmightwebetterunderstandthebenefits/costs
+ofindividualapproachesintermsoflearningimpacts(e.g.,whenisitbettertorelyonuser-
+vssystem-initiatedcomponents,andwhenisacombinationrequired?)
+(2) At the same time, on-the-spot components are so far relatively limited in the types of spe-
+cific technological mechanisms used and emotional processes supported: these are predomi-
+nantlyeithersimplereminders(‘remembertoreappraiseyouremotions’)orsomeformof
+(on-body)hapticfeedback.Whatotherformsofon-the-spotdeliveryarefeasible?Especially,
+how could we use interactive technologies to embed support for ER skill application into
+momentsofheightenedemotionalexperiencesineverydaylife(e.g.,similarlytotheatten-
+tion/response modulation impact of the Smart toys research stream [88, 97])? How might
+newsystemsutilisesocialinteraction(forbetter/worse)tosupportemotionregulationprac-
+tice, considering that most of our day-to-day interaction is in dyadic/group systems (e.g.,
+families,households,friendshipgroupsenvironments)?
+5.3 GuidingtheInterdisciplinaryCommunityDevelopment
+Finally, we discuss how the framework can support the emerging research community around
+technology-enabledemotionregulationinthinkingaboutthefield.
+Wearguethat—withinsuchaninherentlyinterdisciplinaryspace—itisimportanttosupportre-
+searchersandpractitionersacrossthefullscalefrommostlyHCIcontributions(e.g.,excitingtech-
+nology innovation with potential downstream ER impacts) to mostly psychological contributions
+(e.g.,measuringpsychologicalimpactofrobustinterventionsystemstestedinlargescaledeploy-
+ments).6
+Asanexample,weoutlineonepossiblewayofstructuringourthinkingofsuchprogressionbe-
+low,recognisingtheimportanceofresearchengagementatalllevelsofinterest,resources,andre-
+searchgoals—withtheframeworkprovidingacommonlanguageandconceptualstructureacross
+arangeoftechnological/designreadiness.WehaveaddedprospectiveHCIconferencevenuesto
+furtherillustratethetypeofworkonemightimaginebeingproducedateachofthelevels.
+6See,e.g.,[22]forananalogousprocessinthecontextofonline-CBTresearchinthelasttwodecades!
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 33 End (Direct) ---
+
+13:34 P.Slovaketal.
+(L1) theory-informedinterventioncomponentdevelopment
+(UIST,UbiComp,DIS,CHI)
+i.e.,focusontechnology/designinnovationandexploration,butwithaframeworkhelpingto
+infusepsychologytheoryintoHCIdesignofpotentialinterventiondeliverymechanisms
+(L2) focusedinvestigationofsupportingspecificERstrategies
+(DIS,CHI)
+i.e.,focusonre-envisioning/validatingmechanismimplementationsfrompriorleveltounder-
+standtheirimpactonERtargets,withoutnecessarilydevelopingafullintervention
+(L3) combiningexistingdesigncomponentsintopossiblereal-worldinterventions
+(CHI,CSCW,JMIR)
+i.e.,utilisingsuccessfulimplementationsofdeliverymechanismsinnewways,withthefocus
+onunderstandingappropriationandpotentialforreal-worldimpact
+(L4) understandingforwhom,where,andhowproposedinterventionswork
+(CHI,JMIR,main-streampsychologyjournalssuchasLancetDigitalHealth)
+i.e.,focusonefficacyandeffectivenessdata,includinglarge-scalerandomisedtrialsandpolicy
+implications
+Ineachoftheselevels,theframeworkcanorientHCIdesignerstothekeydesignchoiceseven
+iftheyarenotpsychologyexperts;andinthelaterstages,canhelporientpsychologyresearchers
+tothecapabilitiesoftechnologieswithoutrequiringsubstantialinteractiondesignknowledge.
+Inparticular,weseetheframework’sseparationofthe‘whats’,‘whens/wheres’,and‘hows’as
+guidingHCIresearchersin:(i)selectingappropriateERtargetsandoutcomemeasuresasrelevant
+for the granularity level (i.e., ‘whats’); (ii) building on each other’s work as well as positioning
+it within the broader community (i.e., within the ‘whens’ and ‘hows’); (iii) inspiring innovation
+through facilitating re-use and appropriation of interaction design components across contexts
+intoeffectiveinterventions;andfinally,(iv)progressivelyfacilitatingthetransitionofpromising
+researchprototypesfromHCIintothehandsofthepsychologycommunity,includinglarge-scale
+real-worldinterventiondeployments.
+In addition, the modularity inherent in the framework—e.g., thinking about technology com-
+ponents as implementing particular delivery mechanisms as part of the strategic whole—could
+promotebetterfindingsandtransferabilitybetweenwhatwouldbeseenasthefocusofdifferent
+communities(e.g.,thosepublishinginUISTvs.JMIR).
+6 CONCLUSIONS
+The main aim of this work is to help combine innovative HCI intervention approaches with
+substantial knowledge about the fundamental emotion regulation models from psychology. The
+proposedframeworkisthenawayofsynthesisingthekeyaspects:encapsulatingthepsychology
+fundamentals (theory component, Section 2); articulating plausible technology-enabled delivery
+mechanismsthatcouldbesupportedbyinnovativetechnologies(strategiccomponent,Section3),
+as well as the understanding of what has been done so far within HCI (practical component,
+Section 4). Finally, Section 5 highlights how such considerations can also help shape future
+researchattheintersectionoftheHCIandpsychologyfields.
+Overall, it is our hope that the HCI research community can draw on the three parts of the
+framework—theory, strategic, practical—and the associated research agenda to support research
+at differing scale of granularity: from helping guide the overall research field as well as individ-
+ual research programmes, to supporting specific design projects. On the research field level, the
+framework aims to provide a common language and conceptual structure to connect research
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 34 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:35
+work across a range of technological/design readiness; and to enable rich discussions about the
+keyresearchquestionswe—asaninterdisciplinarycommunity—shouldaimtoaddress.
+Ontheindividualresearchprogrammelevel,weexpectthatindividualresearchersmightmost
+benefitfromthepracticalframeworkcomponenttohelpidentifyanyremaininggapsinexisting
+work,whilepositioningtheirworkinthebroaderfieldwiththehelpofthetheoryandstrategic
+components. For example, a Principal investigator (PI) identifies the relative lack of technology-
+enabledsupportforcognitivereappraisal(e.g.,incontrasttoresponsemodulation),andisinter-
+estedinunderstandingwhether/howsuchinterventionscouldbedevelopedinVR(whichisalso
+missingfromexistingliteratureandthePIhasexpertisein).
+Finally,onthespecificstudylevel,theframeworkcanbothhelpsharpentheresearchquestion
+(intermsofspecificgaps),whilealsoenablingthePItore-useandappropriatehelpfultechniques
+fromacrossthefields.Forexample,tocontinuewiththecognitivereappraisalinVRnarrativefrom
+above,aPIcouldusetheframeworkasfollows:
+—ThetheorycomponentguidestheteaminpickingtherespectiveERtarget(e.g.,specific
+cognitivereappraisaltechniquestotrain)andoutcomemeasuresfrompreviousexperimental
+workinpsychology.
+—Thestrategiccomponenthelpssystematisedesigndecisionsaroundtheplausibledelivery
+mechanisms (e.g., deciding to include a combination of offline, experiential, and didactic
+components).
+—Thepracticalcomponentthenhelpsidentifyspecificdesignchoices:forexample,thePI
+mightchoosetoincludeadidactic psychoeducationcomponent(inspiredbypriorDBTin-
+tervention) as an entry into the newly developed offline VR experience (core contribution
+of the project), with experiential support through biofeedback (re-using some biofeedback
+mechanisms from a game-based prior work) and emotional narrative experiences (also a
+corecontribution,byre-purposingvignettesfromtherapyintoimmersiveVRexperience).
+Itisworkacrossalltheselevelsthatisneededtohelpturnthecurrentemerginginterdisciplinary
+interestintoacoherentbodyofresearchwiththepotentialfordeliveringsubstantialreal-world
+impacts on people’s lives; and we hope this paper can invite, motivate, and support researchers
+fromacrossHCIandpsychologytojoininonthisjourney.
+APPENDICES
+1 SCOPINGREVIEWOFEXISTINGHCISYSTEMS/INTERVENTIONTARGETINGER
+InthisAppendixweprovideadetailedsynthesisthroughascopingreviewofresearchdoneinHCI
+relatedtothedevelopofinteractivetechnologically-basedinterventionsthatsupportlearning,de-
+velopment,andpracticeofemotionregulationwithadultsand/orchildren.Overall,themainfocus
+wastoidentifyandcodemostifnotallexistingHCIworkintermsofthepsychologicalmecha-
+nisms behind the interventions (where possible), in addition to the more commonly addressed
+aspects(e.g.,typeoftechnologyused).
+1.1 ScopingReviewMethodology
+Specifically,wechoseascopingreviewmethodologytodevelopadetailedsynthesisofthetype
+andrangeofstudiesavailableonthisemergingtopicindigitalmentalhealth[6]:suchapproach
+is appropriate to identify the types of evidence available for a topic (which may be split across
+severalfields,orsubfieldsofHCIinourcase),toexaminehowresearchhasbeenconducted,and
+toidentityknowledgegaps,whichisinalignmentwithouraims.Ascopingreviewisconducted
+usingasystematicprocedure,whichcanbereplicatedandoftenaimsidentifyknowledgegaps[67].
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 35 End (Direct) ---
+
+13:36 P.Slovaketal.
+ThefullcodeddatabaseofpapersaswellastheRcodeusedforanalysiswillbemadeavailable
+throughtheOpenScienceFramework.
+Thisapproachenabledustosynthesisehighlevelthemesrelatedtothekindsofresearchthathas
+been done related to interactive technology development for learning, developing, or practising
+ER, with a specific focus on research with an end goal of creating ER interventions. The results
+of our scoping review provided a synthesis of research to date, serving as a foundation for our
+analysis of the four delivery mechanisms we focus in our framework (Section 4) and enabling
+ustohighlightgapsoropportunitiesforHCI,whichwediscussedinSection5ofthispaper.We
+present the detailed scoping review methods and results here as context for our paper and for
+thoseinterestedinmoreinformationorgettinganoverviewofthecurrentstateofthefield.
+SelectionandFiltering: Weconductedaliteraturereviewthattargetedfullpapersandnotesas
+well as high quality works-in-progress that were published in top venues in HCI. We targeted
+theACMdigitallibrary,IEEEdatabasesandusedGoogleScholartosearchforpaperspublished
+betweenJanuary12009andDecember82021.Ourkeywordsearchcriteriawere‘interactivetech-
+nology” (i.e.,involved human-computerinteraction)andoneormore of‘emotionregulation’or
+‘self-regulation’or‘stress’or‘stress-regulation’.Thesearchresultedin5,574papers.Wethencon-
+ducted two passes of filtering (see Figure 9) based on title and keywords, excluding papers that
+were non-English, duplicates, review papers and/or did not address human emotion-regulation,
+leaving333papers.
+During the third and fourth passes of filtering, we scanned abstracts and/or full texts and ex-
+cludedpapersthatdidnotinvolveaninteractivetechnology(e.g.describedastudywithnodigital
+technologyorwithanon-interactivetechnology)andreviewedpublicationvenues,removingnon-
+peer reviewed papers and papers that were published in non-international publications, leaving
+130papers.Inthefifthandsixthpassesoffilteringwereviewedthefulltextandexcludedpapers
+thatdidnotincludeanevaluationorauserstudyofanykindordidnotincludeanyinformation
+thatcouldbeusedtoidentifyoneormoreinterventionmechanisms,leaving52papers.Finally,we
+conductedaseventhpassinwhichwereadthefulltextandexcludedpaperswheretheend-goal
+of the research was not an emotion regulation intervention (resulting in 36 papers), which was
+necessaryforthefollow-upanalysisdescribedinSection4.Thisisthedatasetthatwereporton
+inbothSection4andinthisAppendix.
+InductiveAnalysisProcess. Ouranalysisprocessfollowedaninductiveinterpretiveanalysispro-
+cess,similartoopencodingingroundedtheory[20],sincewedidnothaveanestablishedanalytical
+framework for coding the articless that were selected in our scoping review [6]. In this process,
+weiterativelyidentifiedthemesordimensions,whichdescribetheresearchpapersfromdifferent
+perspectives. For each dimension we iteratively and comparatively developed and defined cate-
+gories,resultinginthedevelopmentofacodebook,whichwethenusedtocodetheentiredataset.
+WeusedourresearchgoalsandfocusonERinterventionstostructurethisinductiveanditerative
+process,beginningwiththetworesearchers(firstandlastauthors)workingtogethertoidentity
+thesixdimensionsoftheanalysisframework,asdescribedabove.Thedimensionswerederived
+afterreadingthroughaquarterofthearticlesandskimmingmanyothers.Weworkedindividually
+andthentogethertoderivethefollowingsixdimensions:
+We included the (1) type of technology dimension because it enabled us to take a snapshot of
+thekindsofhardware(e.g.,platform,input,output)currentlybeingusedtocreatesystemsused
+inERinterventionresearchinHCI.Wealsoexaminedwhereeachresearchstudyfellonatypical
+research(2)stageinresearchlifecycle(i.e.,early,mid,latestage),whichhelpeduscharacterizethe
+maturity of each study and better understand current state of the field. Third, we described the
+underlying(3)HCIresearchfocus bycodingclustersofHCIresearch,eachrepresentingdifferent
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 36 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:37
+Fig.9. Flowdiagramofpaperselectionprocess.
+theoretical,methodologicalandinterdisciplinarytraditionsfoundinHCIresearchasappliedtoER
+interventioncontext.Toexplicitlycapturethepsychologicalcomponentsofinterventions,wethen
+coded for (4) the intervention mechanism – that is the psychological ‘theory of change’ through
+which the intervention is assumed to affect emotion regulation (e.g. Reminders, Biofeedback);
+(5) the level of specificity of that mechanism (i.e., high, medium, low); and the intended use case
+(6) ongoing vs skill-development support, i.e., whether the intervention was designed to be used
+indefinitely(andeffectswoulddisappeariftakenaway),oraimedasatemporaryscaffoldingfor
+skills development. The last dimension is particularly important given the ramifications for the
+longtermeffectivenessofinterventions,aswellasthelearningtheoriesunderpinningtheinter-
+ventiondesigns.
+Oncedimensionswereidentified,thedatasetanalysisphaseconsistedoftwooftheresearchers
+working inductively to iteratively to develop initial categories and coding rules for each of the
+sixdimensions.Thiswasdoneduringindividualandsharedanalysissessions,eachfocusingona
+subsetofthedimensions(e.g.,(3)HCIfocusand(4)interventionmechanism),overasmallsubset
+of papers. Once categories were defined, the researchers then individually reviewed and coded
+about 25% of the papers across all six dimensions, together reconciling, revising and finalizing
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 37 End (Direct) ---
+
+13:38 P.Slovaketal.
+descriptionsofcategoriesandcodingrulesforeachofthecategories.Thiscodebookwasfinalised
+after we had read and analyzed about half the papers, at which we had well-defined dimension
+categoriesandstablecodingschemesforeachdimension.
+Assuch,theresultingcategorieswithineachofthedimensionshavepredominantlyemerged
+fromthedataandarethuspresentedtogetherwiththeresultsoverviewbelow.Wealsocoded(7)
+theextenttowhicheachsystemreliedonin-the-moment(on-the-spot)vs.out-of-context(offline)
+training;andcognitive(didactic)vsexperiential(experiential)learning;theseresultsareaddressed
+indetailinSection4.3ratherthanhereastheyarecoretoourframework.
+1.2 Results
+Overall the papers are comprised of 36 peer-reviewed papers, split 63.9% ACM, and 19.4% IEEE
+databases,with theremaining 16.7%availablethrough Google Scholar.In whatfollows, we first
+outlinetheresultsforeachofthedimensionsseparately,andthenhighlightsomeofthearising
+connections.Eachsectionstartswithanoverviewofhowthecategorieswithinadimensionare
+representedinthedataset.
+1.2.1 Type of Technology. We classified papers by the type of hardware technologies used to
+implementprototypesorsystems.Theclassificationwasnotmutuallyexclusive,assomesystems
+involvedseveraltechnologies(i.e.,morethanoneplatform,inputand/oroutputdevice);however
+itprovidesasnapshotofthekindsoftechnologiescurrentlybeingusedintocreateERinterven-
+tionsinHCIresearch.Themostcommonplatformsweremobiledevices(16)anddesktoporlaptop
+computers(11),withseveralotherdevicessuchassmartwatches(4),andbespokeembeddedcom-
+putingprototypes(10).Sevenpapersdescribedsystemsthatwereanassemblyinvolvingcustom
+hardware(i.e.systemwascustom-madeassemblyofdevicesandelectronicparts),theremainder
+ofpapersinvolvedsystemscreatedfromcombiningoneormorecommerciallyavailabledevices.
+Thesensor(s)—connectedtothemainplatformforsystems—includedavarietyofbiosensors(e.g.
+respiratory,HR,EMD,EEG,GSRsensors)andnon-screenbasedoutputdevices(s)whichincluded
+VRheadsets,tangiblefidget,lampdisplay,hapticseatpad).
+1.2.2 Stage of Research. HCI investigations may take place over a broad ‘lifecycle’ of design
+research,spanningfromearlydesignexplorationstolarge-scalein-the-wildstudies.Weclassified
+papers based on where the described interventions were on this research trajectory. To simplify
+matters,wecodedthepapersasearly,mid,orlatestage.Thisqualitativeassessmentincorporated
+a range of factors, spanning the research questions addressed by paper authors (e.g., examining
+viabilityofanewdesignconceptorformfactor,versusefficacyevaluationofrobustsystems);the
+purpose and methodology of the evaluation (formative vs summative study designs); as well as
+therobustnessoftheexaminedprototype(e.g.,testingacomponentofafuture-envisionedsystem
+in-lab,versusin-situdeploymentsofrobustfullsystemimplementation).
+Specifically,the13paperswecodedasearlystageresearchfocusedonthedesignofprototypes
+andformativeevaluations.The14articlescodedasmid-stageresearchfocusedoniterativedesign
+and evaluation of more complex and/or robust prototypes with formative or summative evalua-
+tions.Finally,the9paperscodedlatestageresearch involvedhi-fidelity,robustresearchsystems
+thatwerereadyforwide-spreaddeploymentandsummativeevaluationsinlaborfieldstudies.
+1.2.3 HCI Research Focus. The papers in the data set differed markedly in their theoretical
+grounding (from post-positivist to critical design) and the contributions they attempt to make
+(e.g., from verifying intervention efficacy to introducing innovative design ideas). The resulting
+twomaingroupingsreflectatraditionalHCIfocusonevaluation,andadesignorientedapproach
+toresearch.Examplepapersareasfollows:
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 38 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:39
+—InterventionEfficacyResearch(n=26)involvesresearchinwhichthefocusandmotivation
+are on evaluating the effectiveness of a technology-mediated intervention in terms of
+improvinglearning,developingorpracticingERinavarietyofcontexts(e.g.,lab,home,ev-
+erydayactivities).Ofthesemostpapersweremidtolatestageresearch,withtheexceptions
+tendedtofocusonearlystagefeasibilitystudies(e.g.,[25,52,88].Theevaluationsweresplit
+across all intervention mechanisms described below in Section1.2.4, including Awareness
+(5), Physiological Synchronization (3), Reminder and Recommendations (6), Biofeedback
+(10)andOther(2):InstudiesofsystemsbasedonmechanismsofAwareness,Physiological
+SynchronizationandR&R,researchdesignstendedtowardsmixedmeasuresobservational
+studies. While the results of many of these studies were largely positive, the measures
+used typically focused on end-users’ ability to use and understand the systems involved
+in interventions, rather than evaluating changes in skills development around ER. Most
+evaluations resulted in findings related to the need to change aspects of the design of the
+intervention.
+Biofeedback-basedinterventionstendedtobeevaluatedatahigherlevelofrigor.Those
+at mid or late-stage were either observational studies (e.g., [54, 56]) or various forms of
+comparative (e.g. [89, 103, 103]) or controlled experiments (e.g., [5, 51, 108]). There were
+twoRCTs[81,104].Measuresoftenincludedpre-posttestratingsrelatedtostress,anxiety,
+anddepression(e.g.,[5,51,54,81]),performanceonfollow-uptasks(e.g.,[108])andsome
+studiesalsologgedandanalyzedphysiologicaldataduringsessions(e.g.,[54,56,103,104]).
+InmanyofthesestudiesparticipantswereoftenchildrenwithERchallenges(e.g.,ADHD,
+anxiety,fetalalcoholsyndrome).Ingeneral,resultswereoftenmixedwithpositiveevidence
+related to showing a direct impact of the intervention on participant’s ability to regulate
+stress and/or anxiety during the intervention (for an exception see [81]). However, lack
+of controls, short duration of interventions and/or lack of direct measures of ER skills
+developmentmeasuresoutsideoftheinterventionlimitvalidityandgeneralizability.Only
+two studies measured transfer of ER skills into everyday life or administered a follow-up
+testtodeterminemaintenanceofeffects[4,5].
+—DesignOrientedModalityResearch(n=10)involvedworkinwhichthefocusandmotivation
+wereonexploringtheimpactofdifferentmodalitiesofinputandoutputonuserperception,
+engagement and/or other UX-focused measures. These design oriented articles were
+entirely early to mid-stage research. Out of these, several papers focused on comparing
+differentformsofoutputstosupportphysiologicalsynchronization,includingacomparison
+ofplacementforhapticactuatorsrepresentingheartrate[61],andcomparisonsofdifferent
+representations of breath (e.g., haptic versus voice [72]; tactile versus visual and audi-
+tory[15];pacing[65]).Severalotherpapersinvestigatedmodalitiesutilizedinbiofeedback
+systems,includingtheuseofvisualmetaphoricrepresentationsofstressovertime[107],the
+interplayofbreathandheartratewithtangibleandlightoutputs[53],acomparisonofdiffer-
+entphysiologicalinputs[73]andexploringthetiminganddurationoffeedback[74].These
+types of explorations are necessary to understand the impact of design decisions on user
+experienceaspartoftheiterativedevelopmentofsystemsthatcanbeusedinterventions.
+Whilewedidnotincludetheseasseparatecategories,someofthepapersalsomentioned
+the importance of personalization, for example of design choices relative to placement of
+hapticactuators[61])ortriggersforrecommendations[71].Similarly,otherarticlesmention
+theimportanceofsocialfactorsasasecondaryconsiderations,forexample,theimportance
+of facilitator rapport is cited as a key factor leading to positive results in a biofeedback
+intervention for children [5] and teacher created content for interventions [25]. The role
+of physical artefacts for scaffolding for parent-child interactions to bridge SEL learning
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 39 End (Direct) ---
+
+13:40 P.Slovaketal.
+fromschooltohomewasexploredin[87].Theseandotherstudiessuggestthebenefitsand
+importance of considering the personal and social landscape of ER interventions, an area
+thatiscurrentlyunder-representedinHCIresearch.
+1.2.4 InterventionMechanisms. ComplementarytotheHCIresearchfocuscategorisation,the
+coding of the intervention mechanisms aims to identify the commonly occurring psychological
+mechanismsthatthetechnology-enabledERinterventionworkreliedon.Thepurposeistohigh-
+lighttheimportanceofthetheoreticalgroundingusedexplicitlyorassumedaspartoftheinterven-
+tiondesigninterventions,aswellasidentifythecommonalitiesanddifferencesacrossthevaried
+interventionsinourdataset.
+—Biofeedback(n=14)Biofeedbackwasthemostcommonlyusedinterventionmechanism.Sys-
+temscreatedwiththismodelallassumethatuserswilltrytoconsciouslyorunconsciously
+modifytheirbehaviorasameanstoaltertheirphysiologicalorneurologicalstateclosertoa
+targetstate.Papersvaryintermsofinputdatasource,whichmaybesensedphysiologically
+(e.g.,HVR[107])orneurologically(e.g.,EEG[4,5,56]).SeveralpaperscompareinputModal-
+itiesrelatedtobiofeedbackdesign(e.g.,[73,74]),andothersexploreoutputrepresentations
+(e.g.,light[107]).MostbiofeedbacksystemsarePC-based,howeverthreesystemswerede-
+signedformobileuse[4,5,108].Thereisagroupofpapersinwhichbiofeedbackisembedded
+intovideogamesasameanstopracticeERinthecontextofgame-play(e.g.,[54,56,81,103]),
+whentheseinterventionsareevaluatedforefficacy,researchdesignchoices(e.g.,lackofcon-
+trolgroup,nodirectmeasuresofER)oftenlimitedvalidityand/orgeneralizabilityofresults.
+Some interventions explicitly provided support to end-users to learn how to modify regu-
+latory responses (e.g., [4, 5, 51], but most relied on user’s ability to interpret visual forms
+of feedback and use that to regulate mental or emotional states. For example, in biofeed-
+back video games, bio-data impacts game mechanics that are communicated to the player
+throughdynamicvisualrepresentations(e.g.,[56,81,103]).Otherbiofeedbacksystemsuse
+visualrepresentationsbasedonmetaphortheory(e.g.,[4,5])thatprovidemetaphor-based
+cues to how to modify mental and/or emotional states. Over time the goal of biofeedback
+istolearnandpracticeemotion-regulation,withandwithoutthesupportofasystemuntil
+emotion-regulatorybehaviorbecomesincreasinglymoreimplicitorautomated.Fewauthors
+describeexplicitlyhowthistransfermightoccur(e.g.,[4,5,74]).Forexample,interventions
+includedbiofeedbackandpsycho-educationwereproposedasameanstoimprovelearning
+to modify emotional state and transfer those skills to everyday life (e.g., [4, 5, 51]). Most
+authorsdidnotaddresslearningtransfer.
+—Physiologicalsynchronization(n=7)paperswerebasedonasystemdesignedbasedonthe
+mechanismofautomaticandimplicitemotionregulationthatmayoccurwhentheindivid-
+ualperceivesanexternalinputthatmimicstheirownbiosignals(e.g.,the‘falseheart-rate
+feedback’ studies emerging since the 60s [99]). Many papers explored the use of haptic
+representationstopromptatargetbreathorheartrate(e.g.,whiledriving[9,72],through
+a smartwatch [15, 21] or wearable custom device [61]). Overall, this research area is still
+in early stages in terms of design choices that might effectively duplicate human-human
+physiological synchronization as a means to support ER. And, as Choi and Ishii point
+out, the success of this approach may depends on the individual’s level of sensitivity of
+interoceptiveawarenessoftheirowninternalbodystatesrelatedtomotionandstress[15].
+In addition, although this approach could result in automatic down-regulation of stress
+through heart or breath rates, the approach does not posit a mechanism for the explicit
+developmentofcompetencyaroundemotionregulationovertime,whichcouldbesustained
+withoutthesystemneedingtoremainactive.
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 40 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:41
+—Awareness(n=5)papersinvolvedmonitoringandtrackingindividuals’dataasameansto
+increaseuser’sawarenessoftheiremotionalstate(s).Inputdatawasgatheredfromcontex-
+tualdata(e.g.,location[44])orfromself-report,whichwasenteredmanually(e.g.,diary[7])
+and/orfromsensors(e.g.smartwatch[103],multi-sensorwristband[52]).Displaysofinfor-
+mationtakeavarietyofforms,largelyvisual.Anunderlyingassumptioninthismodelisthat
+enhancedawarenesswillmotivateuserstotakeaproactiveroleintheirownstressmanage-
+mentand/orthatuserswillreflectontheinformationbeingprovidedtothemandasaresult
+ofthatreflectionchangetheirfuturebehaviours.However,noneofthesepapersexplorethe
+causeandeffectrelationshipbetweenbeingshowninformationandactuallyimplementing
+strategiesforenhancedemotionregulation.Inaddition,noneofthearticlespositamecha-
+nismfortheexplicitdevelopmentofcompetencyaroundemotionregulation,althoughitis
+possiblethatovertimeanindividualmightdevelopcompetencythroughrepetitivepractice.
+—Reminders and/or Recommendation (n = 6) articles describe interventions that involve
+remindersorrecommendationstofollowstep-by-stepinstructionsabouthowtoenactemo-
+tionregulationstrategies.Thearticlesvaryintermsofthecomplexityofemotionregulation
+strategies suggested. All systems highlight the need for customized reminders and recom-
+mendations.Thesemaybetriggeredbasedonmanuallyenteredself-reports[31,89,91]or
+sensor-baseddataindicativeofstress[71,76]and/orthroughmachine-learningapplication
+designed to look for patterns over time [71]. Some systems involved content that was
+customized by others (e.g., teachers, coaches) in terms of strategies [25] or in terms of
+format(e.g.,parents)[31].Othercontentwasmoregeneric,forexamplecontentwasbased
+on strategies from CBT matched to current emotional state [31]. All articles involved
+evaluations,twoatanearlyformativestage[25,76],oneduringdeploymentaspartofthe
+designprocess[71],andthreeinmoreformaldeployment[31,89,91].Onekeyfindingwas
+that for sensor-based push reminders and recommendations the timing rarely coincided
+withthestressfuleventduetoinaccuraciesinbiodatatorepresentstress.Inaddition,Pina
+et al. suggested that in the moment of stress was not the best timing choice for deliver
+of reminders and recommendations [76]. Findings suggest that manually entered data
+self-reporteddatacombinedwithcustomizedandjust-in-timecontenthadapositiveimpact
+over time (e.g. [31, 89]). No articles offer explicit mechanisms that might reduce the need
+forremindersandrecommendationsovertime.
+—Other (n = 4) papers included the use of general relaxation exercises [14] and experience-
+based interventions designed to provide end-users with the experience of emotion
+regulation prior to learning how to consciously regulate [87, 88]. One paper presented a
+systemthatwasmechanismsagnostic,insteadinstantiatingarangeofmechanismsintothe
+intervention[71].
+1.2.5 Specificity (of the Intervention Mechanism). In contrast to psychology research, where
+outliningaclear‘theoryofchange’fortheinterventionisakeypartofthepeerreviewprocess,HCI
+workoftendoesnotexplicitlydiscussthepresumedcausalpathwaysthroughwhichintervention
+effectsshouldemerge.Tounderstandhowthis(lackof)goodpracticeispresentintheemotion
+regulationinterventionspace,wecodedthelevelofdetailorspecificitythatwasprovidedabout
+theassumedinterventionmechanismand/ortheoryofchange[34,70].
+Weusedatripartitescaleoflow,moderateandhighlevelofspecificitydependingonhowclearly
+andexplicitlyoneormoremechanismsleadingtoimprovedemotionregulationweredescribedin
+thepaperandhowclearlyandexplicitlythosemechanism(s)werelinkedtointerventionelements
+posited to create effects related to learning, developing or practicing ER skills. For example, a
+codingoflowwouldresultifatheoryofbehaviorchangewasdescribed,typicallyinrelatedwork,
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 41 End (Direct) ---
+
+13:42 P.Slovaketal.
+butnoexplicitmechanismsweredescribedthatcouldbeusedtodesigntheintervention.Acoding
+ofhighwasusedwhenoneormoremechanismswereclearlyexplainedandexplicitlylinkedto
+design decisions or elements of the intervention, typically technological elements. A paper was
+coded as medium when the mechanisms were present but not well-described and/or the link to
+designelementswasweak.
+Majorityoftheinterventionmechanismsweredescribedbyauthorsinalow(n=15)ormedium
+(n=13)levelorofdetail.Forexample,inmuchofthemodality-focusedresearch,manyauthors
+assume that the right form of input data linked to particular output representations may lead
+to enhanced awareness of various aspects of emotion regulation, which in turn should improve
+emotionregulation.Inpart,thisisbasedoncognitivebehavioraltherapyinwhichawarenessof
+emotional state is posited as a key component of learning ER. However, causal mechanisms or
+directlinkagesfortheseclaimsarenotdescribed,noraretheyalreadyestablishedintheHCI—or
+psychology—literature.Similarly,muchoftheR&Rrationaleinvolvestheassumptionthatgiving
+peopletherightadviceattherighttimewillimprovetheirabilitytoER.Whilephysiologicalsyn-
+chronizationmayleadtoER,thereisnomechanismpositedthatrelatesthistothedevelopment
+ofself-regulationskills.Surprisingly,manyofthebiofeedbackinterventionmechanismsarealso
+under-specifiedintermsofhowend-usersaresupposedtolearn/knowhowtochangetheirphys-
+iologicalorneurologicalstates.
+Several successful interventions include multiple mechanisms that together are posited to re-
+sult in both enacting and developing ER skills that transfer outside of the intervention. For ex-
+ample,[4,5,51]describeoneormoreinterventionmechanismsinahighlevelofdetail,offering
+directexplanationsforcausesandeffectsinemotionregulationskillsdevelopment,andprovide
+explicitlinksfromthesemechanismstodesignfeaturesandelementsoftheintervention,which
+aresubsequentlyevaluatedforefficacy.
+1.2.6 UseCases:SkillsDevelopmentvsOngoingSupport. Asurprisinglystrongmajorityofthe
+papers in the current data set (n = 31) assumes that the developed systems have to provide an
+on-goingsupportfortheinterventiontobeeffective;andthustheeffectswoulddisappearifthe
+system was removed. In contrast, only several (n = 5) interventions were designed to include a
+waytoscaffoldorreduceend-userdependenceontheinterventionand/orspecifyanexplicittrans-
+fermechanismthatwouldenabletheend-usertoapplyemotionregulationstrategiesoutsideof
+theintervention.In[108]and[81],theauthorsproposedthatusingbiofeedbackgamestoteach
+ER through breath regulation in stressful scenarios may promote carryover to other situations.
+In[4]and[5]theinterventionenabledchildrentodirectlyexperienceERthroughmetaphor-based
+biofeedbackinthecontextofcoachedinterventionsthatusedaCBTapproachtopromoteemotion-
+regulation skill development and transfer. [87] proposed using a shared parent-child experience
+around an interactive media, which included narrative hooks to ER strategies taught in school,
+with the aim to provide parents with language around ER that could be referred to in everyday
+moments.
+2 HOWARETHEIDENTIFIEDDESIGNCOMPONENTSCOMBINEDINEXISTING
+INTERVENTIONS?
+The Section 4.3 synthesised the design components present in HCI work so far, with the aim to
+decomposeexistingworkandprovideuswiththe‘dictionary’oftechniquesthathavebeenutilised
+foreachofthefourpossibledeliverymechanisms(didactic,experiential,offline,on-the-spot).This
+appendixbringsthefocusbacktothefullinterventionsaspresentedinpriorworktoprovidean
+overviewofhowtheidentifiedcomponentsarecombinedintosystemsandidentifyanymeaningful
+patternsorgapsofsuchcombinationsacrossthecurrentdataset.
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 42 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:43
+Fig.10. Illustrationofhowthereviewedinterventionsareassociatedwiththefourdeliverymechanisms–
+didacticvsexperiential;andofflinevson-the-spot.Numbersandlocationindicatethenumberofsystem
+usingcomponentswithintherespectiveintersectionofdimensions(e.g.,asystemusingcomponentscoded
+asdidactic,on-the-spot,andofflinewouldbeplacedintheappropriateintersectionoftheVenndiagram).
+Theannotationshowstheresultingclusteringofresearchareas,asdescribedbelow.
+Thekeyargumentsthatwewillbemakingintherestofthesectionareasfollows:
+(1) The existing work is, so far, clearly separated into three main research areas (implicit on-
+the-spot support, bio-feedback games, and reminders & awareness systems). These areas
+arethenmostlyindependentofeachother–theydrawondifferentbackgroundliterature,
+interventiongoals,andtechnologicalcomponents.
+(2) Asaresult,theclustersalsocorrespondsurprisinglyneatlytothecombinationofdelivery
+mechanisms used, as well as consistent combinations of design components within each
+cluster(i.e.,componentsusedinonecluster—e.g.,implicitfeedbackorrecommenders—are
+rarelyutilisedinotherclusters).
+(3) The lack of cross-cluster combinations suggest clear opportunities for future work as de-
+scribedindetailinthenextsection:forexample,thereareseveralcombinationsoftypesof
+interventioncomponentsthathavenotbeenexploredatallsofar;aswellasmoreintricate
+combinationsofcomponentsthatalreadyexist.
+Inwhatfollows,webrieflyoutlinetheexistingresearchclustersweidentified(seeFigure10)in
+turn,aswellasdiscussthecurrentlyunder-exploredsegments.
+2.0.1 Cluster1–ImplicitOn-the-spotSupport(Experiential+On-the-spot)–n=11. Thepapers
+inCluster1comprisesystemsthatexploreassistive—oftensubconscious—downregulationinter-
+ventions, which are supposed to be available to users alongside other activities. Systems in this
+categorypredominantlyrelyonexperientialimplicittargetcomponents(n=8),drawingonadigi-
+talrepresentationofatargetstate(heartrate,breathrate).Forexample,manypapersexplorethe
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 43 End (Direct) ---
+
+13:44 P.Slovaketal.
+use of haptic representations of breathing patterns or heart rate (e.g. embedded in driver’s seat
+[9,72],throughasmartwatch[15,21]orwearablecustomdevice[61]).Othersystemsuseaudioto
+communicateatargetbreathrate(e.g.,[9])oracombinationofaudioandvisualrepresentationson
+adesktop[35]).Regardlessofthetargetstate,ongoingsupportwasthemostcommonon-the-spot
+component:breathingratewasassociatedwiththeuseofapproachesthatguidetheuserstoward
+anappropriatebreathingratethroughhapticsensations([61]orvisualcues([35]),whileheartrate
+feedback was associated with approaches that tap into implicit emotion regulation approaches.
+Mostofthisworkreliesonsituation-specificinterventiondelivery,suchasinthecontextofinfor-
+mationwork([65,107]),ordriving([9,72]),andtargetsnearlyexclusivelytheresponsemodulation
+oftheGross’Processmodel.
+Threepapersshowcasethepotentialforusingalternativecomponentstodeliverexperiential/on-
+the-spotinterventions,predominantlybymovingtowardmoreconsciouslyenactedemotionreg-
+ulationstrategies:[107]isalignedwiththeotherworkbyalsoprovidingsupportalongsideother
+tasks,butreliesonbio-feedback visualisationtoinformparticipantsabouttheirongoinginternal
+state during a specific task, without any other support for emotion regulation (i.e, targets iden-
+tificationratherthandirectlyresponsemodulation).Incontrast,[53]and[88]developedphysical
+objectsthattheparticipantscanchoosetoaccesswhenneeded(user-initiatedratherthansituation-
+specific delivery). In particular, Liang focused on respiration training through a fidget object in-
+cluding biosensing (a combination of response modulation and emotion awareness) and Slovak’s
+etalinteractivetoythendrawsonarangeofapproaches(combiningattentiondeployment with
+in-situresponsemodulationandpotentialforcognitivechange).
+2.0.2 Cluster2–Bio-feedbackinInteractiveGames(Experiential+Offline+-Didactic)–n=12.
+Thepapersinthisclusterpredominantlydrawonutilisingexperientialbio-feedbackinterventions
+ingames(n=10),withsomesystems[4,5,51,81]alsoaddingdidacticpsychoeducationcompo-
+nentsinspiredordirectlydrawingontraditionalpsychotherapy(e.g,CBTin-personsessionwith
+atherapistcombinedwithabio-feedbackgame[51]).
+Intermsofthecomponentsused,mostofthepapersrelyontheofflinecomponentsthatboth
+elicitemotionandscaffoldtheassociatedemotionregulation[54,56,73,74,81,103,108],utilisinga
+combinationofinteractivegames(usedtoelicitmostlynegativeemotionssuchasstressorfear)
+andanexperientialreal-timebiofeedbackloopcomponenttoprovidefeedbackscaffoldingERtrain-
+ingwithinthegamespace.Twosystems[54,81]developedbespokegamesincludingtherapeutic
+techniquesintothegameplay.However,theremainingsystemfocusedon‘only’addingbiofeed-
+backasanoverlayontoexistinggames([56,73,74,103,108]).Forexample,bio-datawasdesigned
+to impact game mechanics that are communicated to the player through dynamic visual repre-
+sentations(e.g.[56,81,103]).Theremainingsystemsdrewonsomeversionofrelaxationtraining
+components [4, 5, 51], where the systems utilised traditional biofeedback loop approaches with
+simple game-like interactions to facilitate users’ down-regulation together with formal psychoe-
+ducation intervention. These games relied on visual representations of the sensed physiological
+states,usingmetaphorstovisualisethesensedstates(e.g.,anincreaseinwindyweather)ascues
+to help modify mental and/or emotional states. Note that a key difference to the elicit&scaffold
+modelisinthelackofspecificemotiongenerationaspect:theaimistoachieverelaxation(from
+a baseline state, potentially employing strategies from psycho-education sessions), rather than
+down-regulatestrongemotionalexperienceelicitedbytheinterventionitself.
+IntermsofmappingontotheinterventiontargetsfromtheProcessModelofER,themajorityof
+thegame-basedinterventionsarepredominantlyfocusedonresponsemodulationtechniques,with
+reduction of breathing rate being the most commonly trained emotion regulation technique. In
+addition, the interventions that include formal psychoeducation components are predominantly
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 44 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:45
+CBTbased,andthusreferalsotocognitivechangetechniquessuchascognitivereappraisal.Most
+of the interventions also do not provide direct support to transfer the learning from the game
+(offlinecontexts)intotheparticipants’everydayenvironment(on-the-spot).
+Wenotethattwopaperswereexceptionstothisoveralltrend,mostlyastheydidnotdescribe
+fullydevelopedinterventions:[104]isanexperimentalstudycomparingtheeffectsofabdominal
+breathingtraining(i.e.,psychoeducationcombinedwithbio-feedbackornosupport)onmusicians’
+anxietyinanadaptedTrierSocialTest;and[14],whichisadesignexplorationofusingaseries
+ofsimplerelaxationgames(withoutbio-feedback)tosupportchildrenwithautism(qualitatively
+testedwith3participants).
+2.0.3 Cluster3–Recommender&AwarenessSystems(Didactic+Offline||On-the-spot)–n=13.
+Theworkinthisclustercombinestheexistingworkonrecommenderandawarenessandreflection
+systems,potentiallycombinedwitheitherpsycho-educationorvisualisingpatternsovertime.The
+papersaremorediverseintermsofcomponentsusedandtheircombinationsincontrasttoClusters
+1 & 2, but this also comes with a less well established groundwork on the assumed theories of
+change: for example, only 2 out of the 12 papers [44, 89] were coded as High on intervention
+modelspecificity–cf.,Appendix1.
+Conceptually, the papers in this cluster can be divided into two main groups, depending on
+the primary didactic component they rely on (aware&reflect vs recommender), with two sys-
+temshavingcombinedboththesecomponents[44,89].First,thesystemsincludingaware&reflect
+[7,44,52,89,102]involvedmonitoringandtrackingindividuals’emotionsovertimeasameans
+to increase user’s awareness of their emotional state(s). Input data was gathered mostly by par-
+ticipants’ EMA reports, which were either self-initiated (‘user-initiated’ on-the-spot component
+[44, 102])or promptedbyanautomatedsystem(‘system-initiated’component,[7, 89]); and[52]
+reliedonanongoingcollectionthroughawearablesensor.Theseon-the-spotdatacollectioncom-
+ponentswerethenmostlypairedwithareflectioninterface(offlinevisualisationofpatternsover
+time) to enable the participants to gain new insights based on patterns emerging from the emo-
+tionaldataaggregatedovertime[7,44,52,102].Assuch,mostofthisworkisakinto—andlikely
+inspiredby—HCIworkonpersonalinformaticssystems(cf.,[30]).
+Incontrast,thesystemsrelyingonrecommenders providedtheuserswithon-the-spotsugges-
+tionsofspecificERstrategiestouse[25,31,44,71,76,89,91].Thecontentoftheserecommenda-
+tionseitherreferredbacktowhattheparticipantslearnedinofflinepsycho-educationcomponents
+(mostly traditional talking therapies [31, 76, 89]), or ‘bite-sized’ suggestions that were delivered
+directlyaspartofthereminder(e.g.,activitysuggestionsin[25,71,91]).Inmostofthesesystems
+thespecificreminderswerecontextualisedbasedontheparticipant’sEMAanswer[44,71,89,91]
+orphysiologicalsensing[76].Conceptually,thesesystemsoftendrawonbehaviouralchangein-
+terventionsystems,especiallytheJust-in-time-adaptive-interventionliterature(seee.g.,[69]fora
+recentreview).
+In terms of mapping intervention systems onto the intervention targets within the Process
+Model of ER, the aware&reflect systems are primarily targeting a combination of self-awareness
+and potentially situation selection components: e.g., noticing a pattern of negative emotion in a
+particular situation is assumed to lead to the participant being less likely to engage with simi-
+lar situations in future iterations. The recommender systems show a broader range of potential
+intervention targets that are recommended and many refer to content from traditional talking
+therapies:fromsituationselection(e.g.,“goforarun!”)tocognitivechange(e.g.,“trytoreappraise
+youremotions”)toresponsemodulation(e.g.,“watchafunnyvideo”).However,thisbreadthalso
+means that many potentially useful strategies are covered without sufficient depth, especially if
+theon-the-spotrecommendationsdonotrelyonpriorpsychoeducationcomponents.
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 45 End (Direct) ---
+
+13:46 P.Slovaketal.
+REFERENCES
+[1] Amelia Aldao, Susan Nolen-Hoeksema, and Susanne Schweizer. 2010. Emotion-regulation strategies across psy-
+chopathology:Ameta-analyticreview.ClinicalPsychologyReview30,2(2010),217–237.DOI:https://doi.org/10.1016/
+j.cpr.2009.11.004
+[2] JohnR.Anderson.1982.Acquisitionofcognitiveskill.PsychologicalReview89,4(1982),369–406.DOI:https://doi.
+org/10.1037/0033-295X.89.4.369
+[3] AlissaN.Antle,LeslieChesick,AaronLevisohn,SrilekhaKirshnamachariSridharan,PerryTan,andB.C.Canada
+Vt.2015.Usingneurofeedbacktoteachself-regulationtochildrenlivinginpoverty.InProceedingsofthe14thInter-
+nationalConferenceonInteractionDesignandChildren.119–128.
+[4] AlissaN.Antle,LeslieChesick,andElgin-SkyeMclaren.2018.Openingupthedesignspaceofneurofeedbackbrain–
+computerinterfacesforchildren.ACMTransactionsonComputer-HumanInteraction24,6(2018),1–33.DOI:https://
+doi.org/10.1145/3131607
+[5] AlissaN.Antle,ElginSkyeMcLaren,HollyFiedler,andNaomiJohnson.2019.Designformentalhealth:Howsocio-
+technologicalprocessesmediateoutcomemeasuresinafieldstudyofawearableanxietyapp.InProceedingsofthe
+13InternationalConferenceonTangible,Embedded,andEmbodiedInteraction(2019),87–96.DOI:https://doi.org/10.
+1145/3294109.3295650
+[6] HilaryArkseyandLisaO’Malley.2005.Scopingstudies:Towardsamethodologicalframework.InternationalJournal
+ofSocialResearchMethodology8,1(2005),19–32.DOI:https://doi.org/10.1080/1364557032000119616
+[7] DavidBakkerandNikkiRickard.2018.Engagementinmobilephoneappforself-monitoringofemotionalwellbe-
+ingpredictschangesinmentalhealth:MoodPrism.JournalofAffectiveDisorders227,November(2018),432–442.
+DOI:https://doi.org/10.1016/j.jad.2017.11.016
+[8] AndreasBalaskas,StephenM.Schueller,AnnaL.Cox,andGavinDoherty.2021.Ecologicalmomentaryinterventions
+formentalhealth:Ascopingreview.PLoSONE16,3March(2021),e0248152.DOI:https://doi.org/10.1371/journal.
+pone.0248152
+[9] StephanieBalters,MatthewL.Mauriello,SoYeonPark,JamesA.Landay,andPabloE.Paredes.2020.Calmcommute:
+Guidedslowbreathingfordailystressmanagementindrivers.ProceedingsoftheACMonInteractive,Mobile,Wearable
+andUbiquitousTechnologies4,1,Article38(March2020),19pages.DOI:https://doi.org/10.1145/3380998
+[10] SteveBenford,GabriellaGiannachi,BorianaKoleva,andTomRodden.2009.Frominteractiontotrajectories:De-
+signingcoherentjourneysthroughuserexperiences.InProceedingsoftheSIGCHIConferenceonHumanFactorsin
+ComputingSystems. ACM,709–718.DOI:http://portal.acm.org/citation.cfm?id=1518701.1518812
+[11] AlexandraH.Bettis,TaylorA.Burke,JacquelineNesi,andRichardT.Liu.2021.Digitaltechnologiesforemotion-
+regulationassessmentandintervention:Aconceptualreview.ClinicalPsychologicalScience(2021),216770262110119.
+DOI:https://doi.org/10.1177/21677026211011982
+[12] AnnBlandford.2019.HCIforhealthandwellbeing:Challengesandopportunities.InternationalJournalofHuman-
+ComputerStudies131(2019),41–51.
+[13] RafaelA.Calvo,SidneyD’Mello,JonathanGratch,andArvidKappas(Eds.).2015.TheOxfordHandbookofAffective
+Computing.OxfordUniversityPress.
+[14] StéphanieCarlier,SaraVanderPaelt,FemkeOngenae,FemkeDeBackere,andFilipDeTurck.2019.Usingaserious
+gametoreducestressandanxietyinchildrenwithautismspectrumdisorder.InProceedingsofthe13thEAIInterna-
+tionalConferenceonPervasiveComputingTechnologiesforHealthcare(Trento,Italy)(PervasiveHealth’19).Association
+forComputingMachinery,452–461.DOI:https://doi.org/10.1145/3329189.3329237
+[15] KyungYunChoiandHiroshiIshii.2020.AmbienBeat:Wrist-wornmobiletactilebiofeedbackforheartraterhyth-
+micregulation.InProceedingsofthe14thInternationalConferenceonTangible,Embedded,andEmbodiedInterac-
+tion(SydneyNSW,Australia)(TEI’20).AssociationforComputingMachinery,NewYork,NY,17–30.DOI:https://
+doi.org/10.1145/3374920.3374938
+[16] FranceliL.Cibrian,KimberleyD.Lakes,SabrinaE.B.Schuck,andGillianR.Hayes.2022.Thepotentialforemerging
+technologiestosupportself-regulationinchildrenwithADHD:Aliteraturereview.InternationalJournalofChild-
+ComputerInteraction31(2022),100421.DOI:https://doi.org/10.1016/j.ijcci.2021.100421
+[17] BarbaraCludius,DouglasMennin,andThomasEhring.2020.Emotionregulationasatransdiagnosticprocess.Emo-
+tion(Washington,D.C.)20,1(2020),37–42.DOI:https://doi.org/10.1037/emo0000646
+[18] LindaM.Collins,D.Ph,TimothyB.Baker,D.Ph,RobinJ.Mermelstein,D.Ph,MeganE.Piper,D.Ph,DouglasE.
+Jorenby,D.Ph,StevensS.Smith,D.Ph,BruceA.Christiansen,D.Ph,TanyaR.Schlam,D.Ph,JessicaW.Cook,D.Ph,
+andMichaelC.Fiore.2011.Themultiphaseoptimizationstrategyforengineeringeffectivetobaccouseinterventions.
+(2011),208–226.DOI:https://doi.org/10.1007/s12160-010-9253-x
+[19] BruceE.Compas,SarahS.Jaser,AlexandraH.Bettis,KellyH.Watson,MeredithA.Gruhn,JenniferP.Dunbar,
+EllenWilliams,andJenniferC.Thigpen.2017.Coping,emotionregulation,andpsychopathologyinchildhoodand
+adolescence:Ameta-analysisandnarrativereview.PsychologicalBulletin143,9(2017),939–991.DOI:https://doi.org/
+10.1037/bul0000110
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 46 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:47
+[20] JulietM.CorbinandAnselmStrauss.1990.Groundedtheoryresearch:Procedures,canons,andevaluativecriteria.
+QualitativeSociology13,1(1990),3–21.
+[21] Jean Costa, Francois Guimbretiere, Malte Jung, and Tanzeem Choudhury. 2019. BoostMeUp - improving cogni-
+tiveperformanceinthemomentbyunobtrusivelyregulatingemotionswithasmartwatch.ACMTransactionson
+Computer-HumanInteraction3,2(2019).
+[22] DavidCoyleandGavinDoherty.2009.Clinicalevaluationsandcollaborativedesign:Developingnewtechnologies
+formentalhealthcareinterventions.InProceedingsoftheSIGCHIConferenceonHumanFactorsinComputingSystems.
+ACMPress,NewYork,NewYork,2051.DOI:https://doi.org/10.1145/1518701.1519013
+[23] MollyK.Crossman,AlanE.Kazdin,andElizabethR.Kitt.2018.Theinfluenceofasociallyassistiverobotonmood,
+anxiety,andarousalinchildren.ProfessionalPsychology:ResearchandPractice49,1(2018),48–56.DOI:https://doi.
+org/10.1037/pro0000177
+[24] MaryJ.DeSilva,EricaBreuer,LucyLee,LauraAsher,NeerjaChowdhary,CrickLund,andVikramPatel.2014.
+Theoryofchange:Atheory-drivenapproachtoenhancethemedicalresearchcouncil’sframeworkforcomplex
+interventions.Trials15,1(122014),267.DOI:https://doi.org/10.1186/1745-6215-15-267
+[25] AntonioDiaz-Escudero,JuanC.Torrado,JavierGomez,andGermánMontoro.2018.Technology:Aidedauthoring
+toolsforASDcoachingsupport.InProceedingsofthe19thInternationalConferenceonHumanComputerInteraction.
+1–6.
+[26] JillEhrenreich-MayandEmilyL.Bilek.2012.Thedevelopmentofatransdiagnostic,cognitivebehavioralgroupin-
+terventionforchildhoodanxietydisordersandco-occurringdepressionsymptoms.CognitiveandBehavioralPractice
+19,1(22012),41–55.DOI:http://dx.doi.org/10.1016/j.cbpra.2011.02.003
+[27] KristenK.Ellard,ChristopherP.Fairholme,ChristinaL.Boisseau,ToddJ.Farchione,andDavidH.Barlow.2010.
+Unifiedprotocolforthetransdiagnostictreatmentofemotionaldisorders:Protocoldevelopmentandinitialoutcome
+data.CognitiveandBehavioralPractice17,1(2010),88–101.DOI:https://doi.org/10.1016/j.cbpra.2009.06.002
+[28] GillianEngland-MasonandAndreaGonzalez.2020.Interveningtoshapechildren’semotionregulation:Areview
+ofemotionsocializationparentingprogramsforyoungchildren.Emotion(Washington,D.C.)20,1(2020),98–104.
+DOI:https://doi.org/10.1037/emo0000638
+[29] DanielA.Epstein,ClaraCaldeira,MayaraCostaFigueiredo,XiLu,LucasM.Silva,LucretiaWilliams,JongHoLee,
+QingyangLi,SimranAhuja,QiuerChen,PayamDowlatyari,CraigHilby,SazedaSultana,ElizabethV.Eikey,and
+YunanChen.2020.Mappingandtakingstockofthepersonalinformaticsliterature.ProceedingsoftheACMonInter-
+active,Mobile,WearableandUbiquitousTechnologies4,4(2020).DOI:https://doi.org/10.1145/3432231
+[30] DanielA.Epstein,AnPing,JamesFogarty,andSeanA.Munson.2015.Alivedinformaticsmodelofpersonalin-
+formatics.InProceedingsofthe2015ACMInternationalJointConferenceonPervasiveandUbiquitousComputing.
+731–742.
+[31] CharlesFage,CharlesConsel,KattalinEtchegoyhen,AnouckAmestoy,ManuelBouvard,CecileMazon,andHelene
+Sauzeon.2019.AnemotionregulationappforschoolinclusionofchildrenwithASD:Designprinciplesandevalua-
+tion.Computers&Education131(2019),1–21.DOI:https://doi.org/10.1016/j.compedu.2018.12.003
+[32] NormanA.S.Farb,AdamK.Anderson,JulieA.Irving,andZindelV.Segal.2014.Mindfulnessinterventionsand
+emotionregulation.(2014).Publisher:GuilfordPress.
+[33] BrettQ.FordandAllisonS.Troy.2019.Reappraisalreconsidered:Acloserlookatthecostsofanacclaimedemotion-
+regulationstrategy.CurrentDirectionsinPsychologicalScience 28,2(2019),195–203.DOI:https://doi.org/10.1177/
+0963721419827526
+[34] SueC.FunnellandPatriciaJ.Rogers.2011.PurposefulProgramTheory:EffectiveUseofTheoriesofChangeandLogic
+Models.Vol.31.JohnWiley&Sons.
+[35] AsmaGhandehariounandRosalindPicard.2017.BrightBeat:Effortlesslyinfluencingbreathingforcultivatingcalm-
+ness and focus. Association for Computing Machinery, New York, NY, 1624–1631. DOI:https://doi.org/10.1145/
+3027063.3053164
+[36] James J. Gross. 1998. The emerging field of emotion regulation. Review of General Psychology 2, 3 (1998), 271.
+DOI:https://doi.org/10.1037/1089-2680.2.3.271
+[37] JamesJ.Gross(Ed.).2014.HandbookofEmotionRegulation.GuilfordPress,NewYork,NY.
+[38] JamesJ.Gross.2015.Emotionregulation:Currentstatusandfutureprospects.PsychologicalInquiry26,1(2015),1–26.
+DOI:https://doi.org/10.1080/1047840X.2014.940781
+[39] JamesJ.GrossandJamesJ.Gross.2015.Psychologicalinquiry:Aninternationaljournalfortheadvancementof
+psychologicaltheoryemotionregulation:Currentstatusandfutureprospectsemotionregulation:currentstatus
+andfutureprospects.April(2015),37–41.DOI:https://doi.org/10.1080/1047840X.2014.940781
+[40] EricB.Hekler,PredragKlasnja,JonE.Froehlich,andMatthewP.Buman.2013.Mindthetheoreticalgap:Interpreting,
+using,anddevelopingbehavioraltheoryinHCIresearch.InProceedingsoftheSIGCHIConferenceonHumanFactors
+inComputingSystems.ACMPress,3307.DOI:https://doi.org/10.1145/2470654.2466452
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 47 End (Direct) ---
+
+13:48 P.Slovaketal.
+[41] ChrisHollis,StephanieSampson,LucySimons,E.BethanDavies,RachelChurchill,VictoriaBetton,DebbieButler,
+KathyChapman,KatherineEaston,TotoAnneGronlund,ThomasKabir,MatRawsthorne,ElizabethRye,andAndré
+Tomlin.2018.Identifyingresearchprioritiesfordigitaltechnologyinmentalhealthcare:ResultsoftheJamesLind
+AlliancePrioritySettingPartnership.TheLancetPsychiatry5,10(2018),845–854.DOI:https://doi.org/10.1016/S2215-
+0366(18)30296-7
+[42] VictoriaHollis,AlonPekurovsky,EunikaWu,andSteveWhittaker.2018.Onbeingtoldhowwefeel.Proceedingsof
+theACMonInteractive,Mobile,WearableandUbiquitousTechnologies2,3(92018),1–31.DOI:https://doi.org/10.1145/
+3264924
+[43] GrantD.Huang,JoncaBull,KellyJohnstonMcKee,ElizabethMahon,BethHarper,andJamieN.Roberts.2018.
+Clinicaltrialsrecruitmentplanning:AproposedframeworkfromtheClinicalTrialsTransformationInitiative.Con-
+temporaryClinicalTrials66,November2017(2018),74–79.DOI:https://doi.org/10.1016/j.cct.2018.01.003
+[44] YunHuang,YingTang,andYangWang.2015.Emotionmap:Alocation-basedmobilesocialsystemforimproving
+emotionawarenessandregulation.InProceedingsofthe18thACMConferenceonComputerSupportedCooperative
+Work&SocialComputing.AssociationforComputingMachinery,NewYork,NY,130–142.DOI:https://doi.org/10.
+1145/2675133.2675173
+[45] KatherineIsbister.2016.HowGamesMoveUs:EmotionbyDesign.MITPress.
+[46] KatherineIsbister,ElenaMárquezSegura,andEdwardFMelcer.2018.Socialaffordancesatplay:Gamedesigntoward
+socio-technicalinnovation.InProceedingsofthe2018CHIConferenceonHumanFactorsinComputingSystems.ACM,
+NewYork,NY,1–10.DOI:https://doi.org/10.1145/3173574.3173946
+[47] MengqiJiang,VijayakumarNanjappan,MartijntenBhömer,andHai-NingLiang.2021.Ontheuseofmovement-
+basedinteractionwithsmarttextilesforemotionregulation.Sensors21,3(22021),990.DOI:https://doi.org/10.3390/
+s21030990
+[48] JonKabat-ZinnandThichNhatHanh.2009.FullCatastropheLiving:UsingtheWisdomofYourBodyandMindtoFace
+Stress,Pain,andIllness.Delta.
+[49] Predrag Klasnja, Ambuj Tewari, Eric B. Hekler, Audrey Boruvka, Susan A. Murphy, Saul Shiffman, and Daniel
+Almirall.2015.Microrandomizedtrials:Anexperimentaldesignfordevelopingjust-in-timeadaptiveinterventions.
+HealthPsychology34,Suppl(2015),1220–1228.
+[50] ElizabethT.Kneeland,JohnF.Dovidio,JuttaJoormann,andMargaretS.Clark.2016.Emotionmalleabilitybeliefs,
+emotionregulation,andpsychopathology:Integratingaffectiveandclinicalscience.ClinicalPsychologyReview45
+(2016),81–88.DOI:https://doi.org/10.1016/j.cpr.2016.03.008
+[51] MicheleKnox,J.Lentini,T.S.Cummings,A.McGrady,K.Whearty,andL.Sancrant.2011.Game-basedbiofeedback
+forpaediatricanxietyanddepression.MentalHealthinFamilyMedicine8,3(2011),195.
+[52] R.Kocielnik,F.M.Maggi,andN.Sidorova.2013.Enablingself-reflectionwithLifelogExplorer:Generatingsimple
+viewsfromcomplexdata.InProceedingsofthe20137thInternationalConferenceonPervasiveComputingTechnologies
+forHealthcare(PervasiveHealth), (2013),184–191.DOI:https://doi.org/10.4108/pervasivehealth.2013.251934
+[53] Rong-HaoLiang,BinYu,MengruXue,JunHu,andLoeM.G.Feijs.2018.BioFidget:Biofeedbackforrespiration
+trainingusinganaugmentedfidgetspinner.InProceedingsofthe2018CHIConferenceonHumanFactorsinComputing
+Systems.AssociationforComputingMachinery,NewYork,NY,1–12.DOI:https://doi.org/10.1145/3173574.3174187
+[54] AdamLobel,MarientinaGotsis,ErinReynolds,MichaelAnnetta,RutgerC.M.E.Engels,andIsabelaGranic.2016.
+Designingandutilizingbiofeedbackgamesforemotionregulation:Thecaseofnevermind.InProceedingsofthe2016
+CHIConferenceExtendedAbstractsonHumanFactorsinComputingSystems.AssociationforComputingMachinery,
+NewYork,NY,1945–1951.DOI:https://doi.org/10.1145/2851581.2892521
+[55] KellyMack,EmmaMcDonnell,DhruvJain,LucyLuWang,JonE.Froehlich,andLeahFindlater.2021.Whatdowe
+meanby“accessibilityresearch”?.InProceedingsofthe2021CHIConferenceonHumanFactorsinComputingSystems.
+ACM,NewYork,NY,1–18.DOI:https://doi.org/10.1145/3411764.3445412
+[56] ReganL.Mandryk,ShaneDielschneider,MichaelR.Kalyn,ChristopherP.Bertram,MichaelGaetz,AndreDoucette,
+BrettA.Taylor,AlisonPritchardOrr,andKathyKeiver.2013.Gamesasneurofeedbacktrainingforchildrenwith
+FASD.InProceedingsofthe12thInternationalConferenceonInteractionDesignandChildren-IDC’13.ACMPress,
+NewYork,NewYork,165–172.DOI:https://doi.org/10.1145/2485760.2485762
+[57] JillEhrenreichMay,SarahM.Kennedy,JamieA.Sherman,EmilyL.Bilek,BrianA.Buzzella,ShannonM.Bennett,
+andDavidH.Barlow.2018.UnifiedProtocolsforTransdiagnosticTreatmentofEmotionalDisordersinChildrenand
+Adolescents.
+[58] KibbyMcMahon,DeepikaAnand,MarissaMorris-Jones,andM.ZacharyRosenthal.2019.Apathfromchildhood
+sensoryprocessingdisordertoanxietydisorders:Themediatingroleofemotiondysregulationandadultsensory
+processingdisordersymptoms.FrontiersinIntegrativeNeuroscience13,July(2019),1–11.DOI:https://doi.org/10.3389/
+fnint.2019.00022
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 48 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:49
+[59] KateriMcRaeandJamesJ.Gross.2020.Emotionregulation.Emotion20,1(22020),1–9.DOI:https://doi.org/10.1037/
+emo0000703
+[60] DouglasS.MenninandDavidM.Fresco.2014.Emotionregulationtherapy.HandbookofEmotionRegulation,Gross,
+J.J.(Ed.).2nded.,TheGuilfordPress.
+[61] PardisMiri,RobertFlory,AnderoUusberg,HeatherCulbertson,RichardH.Harvey,AgataKelman,DavisErikPeper,
+JamesJ.Gross,KatherineIsbister,andKeithMarzullo.2020.PIV:Placement,pattern,andpersonalizationofan
+inconspicuousvibrotactilebreathingpacer.ACMTransactionsonComputer-HumanInteraction27,1(2020),1–44.
+DOI:https://doi.org/10.1145/3365107
+[62] DavidC.Mohr,MiZhang,andStephenM.Schueller.2017.Personalsensing:Understandingmentalhealthusing
+ubiquitoussensorsandmachinelearning.AnnualReviewofClinicalPsychology 13(2017),23–47.DOI:https://doi.
+org/10.1146/annurev-clinpsy-032816
+[63] Neema Moraveji, Athman Adiseshan, and Takehiro Hagiwara. 2012. Breathtray: Augmenting respiration self-
+regulationwithoutcognitivedeficit.InProceedingsoftheCHI’12ExtendedAbstractsonHumanFactorsinComputing
+Systems.2405–2410.
+[64] Neema Moraveji, Athman Adiseshan, and Takehiro Hagiwara. 2012. BreathTray: Augmenting respiration self-
+regulationwithoutcognitivedeficit.InProceedingsoftheCHI’12ExtendedAbstractsonHumanFactorsinComput-
+ingSystems.AssociationforComputingMachinery,NewYork,NY,2405–2410.DOI:https://doi.org/10.1145/2212776.
+2223810
+[65] NeemaMoraveji,BenOlson,TrucNguyen,MahmoudSaadat,YaserKhalighi,RoyPea,andJeffreyHeer.2011.Pe-
+ripheralpacedrespiration:Influencinguserphysiologyduringinformationwork.InProceedingsofthe24thAnnual
+ACMSymposiumonUserInterfaceSoftwareandTechnology.
+[66] NeemaMoraveji,BenOlson,TrucNguyen,MahmoudSaadat,YaserKhalighi,RoyPea,andJeffreyHeer.2011.Pe-
+ripheralpacedrespiration:Influencinguserphysiologyduringinformationwork.InProceedingsofthe24thAnnual
+ACMSymposiumonUserInterfaceSoftwareandTechnology.AssociationforComputingMachinery,NewYork,NY,
+423–428.DOI:https://doi.org/10.1145/2047196.2047250
+[67] ZacharyMunn,MicahD.J.Peters,CindyStern,CatalinTufanaru,AlexaMcArthur,andEdoardoAromataris.2018.
+Systematicrevieworscopingreview?Guidanceforauthorswhenchoosingbetweenasystematicorscopingreview
+approach.BMCMedicalResearchMethodology18,1(2018),1–7.
+[68] PeterMusiat,PatriciaConrod,JanetTreasure,AndreTylee,ChrisWilliams,andUlrikeSchmidt.2014.Targetedpre-
+ventionofcommonmentalhealthdisordersinuniversitystudents:Randomisedcontrolledtrialofatransdiagnostic
+trait-focusedweb-basedintervention.PLoSONE9,4(2014),1–10.DOI:https://doi.org/10.1371/journal.pone.0093621
+[69] InbalNahum-Shani,ShawnaN.Smith,BonnieJ.Spring,LindaM.Collins,KatieWitkiewitz,AmbujTewari,and
+SusanA.Murphy.2018.Just-in-timeadaptiveinterventions(JITAIs)inmobilehealth:Keycomponentsanddesign
+principlesforongoinghealthbehaviorsupport.AnnalsofBehavioralMedicine52,6(2018),446–462.DOI:https://doi.
+org/10.1007/s12160-016-9830-8
+[70] AliciaO’Cathain,LizCroot,EdwardA.S.Duncan,NikkiRousseau,KatieSworn,KatrinaTurner,LucyYardley,and
+PatHoddinott.2019.Guidanceonhowtodevelopcomplexinterventionstoimprovehealthandhealthcare.BMJ
+Openinpress,C(2019),2–6.
+[71] Pablo Paredes, Ran Gilad-Bachrach, Mary Czerwinski, Asta Roseway, Kael Rowan, and Javier Hernandez. 2014.
+PopTherapy: Coping with stress through pop-culture. In Proceedings of the Pervasive Health’14. Retrieved from
+http://bid.berkeley.edu/files/papers/PopTherapy1.pdf.
+[72] PabloE.Paredes,YijunZhou,NurAl-HudaHamdan,StephanieBalters,ElizabethMurnane,WendyJu,andJamesA.
+Landay.2018.Justbreathe:In-carinterventionsforguidedslowbreathing.ProceedingsoftheACMonInteractive,
+Mobile,WearableandUbiquitousTechnologies.2,1,Article28(March2018),23pages.DOI:https://doi.org/10.1145/
+3191760
+[73] A. Parnandi and R. Gutierrez-Osuna. 2017. Physiological modalities for relaxation skill transfer in biofeedback
+games.IEEEJournalofBiomedicalandHealthInformatics21,2(2017),361–371.DOI:https://doi.org/10.1109/JBHI.
+2015.2511665
+[74] A.ParnandiandR.Gutierrez-Osuna.2021.Partialreinforcementingamebiofeedbackforrelaxationtraining.IEEE
+TransactionsonAffectiveComputing12,1(2021),141–153.DOI:https://doi.org/10.1109/TAFFC.2018.2842727
+[75] JonathanM.Peake,GrahamKerr,andJohnP.Sullivan.2018.Acriticalreviewofconsumerwearables,mobileap-
+plications,andequipmentforprovidingbiofeedback,monitoringstress,andsleepinphysicallyactivepopulations.
+FrontiersinPhysiology9,6(2018),743.DOI:https://doi.org/10.3389/fphys.2018.00743
+[76] LauraPina,KaelRowan,AstaRoseway,PaulJohns,GillianR.Hayes,andMaryCzerwinski.2014.Insitucuesfor
+ADHDparentingstrategiesusingmobiletechnology.InProceedingsofthe8thInternationalConferenceonPervasive
+ComputingTechnologiesforHealthcare.17–24.
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 49 End (Direct) ---
+
+13:50 P.Slovaketal.
+[77] Cynthia J. Price and Carole Hooven. 2018. Interoceptive awareness skills for emotion regulation: Theory
+and approach of mindful awareness in body-oriented therapy (MABT). Frontiers in Psychology 9 (2018), 798.
+DOI:10.3389/fpsyg.2018.00798
+[78] DavidA.Rosenbaum,RichardA.Carlson,andRickO.Gilmore.2001.Acquisitionofintellectualandperceptual-motor
+skills.AnnualReviewofPsychology52,1(22001),453–470.DOI:https://doi.org/10.1146/annurev.psych.52.1.453
+[79] NathanSakirisandDavidBerle.2019.Asystematicreviewandmeta-analysisoftheUnifiedProtocolasatrans-
+diagnosticemotionregulationbasedintervention.ClinicalPsychologyReview72,June(2019),101751.DOI:https://
+doi.org/10.1016/j.cpr.2019.101751
+[80] Pedro Sanches, Axel Janson, Pavel Karpashevich, Camille Nadal, Chengcheng Qu, Claudia Daudén Roquet,
+MuhammadUmair,CharlesWindlin,GavinDoherty,KristinaHöök,andCorinaSas.2019.HCIandaffectivehealth
+takingstockofadecadeofstudiesandchartingfutureresearchdirections.InProceedingsoftheConferenceonHuman
+FactorsinComputingSystems).DOI:https://doi.org/10.1145/3290605.3300475
+[81] HannekeScholten,MoniqueMalmberg,AdamLobel,RutgerC.M.E.Engels,andIsabelaGranic.2016.Arandomized
+controlledtrialtotesttheeffectivenessofanimmersive3Dvideogameforanxietypreventionamongadolescents.
+PLoSONE11,1(2016),1–24.DOI:https://doi.org/10.1371/journal.pone.0147763
+[82] GalSheppes,GauravSuri,andJamesJ.Gross.2015.Emotionregulationandpsychopathology.AnnualReviewof
+ClinicalPsychology11,1(2015),379–405.DOI:https://doi.org/10.1146/annurev-clinpsy-032814-112739
+[83] EliseSloan,KateHall,RichardMoulding,ShaydenBryce,HelenMildred,andPetraK.Staiger.2017.Emotionreg-
+ulationasatransdiagnostictreatmentconstructacrossanxiety,depression,substance,eatingandborderlineper-
+sonalitydisorders:Asystematicreview.ClinicalPsychologyReview57,October2016(2017),141–163.DOI:https://
+doi.org/10.1016/j.cpr.2017.09.002
+[84] EliseSloan,KateHall,RichardMoulding,ShaydenBryce,HelenMildred,andPetraK.Staiger.2017.Emotionreg-
+ulationasatransdiagnostictreatmentconstructacrossanxiety,depression,substance,eatingandborderlineper-
+sonalitydisorders:Asystematicreview.ClinicalPsychologyReview57,October2016(2017),141–163.DOI:https://
+doi.org/10.1016/j.cpr.2017.09.002
+[85] EliseSloan,KateHall,RichardMoulding,ShaydenBryce,HelenMildred,andPetraK.Staiger.2017.Emotionregula-
+tionasatransdiagnostictreatmentconstructacrossanxiety,depression,substance,eatingandborderlinepersonality
+disorders:Asystematicreview.ClinicalPsychologyReview57,11(2017),141–163.DOI:https://doi.org/10.1016/J.CPR.
+2017.09.002
+[86] PetrSlovak,ChrisFrauenberger,andGeraldineFitzpatrick.2017.Reflectivepracticum:Aframeworkofsensitising
+conceptstodesignfortransformativereflection.InProceedingsofthe2017CHIConferenceonHumanFactorsin
+ComputingSystems.ACM,2696–2707.DOI:https://doi.org/10.1145/3025453.3025516
+[87] PetrSlovak,ChristopherFrauenberger,RanGilad-Bachrach,MiaDoces,BrianSmith,RachelKamb,KaelRowan,and
+GeraldineFitzpatrick.2016.Scaffoldingthescaffolding:Supportingchildren-ssocial-emotionallearningathome.In
+Proceedingsofthe19thACMConferenceonComputer-supportedCooperativeWork&SocialComputing.ACMPress,
+1749–1763.DOI:https://doi.org/10.1145/2818048.2820007
+[88] PetrSlovak,KatieSalen,StephanieTa,andGeraldineFitzpatrick.2018.Mediatingconflictsinminecraft:Empowering
+learninginonlinemultiplayergames.InProceedingsofthe2018CHIConferenceonHumanFactorsinComputing
+Systems.ACMPress,NewYork,NewYork.DOI:https://doi.org/10.1145/3173574.3174169
+[89] SmythandHeron.2016.Isprovidingmobileinterventions“just-in-time”helpful?Anexperimentalproofofconcept
+studyofjust-in-timeinterventionforstressmanagement.InProceedingsofthe2016IEEEWirelessHealth(WH).1–7.
+DOI:https://doi.org/10.1109/WH.2016.7764561
+[90] MichaelA.Southam-GerowandPhilipC.Kendall.2002.Emotionregulationandunderstanding:Implicationsfor
+childpsychopathologyandtherapy.ClinicalPsychologyReview22,2(2002),189–222.DOI:https://doi.org/10.1016/
+S0272-7358(01)00087-3
+[91] Samantha Speer, Emily Hamner, Michael Tasota, Lauren Zito, and Sarah K Byrne-Houser. 2021. MindfulNest:
+Strengtheningemotionregulationwithtangibleuserinterfaces.InProceedingsofthe2021InternationalConference
+onMultimodalInteraction.ACM,NewYork,NY,103–111.DOI:https://doi.org/10.1145/3462244.3479917
+[92] KattaSpiel,EvaHornecker,RuaMaeWilliams,andJudithGood.2022.ADHDandtechnologyresearch-investigated
+byneurodivergentreaders.InProceedingsoftheConferenceonHumanFactorsinComputingSystems(2022).DOI:
+https://doi.org/10.1145/3491102.3517592
+[93] ElizabethA.SteinbergandDeborahA.G.Drabick.2015.Adevelopmentalpsychopathologyperspectiveonadhdand
+comorbidconditions:Theroleofemotionregulation.ChildPsychiatryandHumanDevelopment46,6(2015),951–966.
+DOI:https://doi.org/10.1007/s10578-015-0534-2
+[94] BenjaminTag,SarahWebber,GregWadley,VanessaBartlett,JorgeGoncalves,PeterKoval,PetrSlovak,WallySmith,
+TomHollenstein,AnnaL.Cox,andothers.2021.Makingsenseofemotion-sensing:Workshoponquantifyinghu-
+manemotions.InAdjunctProceedingsofthe2021ACMInternationalJointConferenceonPervasiveandUbiquitous
+ComputingandProceedingsofthe2021ACMInternationalSymposiumonWearableComputers.226–229.
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 50 End (Direct) ---
+
+DesigningforEmotionRegulationInterventions 13:51
+[95] JohnD.Teasdale,ZindelV.Segal,J.MarkG.Williams,ValerieA.Ridgeway,JudithM.Soulsby,andMarkA.Lau.2000.
+Preventionofrelapse/recurrenceinmajordepressionbymindfulness-basedcognitivetherapy.JournalofConsulting
+andClinicalPsychology68,4(2000),615.
+[96] PaulTennent,KristinaHöök,SteveBenford,VasilikiTsaknaki,AnnaStåhl,ClaudiaDaudenRoquet,CharlesWindlin,
+PedroSanches,JoeMarshall,ChristineLi,JuanPabloMartinezAvila,MiquelAlfaras,MuhammadUmair,andFeng
+Zhou.2021.Articulatingsomaexperiencesusingtrajectories.InProceedingsofthe2021CHIConferenceonHuman
+FactorsinComputingSystems.ACM,NewYork,NY,1–16.DOI:https://doi.org/10.1145/3411764.3445482
+[97] NikkiTheofanopoulou,KatherineIsbister,JulianEdbrooke-Childs,andPetrSlovák.2019.Asmarttoyintervention
+topromoteemotionregulationinmiddlechildhood:Feasibilitystudy.JMIRMentalHealth6,8(2019),e14029.
+[98] JohnTorous,PatrickStaples,IanBarnett,LuisSandoval,MatcheriKeshavan,andJukkaPekkaOnnela.2018.Charac-
+terizingtheclinicalrelevanceofdigitalphenotypingdataqualitywithapplicationstoacohortwithschizophrenia.
+DigitalMedicine83,9(2018),S61.DOI:https://doi.org/10.1016/j.biopsych.2018.02.167
+[99] StuartValins.1966.Cognitiveeffectsoffalseheart-ratefeedback.JournalofPersonalityandSocialPsychology4,4
+(1966),400.
+[100] GregWadley,VassilisKostakos,PeterKoval,WallySmith,SarahWebber,KristinaHöök,AnnaCox,ReganMandryk,
+JamesGross,andPetrSlovák.2022.Thefutureofemotioninhuman-computerinteraction.InProceedingsoftheCHI
+ConferenceonHumanFactorsinComputingSystemsExtendedAbstracts.ACM,inprint.
+[101] GregWadley,WallySmith,PeterKoval,andJamesJ.Gross.2020.Digitalemotionregulation.CurrentDirectionsin
+PsychologicalScience29,4(2020),412–418.DOI:https://doi.org/10.1177/0963721420920592
+[102] DandingWang,QianYang,AshrafAbdul,andBrianY.Lim.2019.Designingtheory-drivenuser-centricexplainable
+AI.Proceedingsofthe2019CHIConferenceonHumanFactorsinComputingSystems(2019),1–15.DOI:https://doi.org/
+10.1145/3290605.3300831
+[103] Z.Wang,A.Parnandi,andR.Gutierrez-Osuna.2018.BioPad:Leveragingoff-the-shelfvideogamesforstressself-
+regulation.IEEEJournalofBiomedicalandHealthInformatics22,1(2018),47–55.DOI:https://doi.org/10.1109/JBHI.
+2017.2671788
+[104] RuthWells,TimOuthred,JamesA.J.Heathers,DanielS.Quintana,andAndrewH.Kemp.2012.Matterovermind:A
+randomised-controlledtrialofsingle-sessionbiofeedbacktrainingonperformanceanxietyandheartratevariability
+inmusicians.PLoSONE7,10(2012).DOI:https://doi.org/10.1371/journal.pone.0046597
+[105] DanielM.Wolpert,JörnDiedrichsen,andJ.RandallFlanagan.2011.Principlesofsensorimotorlearning.Nature
+ReviewsNeuroscience12,12(2011).DOI:https://doi.org/10.1038/nrn3112
+[106] JungKyoonYoon,ShuranLi,andYuHao.2021.Design-mediatedpositiveemotionregulation:Thedevelopmentof
+aninteractivedevicethatsupportsdailypracticeofpositivementaltimetraveling.InternationalJournalofHuman-
+ComputerInteraction00,00(2021),1–15.DOI:https://doi.org/10.1080/10447318.2021.1948685
+[107] BinYu,JunHu,MathiasFunk,andLoeFeijs.2018.DeLight:Biofeedbackthroughambientlightforstressintervention
+andrelaxationassistance.PersonalandUbiquitousComputing22,4(2018),787–805.
+[108] M.A.Zafar,B.Ahmed,andR.Gutierrez-Osuna.2017.Playingwithandwithoutbiofeedback.InProceedingsofthe
+2017IEEE5thInternationalConferenceonSeriousGamesandApplicationsforHealth(SeGAH).1–7.https://doi.org/10.
+1109/SeGAH.2017.7939272
+Received31March2022;revised24June2022;accepted4July2022
+ACMTransactionsonComputer-HumanInteraction,Vol.30,No.1,Article13.Publicationdate:March2023.
+
+--- Page 51 End (Direct) ---

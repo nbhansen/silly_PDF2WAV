@@ -95,17 +95,6 @@ class OCRProcessor:
             return f"Error during OCR (image-based) process: {str(e)}"
 
     def extract_text_from_pdf(self, pdf_path):
-        """
-        Main public method to extract text from a PDF.
-        It first tries direct text extraction. If that fails or yields minimal text,
-        it falls back to OCR.
-
-        Args:
-            pdf_path (str): The path to the PDF file.
-
-        Returns:
-            str: The extracted text, or an error message if all methods fail.
-        """
         print(f"OCRProcessor: Starting text extraction pipeline for {pdf_path}")
         
         direct_text_content = self._extract_text_directly(pdf_path)
@@ -113,13 +102,18 @@ class OCRProcessor:
         MIN_CHARS_FOR_DIRECT_TEXT = 100 # Arbitrary threshold
         if direct_text_content and len(direct_text_content) > MIN_CHARS_FOR_DIRECT_TEXT:
             print(f"OCRProcessor: Using directly extracted text (length: {len(direct_text_content)}).")
-            return direct_text_content
+            extracted_text = direct_text_content
         else:
-            if direct_text_content: # Log if direct text was found but was too short
+            if direct_text_content:
                 print(f"OCRProcessor: Direct text was minimal (length: {len(direct_text_content)}). Falling back to OCR.")
-            else: # Log if no direct text was found at all
+            else:
                 print("OCRProcessor: No direct text found. Falling back to OCR.")
-            
-            # Fallback to OCR
-            ocr_text_content = self._extract_text_with_ocr(pdf_path)
-            return ocr_text_content
+            extracted_text = self._extract_text_with_ocr(pdf_path)
+            print(f"OCR extracted text length: {len(extracted_text)}")
+
+        # Always write debug file
+        with open("ocr_extracted_debug.txt", "w", encoding="utf-8") as f:
+            f.write(extracted_text)
+        print(f"OCRProcessor: Wrote extracted text to ocr_extracted_debug.txt for debugging.")
+
+        return extracted_text

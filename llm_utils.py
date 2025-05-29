@@ -81,7 +81,6 @@ class LLMProcessor:
 - Preserve all text that would be read aloud in an ebook, including all paragraphs and their intended structure.
 - Skip in-text citations (e.g., [1], (Author, 2023)).
 - Skip mathematical formulas and equations if present.
-- skip URLS except the top-level part, eg. "https://example.com/path/to/resource" should be turned into just example.com
 
 **Crucial for Readability and TTS (Pay close attention to these):**
 - **Maintain or Reconstruct Natural Spacing:** Ensure there is a single proper space between all words. Ensure appropriate single spacing follows all punctuation marks (e.g., a period, comma, colon, semicolon should be followed by a space, unless it's part of a standard abbreviation like "e.g.").
@@ -124,61 +123,64 @@ Cleaned text:"""
         """Process text in overlapping chunks and reassemble."""
         chunks = []
         cleaned_chunks = []
-        
-        # Split into chunks with overlap
+
+        text_len = len(text_to_clean)
         start = 0
-        while start < len(text_to_clean):
-            end = min(start + chunk_size, len(text_to_clean))
+
+        while start < text_len:
+            end = min(start + chunk_size, text_len)
             chunk = text_to_clean[start:end]
-            
-            # Try to break at a sentence boundary near the end to avoid cutting mid-sentence
-            if end < len(text_to_clean):  # Not the last chunk
-                # Look backwards from the end for sentence endings
-                for i in range(min(500, end - start), 0, -1):  # Look back up to 500 chars
-                    if chunk[end - start - i:end - start - i + 1] in '.!?':
-                        # Found a sentence ending, adjust chunk boundary
-                        chunk = text_to_clean[start:start + (end - start - i + 1)]
-                        break
-            
+
+            # Try to break at a sentence boundary near the end (look for punctuation + whitespace)
+            if end < text_len:
+                boundary = chunk.rfind('. ')
+                for punct in ['. ', '! ', '? ']:
+                    idx = chunk.rfind(punct)
+                    if idx > boundary:
+                        boundary = idx
+                if boundary > chunk_size // 2:
+                    end = start + boundary + 2  # Include punctuation and space
+                    chunk = text_to_clean[start:end]
+
             chunks.append(chunk)
-            if end >= len(text_to_clean):
+            if end >= text_len:
                 break
-            start += len(chunk) - overlap_size
-        
+            # Always advance by at least 1 to avoid infinite loop
+            start = max(end - overlap_size, start + 1)
+
         print(f"LLMProcessor: Split into {len(chunks)} chunks for processing.")
-        
+
         # Process each chunk with rate limiting
         for i, chunk in enumerate(chunks):
             print(f"LLMProcessor: Processing chunk {i+1}/{len(chunks)} (length: {len(chunk)} chars)...")
-            
-            # Add small delay to respect API rate limits
             if i > 0:
-                time.sleep(1)  # 1 second delay between requests
-            
+                time.sleep(1)
             cleaned_chunk = self._clean_single_chunk(chunk)
-            
             if cleaned_chunk.startswith("Error"):
                 print(f"LLMProcessor: Error in chunk {i+1}, using original chunk.")
                 cleaned_chunk = chunk
-            
             cleaned_chunks.append(cleaned_chunk)
-        
+
         print("LLMProcessor: Reassembling cleaned chunks...")
-        
-        # Reassemble chunks with overlap removal
-        if len(cleaned_chunks) == 1:
-            return cleaned_chunks[0]
-        
-        # Simple reassembly - more sophisticated overlap handling could be added
+
+        # Remove duplicated overlap between chunks
         result = cleaned_chunks[0]
-        
         for i in range(1, len(cleaned_chunks)):
-            # For simplicity, just add each subsequent chunk
-            # A more sophisticated approach would detect and remove overlapping content
-            result += " " + cleaned_chunks[i]
-        
-        # Basic cleanup of double spaces
-        result = ' '.join(result.split())
-        
+            overlap = cleaned_chunks[i-1][-overlap_size:]
+            next_chunk = cleaned_chunks[i]
+            if next_chunk.startswith(overlap):
+                next_chunk = next_chunk[len(overlap):]
+            result += next_chunk
+
         print(f"LLMProcessor: Chunked processing complete. Final length: {len(result)} chars")
+
+        # --- DEBUG: Write cleaned result to file ---
+        try:
+            debug_path = "llm_cleaned_debug.txt"
+            with open(debug_path, "w", encoding="utf-8") as f:
+                f.write(result)
+            print(f"LLMProcessor: Wrote cleaned text to {debug_path} for debugging.")
+        except Exception as e:
+            print(f"LLMProcessor: Failed to write debug file: {e}")
+
         return result
