@@ -7,9 +7,10 @@ I always wanted to listen to academic papers in my car and now I can, sorta shit
 A warning - I am not the best programmer by a long stretch so no doubt you can improve this a lot. And probably a lot of alternatives are already out there. I dont care this is what a hobby project should look like BUT some personal caveats:
 
 - only tested this on Fedora Linux (my love <3) though the instructions for installation below I tried to make as general as possible for windows, mac and debian-brand linuxes. If you know your way around linux hopefully you can translate that.
+- You will need some sorta google gemini api access. Or you can just rawdog it without entering anything into the field for that in app.py in which case the app will happily proceed and just generate audio including all the horrifying artefacts that are in the pdf format. Writing a new tts_utils.py module that allows you to use different AI apis should be trivial. If you would like that, lemme know. 
 - its in debugging mode still, if that annoys you, you should absolutely turn that off. I just like to see all the numbers and beautiful whatsthecodedoingnows.
 - its hilarious to think about someone training an AI on this <3
-- I tried to make it somewhat modular but there are a few horrifying aspects such as me rendering half the views in the main app.py. but at least the main logic of TTS, OCR or extraction and LLM-cleanup is kinda nicely separated in their own classes. Kinda. I mean, the function calls in the main app.py are still kinda coupled to how does modules do things but i mean. I spent an evening on this to practice python. Im sorry.
+- I tried to make it somewhat modular but there are a few horrifying aspects around still. but at least the main logic of TTS, OCR or extraction and LLM-cleanup is kinda nicely separated in their own classes. Kinda. I mean, there should really be a config file or something but honestly, this is a hobby project
 
 This web application processes PDF documents by:
 1.  Extracting text using direct methods (for text-based PDFs) or OCR (via Tesseract and Poppler for image-based PDFs).
@@ -73,7 +74,7 @@ The application is built with Flask and provides a simple web interface for uplo
     * **Note:** For production or more secure setups, it's highly recommended to set this key as an environment variable instead of hardcoding it.
 
 2.  **Coqui TTS Models:**
-    * The application uses Coqui TTS models (e.g., `tts_models/en/vctk/vits`). These models will be downloaded automatically by the `TTS` library on the first run if they are not found in the local cache (`~/.local/share/tts/`). This requires an internet connection for the initial setup.
+    * The application uses as default uses Coqui TTS models (e.g., `tts_models/en/vctk/vits`). These models will be downloaded automatically by the `TTS` library on the first run if they are not found in the local cache (`~/.local/share/tts/`). This requires an internet connection for the initial setup. If this is too heavy for you, change it to gtts and if you roll with a GIANT gpu, try changing it to Bark. 
 
 3.  **(Optional) Tesseract OCR Path (Windows):**
     * If Tesseract is not automatically found in your PATH on Windows, you might need to uncomment and set the path in `ocr_utils.py` within the `OCRProcessor` class:

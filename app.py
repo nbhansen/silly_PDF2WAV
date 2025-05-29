@@ -12,7 +12,7 @@ AUDIO_FOLDER = 'audio_outputs'
 ALLOWED_EXTENSIONS = {'pdf'}
 
 # !! IMPORTANT !! Replace with your actual API key
-GOOGLE_AI_API_KEY = "damngirl"  # Your key
+GOOGLE_AI_API_KEY = "123 checkout my hooorns"  # Your key
 
 # --- TTS Engine Configuration ---
 _SELECTED_TTS_ENGINE_CONFIG = "coqui"  # or "gtts", "bark"
