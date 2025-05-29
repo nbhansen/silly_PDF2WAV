@@ -122,31 +122,44 @@ Cleaned text:"""
     def _clean_text_chunked(self, text_to_clean, chunk_size, overlap_size):
         """Process text in overlapping chunks and reassemble."""
         chunks = []
+        
         cleaned_chunks = []
 
         text_len = len(text_to_clean)
         start = 0
 
+        print(f"LLMProcessor: Splitting text into chunks of size {chunk_size} with overlap of {overlap_size}...")
         while start < text_len:
             end = min(start + chunk_size, text_len)
             chunk = text_to_clean[start:end]
 
             # Try to break at a sentence boundary near the end (look for punctuation + whitespace)
             if end < text_len:
-                boundary = chunk.rfind('. ')
-                for punct in ['. ', '! ', '? ']:
-                    idx = chunk.rfind(punct)
-                    if idx > boundary:
-                        boundary = idx
-                if boundary > chunk_size // 2:
-                    end = start + boundary + 2  # Include punctuation and space
+                # Look for good break points in the last 20% of the chunk
+                search_start = max(start + int(chunk_size * 0.8), start + chunk_size // 2)
+                search_region = chunk[search_start - start:]
+                
+                best_break = -1
+                # Look for sentence endings
+                for punct in ['. ', '! ', '? ', '.\n', '!\n', '?\n']:
+                    idx = search_region.rfind(punct)
+                    if idx > best_break:
+                        best_break = idx
+                
+                if best_break > 0:
+                    # Adjust end to the sentence boundary
+                    end = search_start + best_break + 1  # +1 to include the punctuation
                     chunk = text_to_clean[start:end]
 
             chunks.append(chunk)
+            print(f"LLMProcessor: Created chunk {len(chunks)} - chars {start} to {end} (length: {len(chunk)})")
+            
             if end >= text_len:
                 break
-            # Always advance by at least 1 to avoid infinite loop
-            start = max(end - overlap_size, start + 1)
+            
+            # FIXED: Advance by chunk_size minus overlap, but ensure we don't go backwards
+            next_start = max(end - overlap_size, start + 1)
+            start = next_start
 
         print(f"LLMProcessor: Split into {len(chunks)} chunks for processing.")
 
@@ -159,18 +172,57 @@ Cleaned text:"""
             if cleaned_chunk.startswith("Error"):
                 print(f"LLMProcessor: Error in chunk {i+1}, using original chunk.")
                 cleaned_chunk = chunk
+            print(f"LLMProcessor: Cleaned chunk {i+1} length: {len(cleaned_chunk)} chars")
             cleaned_chunks.append(cleaned_chunk)
 
         print("LLMProcessor: Reassembling cleaned chunks...")
 
-        # Remove duplicated overlap between chunks
+        # FIXED: Improved chunk reassembly logic
+        if not cleaned_chunks:
+            return ""
+        
         result = cleaned_chunks[0]
+        
         for i in range(1, len(cleaned_chunks)):
-            overlap = cleaned_chunks[i-1][-overlap_size:]
-            next_chunk = cleaned_chunks[i]
-            if next_chunk.startswith(overlap):
-                next_chunk = next_chunk[len(overlap):]
-            result += next_chunk
+            current_chunk = cleaned_chunks[i]
+            
+            # Try to find and remove overlap between consecutive chunks
+            if overlap_size > 0 and len(result) > overlap_size:
+                # Get the last part of result for overlap detection
+                overlap_search_text = result[-overlap_size:].strip()
+                
+                # Look for this text at the beginning of the current chunk
+                current_chunk_start = current_chunk[:overlap_size*2].strip()  # Search in first part of current chunk
+                
+                # Find the best overlap match
+                best_overlap = 0
+                # Try different overlap lengths
+                for test_len in range(min(len(overlap_search_text), len(current_chunk_start)), 50, -10):
+                    if test_len <= 0:
+                        break
+                    test_overlap = overlap_search_text[-test_len:]
+                    if current_chunk_start.startswith(test_overlap):
+                        best_overlap = test_len
+                        print(f"LLMProcessor: Found overlap of {best_overlap} chars between chunks {i} and {i+1}")
+                        break
+                
+                if best_overlap > 0:
+                    # Remove the overlapping part from the current chunk
+                    overlap_text = overlap_search_text[-best_overlap:]
+                    if current_chunk.startswith(overlap_text):
+                        current_chunk = current_chunk[best_overlap:]
+                    else:
+                        # Try to find it within the first part and remove
+                        overlap_pos = current_chunk.find(overlap_text)
+                        if 0 <= overlap_pos <= 100:  # Only if found near the beginning
+                            current_chunk = current_chunk[overlap_pos + best_overlap:]
+            
+            # Add appropriate spacing between chunks if needed
+            if result and current_chunk:
+                if not result.endswith(' ') and not current_chunk.startswith(' '):
+                    result += ' '
+            
+            result += current_chunk
 
         print(f"LLMProcessor: Chunked processing complete. Final length: {len(result)} chars")
 

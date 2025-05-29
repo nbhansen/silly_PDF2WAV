@@ -17,7 +17,7 @@ UPLOAD_FOLDER = 'uploads'
 AUDIO_FOLDER = 'audio_outputs'
 ALLOWED_EXTENSIONS = {'pdf'}
 # !! IMPORTANT !! Replace "YOUR_GOOGLE_AI_API_KEY" with your actual API key STRING (in quotes).
-GOOGLE_AI_API_KEY = "whyyounowork" # Replace with your actual API key
+GOOGLE_AI_API_KEY = "afdadsfaf" # Replace with your actual API key
 # This global variable will be set based on TTS_ENGINE_KWARGS or default in __main__
 # It's used for display purposes in the HTML template.
 SELECTED_TTS_ENGINE = "TTS" # Default placeholder
@@ -25,7 +25,7 @@ SELECTED_TTS_ENGINE = "TTS" # Default placeholder
 # --- TTS Engine Configuration ---
 # Choose your desired TTS engine: "coqui", "gtts", or "bark" (when implemented)
 # This configuration will be used when initializing tts_processor
-_SELECTED_TTS_ENGINE_CONFIG = "coqui" # Or "gtts", "coqui"
+_SELECTED_TTS_ENGINE_CONFIG = "coqui" # Or "coqui" (middle of the road pretty good and you have a gpu), "bark" (hefty heavy boi)
 TTS_ENGINE_KWARGS = {}
 
 if _SELECTED_TTS_ENGINE_CONFIG.lower() == "coqui":
@@ -91,7 +91,7 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def split_text_for_tts(text, max_chars=1500):
+def split_text_for_tts(text, max_chars=5000): # set this to lower value if you want smaller chunks ie your gpu vram choking
     """Split text into chunks for TTS, trying to break at sentence boundaries."""
     import re
     sentences = re.split(r'(?<=[.!?])\s+', text)
@@ -108,7 +108,7 @@ def split_text_for_tts(text, max_chars=1500):
         chunks.append(current.strip())
     return chunks
 
-def generate_audio_from_chunks(cleaned_text, base_filename_no_ext, tts_processor, audio_dir, max_chars=1500):
+def generate_audio_from_chunks(cleaned_text, base_filename_no_ext, tts_processor, audio_dir, max_chars=5000):
     """
     Splits cleaned_text into chunks, generates audio for each, and concatenates them.
     Returns the final audio filename or None on failure.
