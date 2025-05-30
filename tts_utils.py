@@ -2,10 +2,10 @@ import os
 import torch # For checking CUDA availability and setting device
 import numpy # For Bark's add_safe_globals fix
 
-# --- Base Class for TTS Processors ---
+# --- Abstract Class for TTS Processors ---
 class BaseTTSProcessor:
     """
-    Abstract base class for TTS processors.
+  
     Specific TTS engine wrappers should inherit from this class
     and implement the generate_audio_file method.
     """

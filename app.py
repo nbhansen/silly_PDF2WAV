@@ -12,7 +12,7 @@ AUDIO_FOLDER = 'audio_outputs'
 ALLOWED_EXTENSIONS = {'pdf'}
 
 # !! IMPORTANT !! Replace with your actual API key
-GOOGLE_AI_API_KEY = "123 checkout my hooorns"  # Your key
+GOOGLE_AI_API_KEY = "crawling in my skin"  # Your key
 
 # --- TTS Engine Configuration ---
 _SELECTED_TTS_ENGINE_CONFIG = "coqui"  # or "gtts", "bark"
@@ -20,9 +20,9 @@ TTS_ENGINE_KWARGS = {}
 
 if _SELECTED_TTS_ENGINE_CONFIG.lower() == "coqui":
     TTS_ENGINE_KWARGS = {
-        "model_name": "tts_models/en/vctk/vits", 
+        "model_name": "tts_models/en/ljspeech/vits", 
         "use_gpu_if_available": True,
-        "speaker_idx_to_use": "p227"
+        
     }
     SELECTED_TTS_ENGINE = "Coqui TTS"
 elif _SELECTED_TTS_ENGINE_CONFIG.lower() == "gtts":

@@ -10,7 +10,7 @@ class TTSGenerator:
     def __init__(self, engine: str, config: dict):
         self.processor = get_tts_processor(engine, **config)
         self.engine_name = engine
-        self.chunk_size = 5000  # Characters per audio chunk
+        self.chunk_size = 20000  # Characters per audio chunk
     
     def generate(self, text: str, output_name: str, output_dir: str = "audio_outputs") -> Optional[str]:
         """Generate audio from text (single chunk method)"""
