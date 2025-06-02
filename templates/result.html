@@ -6,154 +6,318 @@
     <title>PDF to Audio - Result</title>
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
+            font-family: Arial, sans-serif;
+            margin: 0;
             padding: 20px;
-            background-color: #f5f5f5;
+            background-color: #222222;
+            color: #FFFF00;
             line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 90vh;
         }
         .container {
-            background: white;
+            background-color: #333333;
+            border: 1px solid #FFD700;
+            color: #FFFF00;
             padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(255, 255, 0, 0.1);
+            width: 90%;
+            max-width: 800px;
+            text-align: center;
         }
         h1 {
-            color: #2c3e50;
-            text-align: center;
+            color: #FFFF00;
+            border-bottom: 2px solid #FFD700;
+            padding-bottom: 10px;
             margin-bottom: 30px;
         }
         .success-message {
-            background-color: #d4edda;
-            border: 1px solid #c3e6cb;
-            color: #155724;
+            background-color: #2a4a2a;
+            border: 1px solid #4a8a4a;
+            color: #88ff88;
             padding: 15px;
             border-radius: 5px;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
+            font-weight: bold;
         }
         .file-info {
-            background-color: #f8f9fa;
-            border-left: 4px solid #007bff;
-            padding: 15px;
-            margin-bottom: 20px;
+            background-color: #2a2a2a;
+            border: 1px solid #555;
+            border-left: 4px solid #FFD700;
+            padding: 20px;
+            margin-bottom: 25px;
+            border-radius: 0 5px 5px 0;
+            text-align: left;
         }
         .file-info h3 {
             margin-top: 0;
-            color: #495057;
+            color: #FFD700;
+            margin-bottom: 15px;
         }
         .file-info p {
-            margin: 5px 0;
-            color: #6c757d;
+            margin: 8px 0;
+            color: #FFFFE0;
         }
-        .audio-player {
-            text-align: center;
-            margin: 30px 0;
+        .file-info strong {
+            color: #FFD700;
         }
-        .audio-player audio {
+        .audio-player-section {
+            background-color: #2a2a2a;
+            border: 1px solid #555;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 25px 0;
+        }
+        .audio-player-section h3 {
+            color: #FFD700;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+        .single-audio-player {
+            margin: 20px 0;
+        }
+        .single-audio-player audio {
             width: 100%;
-            max-width: 500px;
+            max-width: 600px;
+            background-color: #444;
+            border-radius: 5px;
+        }
+        .multiple-audio-note {
+            background-color: #4a4a2a;
+            border: 1px solid #8a8a4a;
+            color: #ffff88;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        .audio-part {
+            background-color: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 5px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+        .audio-part h4 {
+            color: #FFD700;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        .audio-part audio {
+            width: 100%;
+            background-color: #333;
+            border-radius: 3px;
+            margin-bottom: 15px;
         }
         .download-section {
-            text-align: center;
-            margin: 20px 0;
+            margin: 30px 0;
         }
         .download-btn {
             display: inline-block;
-            background-color: #28a745;
-            color: white;
+            background-color: #FFD700;
+            color: #222222;
             padding: 12px 24px;
             text-decoration: none;
             border-radius: 5px;
             font-weight: bold;
             margin: 10px;
-            transition: background-color 0.3s;
+            transition: all 0.3s ease;
+            border: 1px solid #FFFF00;
         }
         .download-btn:hover {
-            background-color: #218838;
+            background-color: #FFFF00;
+            color: #111111;
             text-decoration: none;
-            color: white;
+            transform: translateY(-1px);
+        }
+        .download-btn.primary {
+            background-color: #4a8a4a;
+            color: #ffffff;
+            border: 1px solid #6aba6a;
+            font-size: 1.1em;
+            padding: 15px 30px;
+        }
+        .download-btn.primary:hover {
+            background-color: #5aba5a;
+            color: #ffffff;
         }
         .back-btn {
             display: inline-block;
-            background-color: #6c757d;
-            color: white;
-            padding: 10px 20px;
+            background-color: #555555;
+            color: #FFFFE0;
+            padding: 12px 24px;
             text-decoration: none;
             border-radius: 5px;
-            margin: 10px;
-            transition: background-color 0.3s;
+            margin: 15px;
+            transition: all 0.3s ease;
+            border: 1px solid #777;
         }
         .back-btn:hover {
-            background-color: #545b62;
+            background-color: #666666;
+            color: #FFFFFF;
             text-decoration: none;
-            color: white;
+            transform: translateY(-1px);
         }
         .instructions {
-            background-color: #fff3cd;
-            border: 1px solid #ffeaa7;
-            color: #856404;
-            padding: 15px;
+            background-color: #4a4a2a;
+            border: 1px solid #8a8a4a;
+            color: #ffff88;
+            padding: 20px;
             border-radius: 5px;
-            margin: 20px 0;
+            margin: 25px 0;
+            text-align: left;
         }
         .instructions h4 {
             margin-top: 0;
+            color: #FFD700;
+        }
+        .instructions ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .instructions li {
+            margin: 8px 0;
+        }
+        .debug-info {
+            background-color: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: left;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+        .debug-info h4 {
+            color: #FFD700;
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-family: Arial, sans-serif;
+        }
+        .debug-info .debug-item {
+            margin: 5px 0;
+            color: #CCCCCC;
+        }
+        .debug-info .debug-label {
+            color: #FFD700;
+            font-weight: bold;
+        }
+        .icon {
+            font-size: 1.2em;
+            margin-right: 8px;
+        }
+        @media (max-width: 600px) {
+            .container {
+                width: 95%;
+                padding: 20px;
+            }
+            .download-btn {
+                display: block;
+                margin: 10px 0;
+                text-align: center;
+            }
+            .audio-part {
+                padding: 15px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎉 Audio Generated Successfully!</h1>
+        <h1><span class="icon">🎉</span>Audio Generated Successfully!</h1>
         
         <div class="success-message">
             <strong>Success!</strong> Your PDF has been converted to audio.
         </div>
 
         <div class="file-info">
-            <h3>📄 File Information</h3>
+            <h3><span class="icon">📄</span>File Information</h3>
             <p><strong>Original PDF:</strong> {{ original_filename }}</p>
             <p><strong>TTS Engine:</strong> {{ tts_engine }}</p>
-            <p><strong>Audio Format:</strong> {{ audio_file.split('.')[-1].upper() }}</p>
+            {% if file_count > 1 %}
+                <p><strong>Audio Parts:</strong> {{ file_count }} files generated</p>
+            {% endif %}
+            <p><strong>Audio Format:</strong> {{ audio_file.split('.')[-1].upper() if audio_file else 'Unknown' }}</p>
         </div>
 
-        <div class="audio-player">
-    <h3>🎵 Listen to Your Audio</h3>
-    {% if file_count > 1 %}
-        <p><strong>Note:</strong> Your PDF was split into {{ file_count }} parts due to its length.</p>
-        {% for i in range(file_count) %}
-            <div style="margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px;">
-                <h4>Part {{ i + 1 }} of {{ file_count }}</h4>
-                <audio controls preload="metadata" style="width: 100%;">
-                    <source src="{{ url_for('serve_audio', filename=audio_files[i]) }}" type="audio/{{ 'mpeg' if audio_files[i].endswith('.mp3') else 'wav' }}">
-                    Your browser does not support the audio element.
-                </audio>
-                <div style="margin-top: 10px;">
-                    <a href="{{ url_for('serve_audio', filename=audio_files[i]) }}" download="{{ audio_files[i] }}" class="download-btn" style="font-size: 0.9em; padding: 8px 16px;">
-                        📥 Download Part {{ i + 1 }}
-                    </a>
+        <div class="audio-player-section">
+            <h3><span class="icon">🎵</span>Listen to Your Audio</h3>
+            
+            {% if file_count > 1 %}
+                <div class="multiple-audio-note">
+                    <strong>Note:</strong> Your PDF was split into {{ file_count }} parts due to its length.
                 </div>
-            </div>
-        {% endfor %}
-    {% else %}
-        <audio controls preload="metadata">
-            <source src="{{ url_for('serve_audio', filename=audio_file) }}" type="audio/{{ 'mpeg' if audio_file.endswith('.mp3') else 'wav' }}">
-            Your browser does not support the audio element.
-        </audio>
-    {% endif %}
-</div>
+                
+                {% for i in range(file_count) %}
+                    <div class="audio-part">
+                        <h4>Part {{ i + 1 }} of {{ file_count }}</h4>
+                        <audio controls preload="metadata">
+                            <source src="{{ url_for('serve_audio', filename=audio_files[i]) }}" type="audio/{{ 'mpeg' if audio_files[i].endswith('.mp3') else 'wav' }}">
+                            Your browser does not support the audio element.
+                        </audio>
+                        <div>
+                            <a href="{{ url_for('serve_audio', filename=audio_files[i]) }}" download="{{ audio_files[i] }}" class="download-btn">
+                                <span class="icon">📥</span>Download Part {{ i + 1 }}
+                            </a>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="single-audio-player">
+                    <audio controls preload="metadata">
+                        <source src="{{ url_for('serve_audio', filename=audio_file) }}" type="audio/{{ 'mpeg' if audio_file.endswith('.mp3') else 'wav' }}">
+                        Your browser does not support the audio element.
+                    </audio>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="download-section">
+            {% if combined_mp3_file %}
+                <a href="{{ url_for('serve_audio', filename=combined_mp3_file) }}" download="{{ combined_mp3_file }}" class="download-btn primary">
+                    <span class="icon">🎧</span>Download Complete MP3
+                </a>
+                <br>
+            {% endif %}
+            
+            {% if file_count == 1 %}
+                <a href="{{ url_for('serve_audio', filename=audio_file) }}" download="{{ audio_file }}" class="download-btn primary">
+                    <span class="icon">📥</span>Download Audio File
+                </a>
+            {% endif %}
+        </div>
 
         <div class="instructions">
-            <h4>💡 Tips:</h4>
+            <h4><span class="icon">💡</span>Tips</h4>
             <ul>
                 <li>Use the audio controls above to play, pause, and adjust volume</li>
-                <li>Click "Download Audio File" to save the audio to your device</li>
-                <li>The audio file will be automatically deleted from the server after some time</li>
+                <li>Click "Download" buttons to save audio files to your device</li>
+                {% if combined_mp3_file %}
+                    <li>The "Complete MP3" contains all parts combined into a single file</li>
+                {% endif %}
+                <li>Audio files will be automatically deleted from the server after some time</li>
+                <li>For best quality, use headphones or good speakers</li>
             </ul>
         </div>
 
-        <div style="text-align: center; margin-top: 30px;">
-            <a href="{{ url_for('index') }}" class="back-btn">← Convert Another PDF</a>
+        {% if debug_info %}
+            <div class="debug-info">
+                <h4><span class="icon">🔧</span>Processing Details</h4>
+                {% for key, value in debug_info.items() %}
+                    <div class="debug-item">
+                        <span class="debug-label">{{ key.replace('_', ' ').title() }}:</span> {{ value }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div style="margin-top: 40px;">
+            <a href="{{ url_for('index') }}" class="back-btn">
+                <span class="icon">←</span>Convert Another PDF
+            </a>
         </div>
     </div>
 
@@ -163,10 +327,28 @@
         
         // Optional: Auto-scroll to audio player
         document.addEventListener('DOMContentLoaded', function() {
-            const audioPlayer = document.querySelector('.audio-player');
-            if (audioPlayer) {
-                audioPlayer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const audioSection = document.querySelector('.audio-player-section');
+            if (audioSection) {
+                setTimeout(() => {
+                    audioSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 500);
             }
+        });
+
+        // Enhanced audio player feedback
+        document.querySelectorAll('audio').forEach(audio => {
+            audio.addEventListener('loadstart', function() {
+                console.log('Loading audio:', this.src);
+            });
+            
+            audio.addEventListener('canplay', function() {
+                console.log('Audio ready to play:', this.src);
+            });
+            
+            audio.addEventListener('error', function() {
+                console.error('Audio loading error:', this.src);
+                // Could show user-friendly error message here
+            });
         });
     </script>
 </body>

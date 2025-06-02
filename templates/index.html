@@ -8,48 +8,52 @@
         body { 
             font-family: Arial, sans-serif; 
             margin: 0; 
-            padding: 20px; /* Added some padding to the body */
-            background-color: #222222; /* Very dark gray background */
-            color: #FFFF00; /* Strong yellow text */
+            padding: 20px;
+            background-color: #222222;
+            color: #FFFF00;
             line-height: 1.6;
-            display: flex; /* For centering content */
+            display: flex;
             flex-direction: column;
             align-items: center;
-            min-height: 90vh; /* Ensure it takes most of the screen height */
+            min-height: 90vh;
         }
         .container {
-            background-color: #333333; /* Slightly lighter dark gray for the main content box */
-            border: 1px solid #FFD700; /* Yellow border */
+            background-color: #333333;
+            border: 1px solid #FFD700;
             color: #FFFF00; 
             padding: 30px; 
             border-radius: 8px; 
-            box-shadow: 0 0 15px rgba(255, 255, 0, 0.1); /* Subtle yellow glow */
+            box-shadow: 0 0 15px rgba(255, 255, 0, 0.1);
             width: 90%; 
-            max-width: 600px; /* Max width for the form container */
-            text-align: center; /* Center text inside the container */
+            max-width: 700px;
+            text-align: center;
         }
         h1 { 
-            color: #FFFF00; /* Yellow heading */
-            border-bottom: 2px solid #FFD700; /* Yellow underline */
+            color: #FFFF00;
+            border-bottom: 2px solid #FFD700;
             padding-bottom: 10px; 
-            margin-bottom: 20px; /* Space below heading */
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
         }
         label {
-            display: block; /* Make label take full width */
-            margin-bottom: 10px;
+            display: block;
+            margin-bottom: 8px;
             font-weight: bold;
+            color: #FFD700;
         }
         input[type="file"] {
             display: block;
-            margin: 0 auto 20px auto; /* Center the file input */
+            margin: 0 auto 10px auto;
             padding: 8px;
             border-radius: 4px;
             border: 1px solid #FFD700;
-            background-color: #444444; /* Darker background for input */
-            color: #FFFFE0; /* Lighter yellow for input text */
-            width: 80%; /* Make file input take more width */
+            background-color: #444444;
+            color: #FFFFE0;
+            width: 90%;
         }
-        /* Style the file input button (browser specific) */
         input[type="file"]::file-selector-button {
             background-color: #FFD700;
             color: #222222;
@@ -62,33 +66,297 @@
         input[type="file"]::file-selector-button:hover {
             background-color: #FFFF00;
         }
+        .page-range-container {
+            background-color: #2a2a2a;
+            border: 1px solid #555;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        .page-range-header {
+            font-size: 1.1em;
+            color: #FFD700;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .checkbox-group {
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        input[type="checkbox"] {
+            transform: scale(1.3);
+            accent-color: #FFD700;
+        }
+        .checkbox-label {
+            font-weight: normal;
+            color: #FFFFE0;
+            margin: 0;
+        }
+        .page-range-inputs {
+            display: none;
+            gap: 15px;
+            align-items: center;
+            justify-content: flex-start;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        .page-range-inputs.active {
+            display: flex;
+        }
+        input[type="number"] {
+            width: 80px;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #FFD700;
+            background-color: #444444;
+            color: #FFFFE0;
+            text-align: center;
+            font-size: 14px;
+        }
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #FFFF00;
+            box-shadow: 0 0 5px rgba(255, 255, 0, 0.3);
+        }
+        .page-input-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .help-text {
+            font-size: 0.85em;
+            color: #AAAAAA;
+            margin-top: 15px;
+            line-height: 1.4;
+        }
+        .help-text strong {
+            color: #FFD700;
+        }
+        .tip-icon {
+            font-size: 1.2em;
+        }
         input[type="submit"] {
             display: inline-block; 
-            padding: 12px 25px; 
-            background-color: #FFD700; /* Yellow button background */
-            color: #222222; /* Dark text on yellow button */
+            padding: 15px 30px; 
+            background-color: #FFD700;
+            color: #222222;
             text-decoration: none; 
             border-radius: 5px; 
-            transition: background-color 0.3s ease; 
-            font-size: 1em; 
+            transition: all 0.3s ease; 
+            font-size: 1.1em; 
             font-weight: bold;
             border: 1px solid #FFFF00;
-            cursor: pointer; /* Add pointer cursor */
+            cursor: pointer;
+            margin-top: 20px;
         }
         input[type="submit"]:hover {
-            background-color: #FFFF00; /* Brighter yellow on hover */
+            background-color: #FFFF00;
             color: #111111;
+            transform: translateY(-1px);
+        }
+        input[type="submit"]:disabled {
+            background-color: #666;
+            color: #999;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .processing-indicator {
+            display: none;
+            margin-top: 20px;
+            color: #FFD700;
+            font-style: italic;
+        }
+        .error-message {
+            background-color: #552222;
+            border: 1px solid #aa4444;
+            color: #ffcccc;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            display: none;
+        }
+        @media (max-width: 600px) {
+            .container {
+                width: 95%;
+                padding: 20px;
+            }
+            .page-range-inputs {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            .page-input-group {
+                width: 100%;
+                justify-content: space-between;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Nicolais silly PDF to WAV Converter</h1>
-        <form action="/upload" method="post" enctype="multipart/form-data">
-            <label for="pdf_file">Choose a PDF file:</label>
-            <input type="file" id="pdf_file" name="pdf_file" accept=".pdf" required>
-            <input type="submit" value="Upload and Process">
+        
+        <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data">
+            
+            <div class="form-group">
+                <label for="pdf_file">Choose a PDF file:</label>
+                <input type="file" id="pdf_file" name="pdf_file" accept=".pdf" required onchange="handleFileSelection()">
+            </div>
+
+            <div class="page-range-container">
+                <div class="page-range-header">
+                    <span class="tip-icon">📄</span>
+                    <span>Page Range Selection</span>
+                </div>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" id="use_page_range" name="use_page_range" onchange="togglePageRange()">
+                    <label for="use_page_range" class="checkbox-label">Specify custom page range (optional)</label>
+                </div>
+                
+                <div class="page-range-inputs" id="page_range_inputs">
+                    <div class="page-input-group">
+                        <span>From page:</span>
+                        <input type="number" id="start_page" name="start_page" min="1" placeholder="1" onchange="validatePageRange()">
+                    </div>
+                    <div class="page-input-group">
+                        <span>to page:</span>
+                        <input type="number" id="end_page" name="end_page" min="1" placeholder="last" onchange="validatePageRange()">
+                    </div>
+                </div>
+                
+                <div class="error-message" id="page_error"></div>
+                
+                <div class="help-text">
+                    <span class="tip-icon">💡</span> <strong>Tips:</strong><br>
+                    • Leave unchecked to process the entire PDF<br>
+                    • For academic papers: typically skip title pages (start at page 2-3) and references (end before last 10-20% of pages)<br>
+                    • You can preview the PDF first to identify the right page range<br>
+                    • Both fields are optional - leave "to page" empty to process until the end
+                </div>
+            </div>
+
+            <input type="submit" id="submitBtn" value="Upload and Process">
+            
+            <div class="processing-indicator" id="processingIndicator">
+                🔄 Processing your PDF... This may take a few minutes.
+            </div>
         </form>
     </div>
+
+    <script>
+        function togglePageRange() {
+            const checkbox = document.getElementById('use_page_range');
+            const inputs = document.getElementById('page_range_inputs');
+            const errorDiv = document.getElementById('page_error');
+            
+            if (checkbox.checked) {
+                inputs.classList.add('active');
+            } else {
+                inputs.classList.remove('active');
+                // Clear values and errors when disabled
+                document.getElementById('start_page').value = '';
+                document.getElementById('end_page').value = '';
+                hideError();
+            }
+        }
+
+        function validatePageRange() {
+            const startPage = parseInt(document.getElementById('start_page').value);
+            const endPage = parseInt(document.getElementById('end_page').value);
+            
+            // Clear previous errors
+            hideError();
+            
+            // Basic validation
+            if (startPage && startPage < 1) {
+                showError('Start page must be 1 or greater');
+                return false;
+            }
+            
+            if (endPage && endPage < 1) {
+                showError('End page must be 1 or greater');
+                return false;
+            }
+            
+            if (startPage && endPage && startPage > endPage) {
+                showError('Start page cannot be greater than end page');
+                return false;
+            }
+            
+            return true;
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('page_error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function hideError() {
+            const errorDiv = document.getElementById('page_error');
+            errorDiv.style.display = 'none';
+        }
+
+        function handleFileSelection() {
+            const fileInput = document.getElementById('pdf_file');
+            const file = fileInput.files[0];
+            
+            if (file) {
+                console.log('Selected file:', file.name, 'Size:', (file.size / 1024 / 1024).toFixed(1) + ' MB');
+                
+                // Could potentially get PDF info here via AJAX in the future
+                // For now, just validate file size
+                const maxSize = 100 * 1024 * 1024; // 100MB
+                if (file.size > maxSize) {
+                    alert('File is too large. Maximum file size is 100MB.');
+                    fileInput.value = '';
+                }
+            }
+        }
+
+        // Form submission handling
+        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            const checkbox = document.getElementById('use_page_range');
+            
+            // If page range is enabled, validate it
+            if (checkbox.checked) {
+                if (!validatePageRange()) {
+                    e.preventDefault();
+                    return false;
+                }
+            }
+            
+            // Show processing indicator
+            const submitBtn = document.getElementById('submitBtn');
+            const processingIndicator = document.getElementById('processingIndicator');
+            
+            submitBtn.disabled = true;
+            submitBtn.value = 'Processing...';
+            processingIndicator.style.display = 'block';
+            
+            // Re-enable form if user navigates back
+            window.addEventListener('beforeunload', function() {
+                submitBtn.disabled = false;
+                submitBtn.value = 'Upload and Process';
+                processingIndicator.style.display = 'none';
+            });
+        });
+
+        // Prevent double submission
+        let formSubmitted = false;
+        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            if (formSubmitted) {
+                e.preventDefault();
+                return false;
+            }
+            formSubmitted = true;
+        });
+    </script>
 </body>
 </html>
