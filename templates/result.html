@@ -76,73 +76,42 @@
             margin-top: 0;
             margin-bottom: 20px;
         }
-        .single-audio-player {
+        .main-audio-player {
             margin: 20px 0;
         }
-        .single-audio-player audio {
+        .main-audio-player audio {
             width: 100%;
             max-width: 600px;
             background-color: #444;
             border-radius: 5px;
-        }
-        .multiple-audio-note {
-            background-color: #4a4a2a;
-            border: 1px solid #8a8a4a;
-            color: #ffff88;
-            padding: 12px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            font-weight: bold;
-        }
-        .audio-part {
-            background-color: #1a1a1a;
-            border: 1px solid #444;
-            border-radius: 5px;
-            padding: 20px;
-            margin: 15px 0;
-        }
-        .audio-part h4 {
-            color: #FFD700;
-            margin-top: 0;
-            margin-bottom: 15px;
-        }
-        .audio-part audio {
-            width: 100%;
-            background-color: #333;
-            border-radius: 3px;
-            margin-bottom: 15px;
         }
         .download-section {
             margin: 30px 0;
         }
         .download-btn {
             display: inline-block;
-            background-color: #FFD700;
-            color: #222222;
-            padding: 12px 24px;
+            background-color: #4a8a4a;
+            color: #ffffff;
+            padding: 15px 30px;
             text-decoration: none;
             border-radius: 5px;
             font-weight: bold;
             margin: 10px;
             transition: all 0.3s ease;
-            border: 1px solid #FFFF00;
+            border: 1px solid #6aba6a;
+            font-size: 1.1em;
         }
         .download-btn:hover {
-            background-color: #FFFF00;
-            color: #111111;
+            background-color: #5aba5a;
+            color: #ffffff;
             text-decoration: none;
             transform: translateY(-1px);
         }
-        .download-btn.primary {
-            background-color: #4a8a4a;
-            color: #ffffff;
-            border: 1px solid #6aba6a;
-            font-size: 1.1em;
-            padding: 15px 30px;
-        }
-        .download-btn.primary:hover {
-            background-color: #5aba5a;
-            color: #ffffff;
+        .download-btn .size-info {
+            display: block;
+            font-size: 0.9em;
+            opacity: 0.8;
+            margin-top: 5px;
         }
         .back-btn {
             display: inline-block;
@@ -181,33 +150,40 @@
         .instructions li {
             margin: 8px 0;
         }
-        .debug-info {
+        .processing-info {
             background-color: #1a1a1a;
             border: 1px solid #444;
             border-radius: 5px;
             padding: 15px;
             margin: 20px 0;
             text-align: left;
-            font-family: monospace;
             font-size: 0.9em;
         }
-        .debug-info h4 {
+        .processing-info h4 {
             color: #FFD700;
             margin-top: 0;
             margin-bottom: 10px;
-            font-family: Arial, sans-serif;
         }
-        .debug-info .debug-item {
+        .processing-info .info-item {
             margin: 5px 0;
             color: #CCCCCC;
         }
-        .debug-info .debug-label {
+        .processing-info .info-label {
             color: #FFD700;
             font-weight: bold;
         }
         .icon {
             font-size: 1.2em;
             margin-right: 8px;
+        }
+        .fallback-info {
+            background-color: #4a3a2a;
+            border: 1px solid #8a6a4a;
+            color: #ffcc88;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-size: 0.9em;
         }
         @media (max-width: 600px) {
             .container {
@@ -219,9 +195,6 @@
                 margin: 10px 0;
                 text-align: center;
             }
-            .audio-part {
-                padding: 15px;
-            }
         }
     </style>
 </head>
@@ -229,88 +202,103 @@
     <div class="container">
         <h1><span class="icon">🎉</span>Audio Generated Successfully!</h1>
         
-        <div class="success-message">
-            <strong>Success!</strong> Your PDF has been converted to audio.
-        </div>
+
 
         <div class="file-info">
             <h3><span class="icon">📄</span>File Information</h3>
             <p><strong>Original PDF:</strong> {{ original_filename }}</p>
             <p><strong>TTS Engine:</strong> {{ tts_engine }}</p>
-            {% if file_count > 1 %}
-                <p><strong>Audio Parts:</strong> {{ file_count }} files generated</p>
+            <p><strong>Audio Format:</strong> MP3 (compressed for easy listening)</p>
+            {% if debug_info and debug_info.text_chunks_count %}
+                <p><strong>Content Sections:</strong> {{ debug_info.text_chunks_count }} parts combined</p>
             {% endif %}
-            <p><strong>Audio Format:</strong> {{ audio_file.split('.')[-1].upper() if audio_file else 'Unknown' }}</p>
         </div>
 
-        <div class="audio-player-section">
-            <h3><span class="icon">🎵</span>Listen to Your Audio</h3>
-            
-            {% if file_count > 1 %}
-                <div class="multiple-audio-note">
-                    <strong>Note:</strong> Your PDF was split into {{ file_count }} parts due to its length.
-                </div>
+        {% if combined_mp3_file %}
+            <div class="audio-player-section">
+                <h3><span class="icon">🎵</span>Your Complete Audio File</h3>
                 
-                {% for i in range(file_count) %}
-                    <div class="audio-part">
-                        <h4>Part {{ i + 1 }} of {{ file_count }}</h4>
-                        <audio controls preload="metadata">
-                            <source src="{{ url_for('serve_audio', filename=audio_files[i]) }}" type="audio/{{ 'mpeg' if audio_files[i].endswith('.mp3') else 'wav' }}">
-                            Your browser does not support the audio element.
-                        </audio>
-                        <div>
-                            <a href="{{ url_for('serve_audio', filename=audio_files[i]) }}" download="{{ audio_files[i] }}" class="download-btn">
-                                <span class="icon">📥</span>Download Part {{ i + 1 }}
-                            </a>
-                        </div>
-                    </div>
-                {% endfor %}
-            {% else %}
-                <div class="single-audio-player">
+                <div class="main-audio-player">
                     <audio controls preload="metadata">
-                        <source src="{{ url_for('serve_audio', filename=audio_file) }}" type="audio/{{ 'mpeg' if audio_file.endswith('.mp3') else 'wav' }}">
+                        <source src="{{ url_for('serve_audio', filename=combined_mp3_file) }}" type="audio/mpeg">
                         Your browser does not support the audio element.
                     </audio>
                 </div>
-            {% endif %}
-        </div>
 
-        <div class="download-section">
-            {% if combined_mp3_file %}
-                <a href="{{ url_for('serve_audio', filename=combined_mp3_file) }}" download="{{ combined_mp3_file }}" class="download-btn primary">
-                    <span class="icon">🎧</span>Download Complete MP3
-                </a>
-                <br>
-            {% endif %}
-            
-            {% if file_count == 1 %}
-                <a href="{{ url_for('serve_audio', filename=audio_file) }}" download="{{ audio_file }}" class="download-btn primary">
-                    <span class="icon">📥</span>Download Audio File
-                </a>
-            {% endif %}
-        </div>
+                <div class="download-section">
+                    <a href="{{ url_for('serve_audio', filename=combined_mp3_file) }}" download="{{ combined_mp3_file }}" class="download-btn">
+                        <span class="icon">🎧</span>Download Complete MP3
+                        <span class="size-info">Optimized for car audio systems</span>
+                    </a>
+                </div>
+            </div>
+        {% elif audio_files and audio_files|length == 1 %}
+            <!-- Single file fallback -->
+            <div class="audio-player-section">
+                <h3><span class="icon">🎵</span>Your Audio File</h3>
+                
+                <div class="main-audio-player">
+                    <audio controls preload="metadata">
+                        <source src="{{ url_for('serve_audio', filename=audio_files[0]) }}" type="audio/{{ 'mpeg' if audio_files[0].endswith('.mp3') else 'wav' }}">
+                        Your browser does not support the audio element.
+                    </audio>
+                </div>
+
+                <div class="download-section">
+                    <a href="{{ url_for('serve_audio', filename=audio_files[0]) }}" download="{{ audio_files[0] }}" class="download-btn">
+                        <span class="icon">📥</span>Download Audio File
+                    </a>
+                </div>
+            </div>
+        {% else %}
+            <!-- Fallback if no combined file -->
+            <div class="fallback-info">
+                <strong>Note:</strong> MP3 compression was not available, but your audio files were generated successfully.
+                {% if audio_files %}
+                    <div style="margin-top: 15px;">
+                        {% for audio_file in audio_files %}
+                            <a href="{{ url_for('serve_audio', filename=audio_file) }}" download="{{ audio_file }}" class="download-btn" style="font-size: 0.9em; padding: 8px 16px; margin: 5px;">
+                                <span class="icon">📥</span>Download Part {{ loop.index }}
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+        {% endif %}
 
         <div class="instructions">
-            <h4><span class="icon">💡</span>Tips</h4>
+            <h4><span class="icon">💡</span>Usage Tips</h4>
             <ul>
                 <li>Use the audio controls above to play, pause, and adjust volume</li>
-                <li>Click "Download" buttons to save audio files to your device</li>
-                {% if combined_mp3_file %}
-                    <li>The "Complete MP3" contains all parts combined into a single file</li>
-                {% endif %}
-                <li>Audio files will be automatically deleted from the server after some time</li>
-                <li>For best quality, use headphones or good speakers</li>
+                <li>Click "Download Complete MP3" to save the file to your device</li>
+                <li>Right-click the download button to save directly to your preferred location</li>
+                <li>Audio files are automatically cleaned up from the server after some time</li>
             </ul>
         </div>
 
         {% if debug_info %}
-            <div class="debug-info">
-                <h4><span class="icon">🔧</span>Processing Details</h4>
-                {% for key, value in debug_info.items() %}
-                    <div class="debug-item">
-                        <span class="debug-label">{{ key.replace('_', ' ').title() }}:</span> {{ value }}
+            <div class="processing-info">
+                <h4><span class="icon">🔧</span>Processing Summary</h4>
+                {% if debug_info.raw_text_length %}
+                    <div class="info-item">
+                        <span class="info-label">Text Extracted:</span> {{ "{:,}".format(debug_info.raw_text_length) }} characters
                     </div>
-                {% endfor %}
+                {% endif %}
+                {% if debug_info.page_range and debug_info.page_range != "full_document" %}
+                    <div class="info-item">
+                        <span class="info-label">Page Range:</span> {{ debug_info.page_range.range_description if debug_info.page_range.range_description else debug_info.page_range }}
+                    </div>
+                {% endif %}
+                {% if debug_info.tts_engine %}
+                    <div class="info-item">
+                        <span class="info-label">TTS Engine:</span> {{ debug_info.tts_engine }}
+                    </div>
+                {% endif %}
+                {% if debug_info.ffmpeg_available is defined %}
+                    <div class="info-item">
+                        <span class="info-label">MP3 Compression:</span> {{ "✅ Available" if debug_info.ffmpeg_available else "❌ Not Available" }}
+                    </div>
+                {% endif %}
             </div>
         {% endif %}
 
@@ -347,7 +335,6 @@
             
             audio.addEventListener('error', function() {
                 console.error('Audio loading error:', this.src);
-                // Could show user-friendly error message here
             });
         });
     </script>

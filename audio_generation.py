@@ -1,4 +1,4 @@
-# audio_generation.py - Enhanced with MP3 compression
+# audio_generation.py - Fixed path handling for FFmpeg
 import os
 import re
 import subprocess
@@ -90,13 +90,62 @@ class TTSGenerator:
         
         print(f"TTSGenerator: Generated {len(generated_files)} individual audio files")
         
-        # Create combined MP3 if requested and we have multiple files
+        # Create combined MP3 if requested - MODIFIED: Now works for single files too
         combined_mp3 = None
-        if create_combined_mp3 and len(generated_files) > 1:
-            combined_mp3 = self._create_combined_mp3(generated_files, base_output_name, output_dir)
+        if create_combined_mp3 and len(generated_files) >= 1:  # Changed from > 1 to >= 1
+            if len(generated_files) == 1:
+                # Single file - convert to MP3
+                combined_mp3 = self._convert_single_to_mp3(generated_files[0], base_output_name, output_dir)
+            else:
+                # Multiple files - combine to MP3
+                combined_mp3 = self._create_combined_mp3(generated_files, base_output_name, output_dir)
         
         return generated_files, combined_mp3
     
+    def _convert_single_to_mp3(self, audio_file: str, base_name: str, output_dir: str) -> Optional[str]:
+        """Convert a single audio file to MP3 format"""
+        if not self.ffmpeg_available:
+            print("TTSGenerator: FFmpeg not available, cannot convert to MP3")
+            return None
+        
+        try:
+            # Prepare file paths
+            input_file = os.path.abspath(os.path.join(output_dir, audio_file))
+            mp3_filename = f"{base_name}_combined.mp3"
+            mp3_path = os.path.abspath(os.path.join(output_dir, mp3_filename))
+            
+            print(f"TTSGenerator: Converting single file to MP3: {mp3_filename}")
+            
+            # Check that input file exists
+            if not os.path.exists(input_file):
+                print(f"TTSGenerator: Input file does not exist: {input_file}")
+                return None
+            
+            # FFmpeg command to convert to MP3
+            cmd = [
+                'ffmpeg', '-y',  # -y to overwrite output file
+                '-i', input_file,
+                '-c:a', 'libmp3lame',  # MP3 codec
+                '-b:a', '128k',        # 128 kbps bitrate
+                '-ar', '22050',        # 22.05 kHz sample rate (good for speech)
+                mp3_path
+            ]
+            
+            # Run FFmpeg
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            
+            if result.returncode == 0 and os.path.exists(mp3_path):
+                file_size = os.path.getsize(mp3_path) / (1024 * 1024)  # MB
+                print(f"TTSGenerator: Successfully converted to MP3: {mp3_filename} ({file_size:.1f} MB)")
+                return mp3_filename
+            else:
+                print(f"TTSGenerator: Failed to convert to MP3: {result.stderr}")
+                return None
+                
+        except Exception as e:
+            print(f"TTSGenerator: Error converting single file to MP3: {e}")
+            return None
+        
     def _create_combined_mp3(self, audio_files: List[str], base_name: str, output_dir: str) -> Optional[str]:
         """Combine multiple audio files into a single compressed MP3"""
         if not self.ffmpeg_available:
@@ -108,10 +157,17 @@ class TTSGenerator:
             return None
         
         try:
-            # Prepare file paths
-            input_files = [os.path.join(output_dir, f) for f in audio_files]
+            # Prepare file paths - FIX: Use absolute paths to avoid path confusion
+            input_files = []
+            for f in audio_files:
+                # Convert to absolute path to avoid path issues
+                if os.path.isabs(f):
+                    input_files.append(f)
+                else:
+                    input_files.append(os.path.abspath(os.path.join(output_dir, f)))
+            
             combined_filename = f"{base_name}_combined.mp3"
-            combined_path = os.path.join(output_dir, combined_filename)
+            combined_path = os.path.abspath(os.path.join(output_dir, combined_filename))
             
             print(f"TTSGenerator: Combining {len(input_files)} files into {combined_filename}")
             
@@ -149,8 +205,10 @@ class TTSGenerator:
             
             with open(concat_file, 'w', encoding='utf-8') as f:
                 for input_file in input_files:
-                    # Escape single quotes and backslashes for FFmpeg
-                    escaped_path = input_file.replace("'", "'\"'\"'").replace("\\", "\\\\")
+                    # Use absolute paths and proper escaping
+                    abs_path = os.path.abspath(input_file)
+                    # For Windows compatibility, use forward slashes and escape properly
+                    escaped_path = abs_path.replace('\\', '/').replace("'", "'\"'\"'")
                     f.write(f"file '{escaped_path}'\n")
             
             # FFmpeg command for concat demuxer
@@ -190,9 +248,10 @@ class TTSGenerator:
             # Build FFmpeg command with concat filter
             cmd = ['ffmpeg', '-y']
             
-            # Add input files
+            # Add input files with absolute paths
             for input_file in input_files:
-                cmd.extend(['-i', input_file])
+                abs_path = os.path.abspath(input_file)
+                cmd.extend(['-i', abs_path])
             
             # Add filter complex for concatenation
             filter_inputs = ''.join([f'[{i}:0]' for i in range(len(input_files))])
@@ -290,49 +349,3 @@ class TTSGenerator:
             print(f"TTSGenerator: Error combining audio: {e}")
             return None
 
-# Test function for MP3 combination
-def test_mp3_combination():
-    """Test the MP3 combination functionality"""
-    print("="*50)
-    print("TESTING MP3 COMBINATION")
-    print("="*50)
-    
-    generator = TTSGenerator("gtts", {"lang": "en"})
-    
-    # Test FFmpeg availability
-    print(f"FFmpeg available: {generator.ffmpeg_available}")
-    
-    if not generator.ffmpeg_available:
-        print("❌ FFmpeg not available. Install FFmpeg to use MP3 combination.")
-        print("Installation instructions:")
-        print("  Ubuntu/Debian: sudo apt install ffmpeg")
-        print("  macOS: brew install ffmpeg")
-        print("  Windows: Download from https://ffmpeg.org/download.html")
-        return
-    
-    # Create test audio files (you would replace this with actual audio files)
-    test_chunks = [
-        "This is the first part of the test audio.",
-        "This is the second part of the test audio.",
-        "This is the third and final part of the test audio."
-    ]
-    
-    # Generate audio files
-    print("Generating test audio files...")
-    audio_files, combined_mp3 = generator.generate_from_chunks(
-        test_chunks, 
-        "test_combination", 
-        "audio_outputs"
-    )
-    
-    print(f"Generated {len(audio_files)} individual files:")
-    for file in audio_files:
-        print(f"  - {file}")
-    
-    if combined_mp3:
-        print(f"✅ Combined MP3 created: {combined_mp3}")
-    else:
-        print("❌ Failed to create combined MP3")
-
-if __name__ == "__main__":
-    test_mp3_combination()

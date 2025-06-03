@@ -1,277 +1,204 @@
-# app.py - Final version with MP3 combination support
+# processors.py - Updated with MP3 combination support
+from dataclasses import dataclass
+from typing import Optional, Dict, Any, List
 import os
-from flask import Flask, render_template, request, redirect, url_for, send_from_directory, jsonify
-from werkzeug.utils import secure_filename
 
-# Import the processor architecture
-from processors import PDFProcessor
+from text_processing import OCRExtractor, TextCleaner
+from audio_generation import TTSGenerator
 
-# --- Configuration ---
-UPLOAD_FOLDER = 'uploads'
-AUDIO_FOLDER = 'audio_outputs'
-ALLOWED_EXTENSIONS = {'pdf'}
+@dataclass
+class ProcessingResult:
+    success: bool
+    audio_files: Optional[List[str]] = None  # List of individual audio files
+    combined_mp3_file: Optional[str] = None  # Combined MP3 file
+    audio_path: Optional[str] = None  # Keep for backward compatibility
+    error: Optional[str] = None
+    debug_info: Optional[Dict[str, Any]] = None
 
-# !! IMPORTANT !! Replace with your actual API key
-GOOGLE_AI_API_KEY = "crawling in my skin"  # Your key
-
-# --- TTS Engine Configuration ---
-_SELECTED_TTS_ENGINE_CONFIG = "coqui"  # or "gtts", "bark"
-TTS_ENGINE_KWARGS = {}
-
-if _SELECTED_TTS_ENGINE_CONFIG.lower() == "coqui":
-    TTS_ENGINE_KWARGS = {
-        "model_name": "tts_models/en/ljspeech/vits", 
-        "use_gpu_if_available": True,
-    }
-    SELECTED_TTS_ENGINE = "Coqui TTS"
-elif _SELECTED_TTS_ENGINE_CONFIG.lower() == "gtts":
-    TTS_ENGINE_KWARGS = {
-        "lang": "en",
-        "tld": "co.uk"
-    }
-    SELECTED_TTS_ENGINE = "gTTS"
-elif _SELECTED_TTS_ENGINE_CONFIG.lower() == "bark": 
-    TTS_ENGINE_KWARGS = {
-        "use_gpu_if_available": True,
-        "use_small_models": True, 
-        "history_prompt": None    
-    }
-    SELECTED_TTS_ENGINE = "Bark"
-else:
-    SELECTED_TTS_ENGINE = _SELECTED_TTS_ENGINE_CONFIG.upper()
-
-# --- Flask App Setup ---
-app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['AUDIO_FOLDER'] = AUDIO_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max file size
-
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(AUDIO_FOLDER, exist_ok=True)
-
-# Initialize the PDFProcessor
-print("Initializing PDFProcessor...")
-try:
-    pdf_processor = PDFProcessor(
-        google_api_key=GOOGLE_AI_API_KEY,
-        tts_engine=_SELECTED_TTS_ENGINE_CONFIG,
-        tts_config=TTS_ENGINE_KWARGS
-    )
-    print("PDFProcessor initialized successfully")
-    processor_available = True
-except Exception as e:
-    print(f"CRITICAL: PDFProcessor initialization failed: {e}")
-    pdf_processor = None
-    processor_available = False
-    SELECTED_TTS_ENGINE = f"{_SELECTED_TTS_ENGINE_CONFIG.upper()} (Failed to Load)"
-
-def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-# --- Flask Routes ---
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-@app.route('/audio_outputs/<filename>')
-def serve_audio(filename):
-    return send_from_directory(app.config['AUDIO_FOLDER'], filename)
-
-@app.route('/get_pdf_info', methods=['POST'])
-def get_pdf_info():
-    """API endpoint to get PDF information after file upload"""
-    if not processor_available or pdf_processor is None:
-        return jsonify({'error': 'PDF Processor not available'}), 500
+class PDFProcessor:
+    """Main processor that orchestrates PDF to audio conversion with MP3 combination"""
     
-    if 'pdf_file' not in request.files:
-        return jsonify({'error': 'No file provided'}), 400
-    
-    file = request.files['pdf_file']
-    if file.filename == '' or not allowed_file(file.filename):
-        return jsonify({'error': 'Invalid file'}), 400
-    
-    try:
-        # Save temporary file to get info
-        original_filename = secure_filename(file.filename)
-        temp_path = os.path.join(app.config['UPLOAD_FOLDER'], f"temp_{original_filename}")
-        file.save(temp_path)
+    def __init__(self, google_api_key: str, tts_engine: str = "coqui", tts_config: Dict = None):
+        print("PDFProcessor: Initializing components...")
+        self.ocr = OCRExtractor()
+        self.cleaner = TextCleaner(google_api_key)
+        self.tts = TTSGenerator(tts_engine, tts_config or {})
+        print("PDFProcessor: Initialization complete")
         
-        # Get PDF info
-        pdf_info = pdf_processor.get_pdf_info(temp_path)
-        
-        # Clean up temp file
+    def process_pdf(self, pdf_path: str, output_name: str, start_page: int = None, end_page: int = None) -> ProcessingResult:
+        """Process a PDF file through the complete pipeline with optional page range"""
         try:
-            os.remove(temp_path)
-        except:
-            pass
-        
-        return jsonify(pdf_info)
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/upload', methods=['POST'])
-def upload_file():
-    if not processor_available or pdf_processor is None:
-        return f"Error: PDF Processor ({SELECTED_TTS_ENGINE}) is not available. Please check server logs."
-
-    if request.method == 'POST':
-        if 'pdf_file' not in request.files:
-            return "No file part in the request."
-        
-        file = request.files['pdf_file']
-        if file.filename == '':
-            return "No file selected."
-        
-        if file and allowed_file(file.filename):
-            original_filename = secure_filename(file.filename)
-            base_filename_no_ext = os.path.splitext(original_filename)[0]
+            # Check if file exists
+            if not os.path.exists(pdf_path):
+                return ProcessingResult(success=False, error=f"File not found: {pdf_path}")
             
-            # Save uploaded file
-            pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], original_filename)
-            file.save(pdf_path)
-            
-            # Get page range parameters
-            use_page_range = request.form.get('use_page_range') == 'on'
-            start_page = None
-            end_page = None
-            page_range_description = ""
-            
-            if use_page_range:
-                try:
-                    start_page_str = request.form.get('start_page', '').strip()
-                    end_page_str = request.form.get('end_page', '').strip()
-                    
-                    if start_page_str:
-                        start_page = int(start_page_str)
-                        if start_page < 1:
-                            return "Error: Start page must be 1 or greater."
-                    
-                    if end_page_str:
-                        end_page = int(end_page_str)
-                        if end_page < 1:
-                            return "Error: End page must be 1 or greater."
-                    
-                    # Validate page range consistency
-                    if start_page and end_page and start_page > end_page:
-                        return "Error: Start page cannot be greater than end page."
-                    
-                    # Validate against actual PDF
-                    validation = pdf_processor.validate_page_range(pdf_path, start_page, end_page)
-                    if not validation.get('valid', False):
-                        return f"Error: {validation.get('error', 'Invalid page range')}"
-                    
-                    # Build description for display
-                    actual_start = validation.get('actual_start', start_page or 1)
-                    actual_end = validation.get('actual_end', end_page)
-                    total_pages = validation.get('total_pages', 0)
-                    pages_to_process = validation.get('pages_to_process', 0)
-                    
-                    page_range_description = f" (pages {actual_start}-{actual_end} of {total_pages}, processing {pages_to_process} pages)"
-                    
-                    print(f"Processing with validated page range: {actual_start} to {actual_end}")
-                    
-                except ValueError:
-                    return "Error: Invalid page numbers. Please enter valid integers."
-                except Exception as e:
-                    return f"Error validating page range: {str(e)}"
-            
-            print(f"Processing PDF: {original_filename}{page_range_description}")
-            
-            # Process the PDF with page range
-            try:
-                result = pdf_processor.process_pdf(pdf_path, base_filename_no_ext, start_page, end_page)
-            except Exception as e:
-                print(f"Processing error: {e}")
-                result = None
-            
-            # Clean up uploaded PDF
-            try:
-                os.remove(pdf_path)
-            except:
-                pass
-            
-            if result and result.success:
-                # Build display filename with page range info
-                display_filename = original_filename + page_range_description
-                
-                # Determine if we have FFmpeg for user messaging
-                ffmpeg_available = result.debug_info.get('ffmpeg_available', False) if result.debug_info else False
-                
-                return render_template('result.html', 
-                                     audio_files=result.audio_files,           
-                                     audio_file=result.audio_files[0] if result.audio_files else None,
-                                     combined_mp3_file=result.combined_mp3_file,
-                                     original_filename=display_filename,
-                                     tts_engine=SELECTED_TTS_ENGINE,
-                                     file_count=len(result.audio_files) if result.audio_files else 0,
-                                     ffmpeg_available=ffmpeg_available,
-                                     debug_info=result.debug_info)
+            # Build page range info for logging
+            if start_page is not None or end_page is not None:
+                page_info = f" (pages {start_page or 1}-{end_page or 'end'})"
             else:
-                error_msg = result.error if result else "Unknown processing error"
-                return f"Error: {error_msg}"
-        else:
-            return "Invalid file type. Please upload a PDF file."
+                page_info = ""
+            
+            print(f"PDFProcessor: Starting processing of {pdf_path}{page_info}")
+            
+            # Step 1: Extract text with page range
+            print("PDFProcessor: Step 1 - Extracting text")
+            raw_text = self.ocr.extract(pdf_path, start_page, end_page)
+            
+            if not raw_text or raw_text.startswith("Error"):
+                return ProcessingResult(success=False, error=f"Text extraction failed: {raw_text}")
+            
+            print(f"PDFProcessor: Extracted {len(raw_text):,} characters from PDF{page_info}")
+            
+            # Step 2: Clean text (now returns list of chunks)
+            print("PDFProcessor: Step 2 - Cleaning text")
+            clean_text_chunks = self.cleaner.clean(raw_text)
+            
+            if not clean_text_chunks:
+                return ProcessingResult(success=False, error="Text cleaning failed - no output from cleaner")
+            
+            # Filter out empty chunks
+            clean_text_chunks = [chunk for chunk in clean_text_chunks if chunk.strip()]
+            
+            if not clean_text_chunks:
+                return ProcessingResult(success=False, error="Text cleaning resulted in empty content")
+            
+            print(f"PDFProcessor: Text cleaning produced {len(clean_text_chunks)} chunks")
+            
+            # Step 3: Generate audio files with MP3 combination
+            print("PDFProcessor: Step 3 - Generating audio files")
+            
+            # ALWAYS try to create MP3, even for single chunks
+            audio_files, combined_mp3 = self.tts.generate_from_chunks(
+                clean_text_chunks, 
+                output_name,
+                create_combined_mp3=True  # Always try to create MP3
+            )
+            
+            if not audio_files:
+                return ProcessingResult(success=False, error="TTS generation failed - no audio files produced")
+                
+            print(f"PDFProcessor: Processing complete! Generated {len(audio_files)} audio files")
+            if combined_mp3:
+                print(f"PDFProcessor: Created combined MP3: {combined_mp3}")
+            else:
+                print("PDFProcessor: No combined MP3 created (FFmpeg may not be available or single chunk)")
+            
+            # Build debug info
+            debug_info = {
+                "raw_text_length": len(raw_text),
+                "text_chunks_count": len(clean_text_chunks),
+                "audio_files_count": len(audio_files),
+                "tts_engine": self.tts.engine_name,
+                "ffmpeg_available": self.tts.ffmpeg_available,
+                "combined_mp3_created": combined_mp3 is not None
+            }
+            
+            # Add page range info to debug
+            if start_page is not None or end_page is not None:
+                debug_info["page_range"] = {
+                    "start_page": start_page,
+                    "end_page": end_page,
+                    "range_description": f"{start_page or 1}-{end_page or 'end'}"
+                }
+            else:
+                debug_info["page_range"] = "full_document"
+            
+            return ProcessingResult(
+                success=True, 
+                audio_files=audio_files,
+                combined_mp3_file=combined_mp3,
+                audio_path=audio_files[0] if audio_files else None,  # First file for compatibility
+                debug_info=debug_info
+            )
+            
+        except Exception as e:
+            print(f"PDFProcessor: Unexpected error: {e}")
+            import traceback
+            traceback.print_exc()
+            return ProcessingResult(success=False, error=f"Processing failed: {str(e)}")
+        
+    def get_pdf_info(self, pdf_path: str) -> Dict[str, Any]:
+        """Get PDF information for the UI (page count, etc.)"""
+        try:
+            return self.ocr.get_pdf_info(pdf_path)
+        except Exception as e:
+            print(f"PDFProcessor: Failed to get PDF info: {e}")
+            return {
+                'total_pages': 0,
+                'title': 'Unknown',
+                'author': 'Unknown',
+                'error': str(e)
+            }
     
-    return redirect(url_for('index'))
+    def validate_page_range(self, pdf_path: str, start_page: int = None, end_page: int = None) -> Dict[str, Any]:
+        """Validate page range against actual PDF"""
+        try:
+            pdf_info = self.get_pdf_info(pdf_path)
+            total_pages = pdf_info.get('total_pages', 0)
+            
+            if total_pages == 0:
+                return {
+                    'valid': False,
+                    'error': 'Could not determine PDF page count',
+                    'total_pages': 0
+                }
+            
+            # Validate start page
+            if start_page is not None:
+                if start_page < 1:
+                    return {
+                        'valid': False,
+                        'error': 'Start page must be 1 or greater',
+                        'total_pages': total_pages
+                    }
+                if start_page > total_pages:
+                    return {
+                        'valid': False,
+                        'error': f'Start page {start_page} exceeds total pages ({total_pages})',
+                        'total_pages': total_pages
+                    }
+            
+            # Validate end page
+            if end_page is not None:
+                if end_page < 1:
+                    return {
+                        'valid': False,
+                        'error': 'End page must be 1 or greater',
+                        'total_pages': total_pages
+                    }
+                if end_page > total_pages:
+                    return {
+                        'valid': False,
+                        'error': f'End page {end_page} exceeds total pages ({total_pages})',
+                        'total_pages': total_pages
+                    }
+            
+            # Validate range consistency
+            if start_page is not None and end_page is not None:
+                if start_page > end_page:
+                    return {
+                        'valid': False,
+                        'error': f'Start page ({start_page}) cannot be greater than end page ({end_page})',
+                        'total_pages': total_pages
+                    }
+            
+            # All validations passed
+            actual_start = start_page if start_page is not None else 1
+            actual_end = end_page if end_page is not None else total_pages
+            
+            return {
+                'valid': True,
+                'total_pages': total_pages,
+                'actual_start': actual_start,
+                'actual_end': actual_end,
+                'pages_to_process': actual_end - actual_start + 1,
+                'percentage_of_document': ((actual_end - actual_start + 1) / total_pages) * 100
+            }
+            
+        except Exception as e:
+            return {
+                'valid': False,
+                'error': f'Page range validation failed: {str(e)}',
+                'total_pages': 0
+            }
 
-@app.route('/system_check')
-def system_check():
-    """System requirements check endpoint"""
-    if not processor_available or pdf_processor is None:
-        return jsonify({'error': 'PDF Processor not available'}), 500
-    
-    try:
-        # Check FFmpeg availability
-        ffmpeg_available = pdf_processor.tts.ffmpeg_available if pdf_processor.tts else False
-        
-        # Check TTS engine status
-        tts_status = "Available" if pdf_processor.tts.processor else "Not Available"
-        
-        system_info = {
-            'tts_engine': SELECTED_TTS_ENGINE,
-            'tts_status': tts_status,
-            'ffmpeg_available': ffmpeg_available,
-            'mp3_compression': ffmpeg_available,
-            'max_file_size_mb': app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)
-        }
-        
-        return jsonify(system_info)
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.errorhandler(413)
-def too_large(e):
-    return "File is too large. Maximum file size is 100MB.", 413
-
-@app.errorhandler(Exception)
-def handle_exception(e):
-    print(f"Unhandled exception: {e}")
-    import traceback
-    traceback.print_exc()
-    return f"An error occurred: {str(e)}", 500
-
-if __name__ == '__main__':
-    print("="*60)
-    print("NICOLAI'S PDF TO AUDIO CONVERTER")
-    print("="*60)
-    print(f"TTS Engine: {SELECTED_TTS_ENGINE}")
-    print(f"Upload folder: {UPLOAD_FOLDER}")
-    print(f"Audio folder: {AUDIO_FOLDER}")
-    
-    # Check system capabilities
-    if processor_available and pdf_processor:
-        ffmpeg_status = "✅ Available" if pdf_processor.tts.ffmpeg_available else "❌ Not Available"
-        print(f"FFmpeg (MP3 compression): {ffmpeg_status}")
-        
-        if not pdf_processor.tts.ffmpeg_available:
-            print("💡 Install FFmpeg for MP3 compression:")
-            print("   Ubuntu/Debian: sudo apt install ffmpeg")
-            print("   macOS: brew install ffmpeg") 
-            print("   Windows: Download from https://ffmpeg.org/download.html")
-    
-    print("="*60)
-    print("Starting Flask development server...")
-    app.run(debug=True, host='0.0.0.0', port=5000)

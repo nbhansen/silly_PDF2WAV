@@ -3,38 +3,41 @@ import os
 from flask import Flask, render_template, request, redirect, url_for, send_from_directory, jsonify
 from werkzeug.utils import secure_filename
 
+# --- Load environment variables ---
+from dotenv import load_dotenv
+load_dotenv()
+
 # Import the processor architecture
 from processors import PDFProcessor
 
 # --- Configuration ---
-UPLOAD_FOLDER = 'uploads'
-AUDIO_FOLDER = 'audio_outputs'
-ALLOWED_EXTENSIONS = {'pdf'}
+UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', 'uploads')
+AUDIO_FOLDER = os.getenv('AUDIO_FOLDER', 'audio_outputs')
+ALLOWED_EXTENSIONS = set(os.getenv('ALLOWED_EXTENSIONS', 'pdf').split(','))
 
-# !! IMPORTANT !! Replace with your actual API key
-GOOGLE_AI_API_KEY = "notmyrealkey"  # Your key
+GOOGLE_AI_API_KEY = os.getenv('GOOGLE_AI_API_KEY', '')
 
 # --- TTS Engine Configuration ---
-_SELECTED_TTS_ENGINE_CONFIG = "coqui"  # or "gtts", "bark"
+_SELECTED_TTS_ENGINE_CONFIG = os.getenv('TTS_ENGINE', 'coqui').lower()
 TTS_ENGINE_KWARGS = {}
 
-if _SELECTED_TTS_ENGINE_CONFIG.lower() == "coqui":
+if _SELECTED_TTS_ENGINE_CONFIG == "coqui":
     TTS_ENGINE_KWARGS = {
-        "model_name": "tts_models/en/ljspeech/vits", 
-        "use_gpu_if_available": True,
+        "model_name": os.getenv('COQUI_MODEL_NAME', "tts_models/en/ljspeech/vits"),
+        "use_gpu_if_available": os.getenv('COQUI_USE_GPU_IF_AVAILABLE', 'True').lower() == 'true',
     }
     SELECTED_TTS_ENGINE = "Coqui TTS"
-elif _SELECTED_TTS_ENGINE_CONFIG.lower() == "gtts":
+elif _SELECTED_TTS_ENGINE_CONFIG == "gtts":
     TTS_ENGINE_KWARGS = {
-        "lang": "en",
-        "tld": "co.uk"
+        "lang": os.getenv('GTTS_LANG', "en"),
+        "tld": os.getenv('GTTS_TLD', "co.uk")
     }
     SELECTED_TTS_ENGINE = "gTTS"
-elif _SELECTED_TTS_ENGINE_CONFIG.lower() == "bark": 
+elif _SELECTED_TTS_ENGINE_CONFIG == "bark":
     TTS_ENGINE_KWARGS = {
-        "use_gpu_if_available": True,
-        "use_small_models": True, 
-        "history_prompt": None    
+        "use_gpu_if_available": os.getenv('BARK_USE_GPU_IF_AVAILABLE', 'True').lower() == 'true',
+        "use_small_models": os.getenv('BARK_USE_SMALL_MODELS', 'True').lower() == 'true',
+        "history_prompt": os.getenv('BARK_HISTORY_PROMPT', None)
     }
     SELECTED_TTS_ENGINE = "Bark"
 else:
@@ -196,12 +199,18 @@ def upload_file():
                 # Build display filename with page range info
                 display_filename = original_filename + page_range_description
                 
+                # Debug: Print what we got from the processor
+                print(f"DEBUG: audio_files = {result.audio_files}")
+                print(f"DEBUG: combined_mp3_file = {result.combined_mp3_file}")
+                print(f"DEBUG: debug_info = {result.debug_info}")
+                
                 return render_template('result.html', 
-                                     audio_files=result.audio_files,           
-                                     audio_file=result.audio_files[0],         
+                                     audio_files=result.audio_files or [],           
+                                     audio_file=result.audio_files[0] if result.audio_files else None,
+                                     combined_mp3_file=result.combined_mp3_file,  # Make sure this is passed
                                      original_filename=display_filename,
                                      tts_engine=SELECTED_TTS_ENGINE,
-                                     file_count=len(result.audio_files),
+                                     file_count=len(result.audio_files) if result.audio_files else 0,
                                      debug_info=result.debug_info)
             else:
                 error_msg = result.error if result else "Unknown processing error"
@@ -210,6 +219,7 @@ def upload_file():
             return "Invalid file type. Please upload a PDF file."
     
     return redirect(url_for('index'))
+
 
 @app.errorhandler(413)
 def too_large(e):

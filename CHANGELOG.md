@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic documentation
 
 ### Changed
-- None yet
+- Environment files and some basic cleanup of random crap-functions I use for debugging
 
 ### Deprecated
 - None yet
