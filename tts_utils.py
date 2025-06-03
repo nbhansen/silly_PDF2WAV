@@ -1,3 +1,5 @@
+# This module provides a unified interface for various TTS engines though should be refactored
+
 import os
 import torch # For checking CUDA availability and setting device
 import numpy # For Bark's add_safe_globals fix
