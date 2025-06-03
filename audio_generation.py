@@ -2,9 +2,24 @@
 import os
 import re
 import subprocess
-import shutil
 from typing import Optional, List, Tuple
 from tts_utils import get_tts_processor
+
+class SimpleTTSEnhancer:
+    """Minimal enhancement - text should already be TTS-optimized by LLM"""
+    
+    @staticmethod
+    def enhance_text_for_tts(text: str) -> str:
+        """Minimal enhancement since LLM should have already optimized"""
+        
+        if not text or not text.strip():
+            return text
+        
+        # Only add paragraph break pauses if they're missing
+        # Look for paragraph breaks that don't already have pause markers
+        text = re.sub(r'\n\s*\n(?!\.\.\.)', '\n\n... ', text)
+        
+        return text
 
 class TTSGenerator:
     """Handles text-to-speech generation with MP3 compression support"""
@@ -39,16 +54,18 @@ class TTSGenerator:
             
         os.makedirs(output_dir, exist_ok=True)
         
-        # Split text for TTS
+        # Split text for TTS first, then enhance each chunk
         chunks = self._split_for_tts(text)
         print(f"TTSGenerator: Split into {len(chunks)} chunks")
         
         if len(chunks) == 1:
-            # Single chunk - direct generation
-            return self.processor.generate_audio_file(text, output_name, output_dir)
+            # Single chunk - enhance and generate directly
+            enhancer = SimpleTTSEnhancer()
+            enhanced_text = enhancer.enhance_text_for_tts(text)
+            return self.processor.generate_audio_file(enhanced_text, output_name, output_dir)
         
-        # Multiple chunks - generate and combine
-        return self._generate_and_combine(chunks, output_name, output_dir)
+        # Multiple chunks - enhance each chunk and combine
+        return self._generate_and_combine_enhanced(chunks, output_name, output_dir)
     
     def generate_from_chunks(self, text_chunks: List[str], base_output_name: str, 
                            output_dir: str = "audio_outputs", 
@@ -80,8 +97,9 @@ class TTSGenerator:
             chunk_output_name = f"{base_output_name}_part{i+1:02d}"
             print(f"TTSGenerator: Generating audio for chunk {i+1}/{len(text_chunks)}: {chunk_output_name}")
             
-            # For individual chunks, we can still split if they're too long
-            chunk_audio = self.generate(text_chunk, chunk_output_name, output_dir)
+            # Process this chunk - split if needed, then enhance each sub-chunk
+            chunk_audio = self._process_chunk_with_enhancement(text_chunk, chunk_output_name, output_dir)
+            
             if chunk_audio:
                 generated_files.append(chunk_audio)
                 print(f"TTSGenerator: Generated {chunk_audio}")
@@ -101,6 +119,83 @@ class TTSGenerator:
                 combined_mp3 = self._create_combined_mp3(generated_files, base_output_name, output_dir)
         
         return generated_files, combined_mp3
+    
+    def _process_chunk_with_enhancement(self, text_chunk: str, output_name: str, output_dir: str) -> Optional[str]:
+        """Process a single text chunk with proper enhancement after splitting"""
+        
+        # First check if this chunk needs splitting
+        if len(text_chunk) <= self.chunk_size:
+            # Small enough - enhance and generate directly
+            enhancer = SimpleTTSEnhancer()
+            enhanced_text = enhancer.enhance_text_for_tts(text_chunk)
+            return self.processor.generate_audio_file(enhanced_text, output_name, output_dir)
+        
+        # Large chunk - split first, then enhance each sub-chunk
+        sub_chunks = self._split_for_tts(text_chunk)
+        print(f"TTSGenerator: Split large chunk into {len(sub_chunks)} sub-chunks")
+        
+        if len(sub_chunks) == 1:
+            # Even after splitting, still one chunk - enhance and generate
+            enhancer = SimpleTTSEnhancer()
+            enhanced_text = enhancer.enhance_text_for_tts(sub_chunks[0])
+            return self.processor.generate_audio_file(enhanced_text, output_name, output_dir)
+        
+        # Multiple sub-chunks - enhance each and combine
+        return self._generate_and_combine_enhanced(sub_chunks, output_name, output_dir)
+    
+    def _generate_and_combine_enhanced(self, chunks: List[str], output_name: str, output_dir: str) -> Optional[str]:
+        """Generate audio for each chunk with enhancement and combine"""
+        try:
+            from pydub import AudioSegment
+        except ImportError:
+            print("TTSGenerator: pydub not available, cannot combine chunks")
+            return None
+            
+        temp_files = []
+        enhancer = SimpleTTSEnhancer()
+        
+        try:
+            # Generate individual chunks with enhancement
+            for i, chunk in enumerate(chunks):
+                print(f"TTSGenerator: Processing enhanced chunk {i+1}/{len(chunks)}")
+                
+                # Enhance this chunk
+                enhanced_chunk = enhancer.enhance_text_for_tts(chunk)
+                
+                temp_name = f"{output_name}_chunk_{i}"
+                temp_file = self.processor.generate_audio_file(enhanced_chunk, temp_name, output_dir)
+                if temp_file:
+                    temp_files.append(os.path.join(output_dir, temp_file))
+            
+            if not temp_files:
+                print("TTSGenerator: No audio chunks generated")
+                return None
+            
+            # Combine audio files
+            print("TTSGenerator: Combining enhanced audio chunks")
+            combined = AudioSegment.empty()
+            for temp_file in temp_files:
+                combined += AudioSegment.from_file(temp_file)
+            
+            # Save combined file
+            ext = self.processor.get_output_extension()
+            final_file = f"{output_name}.{ext}"
+            final_path = os.path.join(output_dir, final_file)
+            combined.export(final_path, format=ext)
+            
+            # Cleanup temp files
+            for temp_file in temp_files:
+                try:
+                    os.remove(temp_file)
+                except:
+                    pass
+                    
+            print(f"TTSGenerator: Combined enhanced audio saved as {final_file}")
+            return final_file
+            
+        except Exception as e:
+            print(f"TTSGenerator: Error combining enhanced audio: {e}")
+            return None
     
     def _convert_single_to_mp3(self, audio_file: str, base_name: str, output_dir: str) -> Optional[str]:
         """Convert a single audio file to MP3 format"""
@@ -348,4 +443,3 @@ class TTSGenerator:
         except Exception as e:
             print(f"TTSGenerator: Error combining audio: {e}")
             return None
-

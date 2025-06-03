@@ -43,6 +43,7 @@ A warning - I am not the best programmer by a long stretch so no doubt you can i
     * **Linux (Debian/Ubuntu):** `sudo apt-get install espeak-ng`
     * **macOS (Homebrew):** `brew install espeak`
     * **Windows:** Download espeak binaries and add to PATH.
+* **FFMPeg**thats great to have anyway, do it brother 
 
 ### Installation Steps
 

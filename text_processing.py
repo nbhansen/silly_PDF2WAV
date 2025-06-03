@@ -1,4 +1,4 @@
-# text_processing.py - Complete rewrite with page range support
+# text_processing.py - Complete rewrite with TTS optimization
 import google.generativeai as genai
 import pytesseract
 from pdf2image import convert_from_path
@@ -191,7 +191,7 @@ class OCRExtractor:
             }
 
 class TextCleaner:
-    """Handles text cleaning using Google's Gemini"""
+    """Handles text cleaning and TTS optimization using Google's Gemini"""
     
     def __init__(self, api_key: str, max_chunk_size: int = 100000):
         self.api_key = api_key
@@ -207,14 +207,23 @@ class TextCleaner:
         try:
             genai.configure(api_key=self.api_key)
             model = genai.GenerativeModel('gemini-2.0-flash')
-            print("TextCleaner: Gemini initialized successfully")
+            print("TextCleaner: Gemini initialized successfully for TTS optimization")
             return model
         except Exception as e:
             print(f"TextCleaner: Failed to initialize Gemini: {e}")
             return None
 
     def clean(self, text: str) -> List[str]:
-        """Clean the extracted text, returns list of cleaned chunks"""
+        """
+        Clean text and optimize for TTS - main entry point for backward compatibility
+        """
+        return self.clean_for_tts(text)
+
+    def clean_for_tts(self, text: str) -> List[str]:
+        """
+        Clean text with LLM and optimize for TTS in one step
+        """
+        
         if not text.strip():
             print("TextCleaner: Empty text provided")
             return [""]
@@ -224,87 +233,181 @@ class TextCleaner:
             return [text]
         
         if not self.model:
-            print("TextCleaner: No LLM model available, returning text as-is")
-            return [text]
-            
-        # Simple chunking for large texts
+            print("TextCleaner: No LLM model available, using basic TTS enhancement")
+            return self._basic_tts_fallback(text)
+        
+        # For large texts, clean in chunks with TTS optimization
         if len(text) <= self.max_chunk_size:
-            cleaned = self._clean_chunk(text)
-            return [cleaned]
-        
-        print(f"TextCleaner: Text is large ({len(text):,} chars), splitting into chunks")
-        chunks = self._smart_split(text, self.max_chunk_size)
-        cleaned_chunks = []
-        
-        for i, chunk in enumerate(chunks):
-            print(f"TextCleaner: Processing chunk {i+1}/{len(chunks)} ({len(chunk):,} chars)")
-            if i > 0:
-                time.sleep(1)  # Rate limiting for API
+            cleaned_text = self._clean_chunk_for_tts(text)
+            return self._chunk_for_audio(cleaned_text)
+        else:
+            print(f"TextCleaner: Large text ({len(text):,} chars), processing in chunks")
+            initial_chunks = self._smart_split(text, self.max_chunk_size)
+            cleaned_chunks = []
             
-            cleaned_chunk = self._clean_chunk(chunk)
-            cleaned_chunks.append(cleaned_chunk)
+            for i, chunk in enumerate(initial_chunks):
+                print(f"TextCleaner: Cleaning and TTS-optimizing chunk {i+1}/{len(initial_chunks)}")
+                if i > 0:
+                    time.sleep(1)  # Rate limiting
+                cleaned_chunk = self._clean_chunk_for_tts(chunk)
+                cleaned_chunks.append(cleaned_chunk)
+                
+                # Write individual debug files
+                try:
+                    debug_path = f"llm_tts_cleaned_chunk_{i+1}_debug.txt"
+                    with open(debug_path, "w", encoding="utf-8") as f:
+                        f.write(cleaned_chunk)
+                    print(f"TextCleaner: Wrote TTS-optimized chunk {i+1} to {debug_path}")
+                except Exception as e:
+                    print(f"TextCleaner: Failed to write debug file: {e}")
             
-            # Write individual debug files
-            try:
-                debug_path = f"llm_cleaned_chunk_{i+1}_debug.txt"
-                with open(debug_path, "w", encoding="utf-8") as f:
-                    f.write(cleaned_chunk)
-                print(f"TextCleaner: Wrote chunk {i+1} to {debug_path}")
-            except Exception as e:
-                print(f"TextCleaner: Failed to write debug file: {e}")
-        
-        print(f"TextCleaner: Processed {len(cleaned_chunks)} chunks successfully")
-        return cleaned_chunks
+            # Combine cleaned chunks with section pauses
+            combined_text = "\n\n... ...\n\n".join(cleaned_chunks)  # Add pauses between major sections
+            return self._chunk_for_audio(combined_text)
 
-    def _clean_chunk(self, text_chunk: str) -> str:
-        """Clean a single chunk of text using Gemini"""
+    def _clean_chunk_for_tts(self, text_chunk: str) -> str:
+        """Clean a single chunk with TTS optimization"""
         if not text_chunk.strip():
             return text_chunk
             
-        prompt = f"""Your primary goal is to clean the following text, extracted from an academic research paper. The cleaned text should be highly readable and well-suited for text-to-speech (TTS) conversion.
-
-**Key Cleaning Tasks (Remove these elements):**
-- Headers and Footers: This includes page numbers, running titles, journal names, conference names, and dates that appear consistently at the top or bottom of pages.
-- Line Numbers: If present in the margins.
-- Marginalia or Side Notes: Any comments or notes found in the margins.
-- Watermarks or Stamps: Text like "Draft," "Confidential," or institutional logos/stamps.
-- Artifacts from Scanning: Random specks, stray lines, or heavily distorted characters that are clearly not part of the intended text.
-- Repeated Copyright or Licensing Information: Especially if it appears on every page or in a boilerplate manner.
-- Extraneous Punctuation or Symbols: Symbols or punctuation that are likely errors from the OCR process and do not contribute to the meaning.
-
-**Core Content Preservation (Focus on these):**
-- Preserve all text that would be read aloud in an ebook, including all paragraphs and their intended structure.
-- Skip in-text citations (e.g., [1], (Author, 2023)).
-- Skip mathematical formulas and equations if present.
-
-**Crucial for Readability and TTS (Pay close attention to these):**
-- **Maintain or Reconstruct Natural Spacing:** Ensure there is a single proper space between all words. Ensure appropriate single spacing follows all punctuation marks.
-- **Handle Hyphenated Words:** If words are hyphenated across line breaks in the input (e.g., "effec-\\ntive"), correctly join them into single words (e.g., "effective") in the output.
-- **Avoid Run-on Words:** The final output must be composed of clearly separated words and sentences. Do not merge words that should be distinct.
-- The output must be **grammatically correct**, well-formed English text, structured into natural paragraphs suitable for reading aloud.
-- **URLs**: If URLs are present they should be cleaned to just say for instance "example.com" instead of "https://example.com/this/is/a/very/long/url/that/should/not/be/read/aloud".
-
-Here is the text to clean:
----
-{text_chunk}
----
-Cleaned text:"""
-
+        prompt = self._get_tts_optimized_prompt(text_chunk)
+        
         try:
             response = self.model.generate_content(prompt)
             if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
                 cleaned_text = response.candidates[0].content.parts[0].text
-                print(f"TextCleaner: Successfully cleaned chunk ({len(cleaned_text):,} chars output)")
+                print(f"TextCleaner: Successfully cleaned and TTS-optimized chunk ({len(cleaned_text):,} chars)")
                 return cleaned_text
             else:
-                print("TextCleaner: LLM response was empty or malformed")
-                return text_chunk
+                print("TextCleaner: LLM response was empty, using fallback")
+                return self._basic_tts_fallback(text_chunk)[0]
         except Exception as e:
-            print(f"TextCleaner: Error during cleaning: {e}")
-            return text_chunk
+            print(f"TextCleaner: Error during TTS optimization: {e}")
+            return self._basic_tts_fallback(text_chunk)[0]
 
+    def _get_tts_optimized_prompt(self, text_chunk: str) -> str:
+        """Generate TTS-optimized cleaning prompt"""
+        
+        return f"""Your primary goal is to clean the following text from an academic research paper and optimize it for text-to-speech (TTS) conversion.
+
+**Key Cleaning Tasks:**
+- Remove headers, footers, page numbers, running titles, journal names
+- Remove line numbers, marginalia, watermarks, scanning artifacts  
+- Skip in-text citations (e.g., [1], (Author, 2023))
+- Skip mathematical formulas and equations
+- Clean URLs to just domain names (e.g., "example.com" instead of full URLs)
+
+**TTS Optimization - Critical for Natural Speech:**
+- Add natural pause markers using ellipses (...) where a speaker would naturally pause
+- Before major topic transitions, add "... ..." for a longer pause
+- After section-ending sentences, add "... ..." before starting new concepts
+- When introducing lists or examples, add brief pauses: "The following examples... first, second, third"
+- For transition words (however, therefore, moreover), add preceding pause: "... However, the results show"
+- Keep sentences shorter when possible - break overly long academic sentences at natural points
+- Ensure smooth reading flow by adding brief pauses around parenthetical information
+
+**Text Structure for Speech:**
+- Maintain clear paragraph breaks for natural speech pacing
+- Join hyphenated words split across lines (e.g., "effec-\\ntive" → "effective")  
+- Create grammatically correct, well-formed English suitable for reading aloud
+- When listing items, use speech-friendly format: "First... Second... Third..." instead of bullet points
+- Replace bullet points or dashes with "Next point:" or similar speech-friendly transitions
+
+**Example of good TTS formatting:**
+Instead of: "The results (see Table 1) show significant improvement. However, further research is needed."
+Output: "The results... show significant improvement. ... However, further research is needed."
+
+Instead of: "Key findings include: • Point one • Point two • Point three"
+Output: "Key findings include... First, point one. ... Second, point two. ... Third, point three."
+
+Here is the text to clean and optimize for TTS:
+---
+{text_chunk}
+---
+
+Cleaned and TTS-optimized text:"""
+
+    def _basic_tts_fallback(self, text: str) -> List[str]:
+        """Fallback TTS enhancement when LLM is not available"""
+        print("TextCleaner: Using basic TTS fallback (no LLM)")
+        # Just do basic paragraph enhancement
+        text = re.sub(r'\n\s*\n', '\n\n... ', text)
+        return self._chunk_for_audio(text)
+    
+    def _chunk_for_audio(self, text: str) -> List[str]:
+        """Split TTS-optimized text into audio-appropriate chunks"""
+        # The text is already TTS-optimized, so we can be more aggressive about preserving structure
+        target_size = 80000  # Larger chunks since they're already optimized
+        
+        if len(text) <= target_size:
+            print("TextCleaner: Text fits in single audio chunk")
+            return [text]
+        
+        print(f"TextCleaner: Splitting TTS-optimized text ({len(text):,} chars) for audio")
+        
+        # Split on major pause markers first (section breaks)
+        major_sections = text.split('\n\n... ...\n\n')
+        
+        chunks = []
+        current_chunk = ""
+        
+        for i, section in enumerate(major_sections):
+            section = section.strip()
+            if not section:
+                continue
+                
+            if len(current_chunk) + len(section) > target_size:
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                
+                # If single section is still too large, split it further
+                if len(section) > target_size:
+                    sub_chunks = self._split_large_section(section, target_size)
+                    chunks.extend(sub_chunks)
+                    current_chunk = ""
+                else:
+                    current_chunk = section
+            else:
+                if current_chunk:
+                    current_chunk += "\n\n... ...\n\n" + section
+                else:
+                    current_chunk = section
+        
+        if current_chunk:
+            chunks.append(current_chunk.strip())
+        
+        print(f"TextCleaner: Split TTS-optimized text into {len(chunks)} audio chunks")
+        return chunks
+    
+    def _split_large_section(self, section: str, max_size: int) -> List[str]:
+        """Split a large section while preserving TTS markers"""
+        # Try to split on existing pause markers first
+        pause_splits = section.split('... ...')
+        
+        chunks = []
+        current_chunk = ""
+        
+        for part in pause_splits:
+            part = part.strip()
+            if not part:
+                continue
+                
+            potential = current_chunk + "... ..." + part if current_chunk else part
+            
+            if len(potential) > max_size:
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                current_chunk = part
+            else:
+                current_chunk = potential
+        
+        if current_chunk:
+            chunks.append(current_chunk.strip())
+        
+        return chunks
+    
     def _smart_split(self, text: str, max_size: int) -> List[str]:
-        """Split text at sentence boundaries for better cleaning"""
+        """Split text at sentence boundaries for initial processing"""
         # First try to split at sentence boundaries
         sentences = re.split(r'(?<=[.!?])\s+', text)
         chunks = []
@@ -345,4 +448,3 @@ Cleaned text:"""
         
         print(f"TextCleaner: Split {len(text):,} chars into {len(final_chunks)} chunks")
         return final_chunks
-
