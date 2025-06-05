@@ -391,15 +391,17 @@ if BARK_AVAILABLE:
         def get_output_extension(self):
             return self.output_extension
 
+
 # --- Gemini TTS Implementation ---
 try:
-    import google.generativeai as genai
-    from google.generativeai.types import GenerateContentConfig, SpeechConfig, VoiceConfig, PrebuiltVoiceConfig
+    from google import genai
+    from google.genai import types
     import wave
     GEMINI_TTS_AVAILABLE = True
     print("Google Gemini TTS library found and imported successfully.")
-except ImportError:
-    print("Google Gemini TTS library not found. GeminiTTSProcessor will not be available.")
+except ImportError as e:
+    print(f"Google Gemini TTS library not found: {e}")
+    print("Install with: pip install google-generativeai")
     GEMINI_TTS_AVAILABLE = False
 
 if GEMINI_TTS_AVAILABLE:
@@ -410,65 +412,97 @@ if GEMINI_TTS_AVAILABLE:
             self.style_prompt = style_prompt
             self.api_key = api_key or os.getenv('GOOGLE_AI_API_KEY', '')
             self.output_extension = "wav"
-            self.model = None
+            self.client = None
+            
             try:
                 if not self.api_key:
                     print("GeminiTTSProcessor: WARNING - No API key provided")
                     return
-                genai.configure(api_key=self.api_key)
-                self.model = genai.GenerativeModel("gemini-2.5-flash-preview-tts")
+                    
+                self.client = genai.Client(api_key=self.api_key)
                 print(f"GeminiTTSProcessor: Initialized with voice '{self.voice_name}'")
             except Exception as e:
-                print(f"GeminiTTSProcessor: Error initializing Gemini model: {e}")
-                self.model = None
+                print(f"GeminiTTSProcessor: Error initializing Gemini client: {e}")
+                self.client = None
 
         def generate_audio_file(self, text_to_speak, output_filename_no_ext, audio_dir):
-            if not self.model:
-                print("GeminiTTSProcessor: Model not available. Skipping audio generation.")
+            if not self.client:
+                print("GeminiTTSProcessor: Client not available. Skipping audio generation.")
                 return None
+                
             print(f"GeminiTTSProcessor: Attempting Gemini TTS generation for {output_filename_no_ext}.{self.output_extension}")
+            
             if not text_to_speak or text_to_speak.strip() == "" or \
                text_to_speak.startswith("LLM cleaning skipped") or text_to_speak.startswith("Error:") or \
                text_to_speak.startswith("Could not convert") or text_to_speak.startswith("No text could be extracted"):
                 print("GeminiTTSProcessor: Skipping audio generation due to empty or error text.")
                 return None
+                
             try:
                 os.makedirs(audio_dir, exist_ok=True)
                 audio_filename = f"{output_filename_no_ext}.{self.output_extension}"
                 audio_filepath = os.path.join(audio_dir, audio_filename)
+                
                 # Prepare prompt with optional style guidance
                 prompt = f"{self.style_prompt}: {text_to_speak}" if self.style_prompt else text_to_speak
+                
                 print(f"GeminiTTSProcessor: Generating audio with voice '{self.voice_name}'")
-                response = self.model.generate_content(
-                    prompt,
-                    generation_config=GenerateContentConfig(
+                
+                response = self.client.models.generate_content(
+                    model="gemini-2.5-flash-preview-tts",
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
                         response_modalities=["AUDIO"],
-                        speech_config=SpeechConfig(
-                            voice_config=VoiceConfig(
-                                prebuilt_voice=PrebuiltVoiceConfig(
+                        speech_config=types.SpeechConfig(
+                            voice_config=types.VoiceConfig(
+                                prebuilt_voice_config=types.PrebuiltVoiceConfig(
                                     voice_name=self.voice_name,
                                 )
                             )
                         ),
                     )
                 )
-                # Extract audio data
-                audio_data = response.candidates[0].content.parts[0].inline_data.data
-                # Save as WAV file
+                
+                # Extract audio data with error handling
+                if not hasattr(response, 'candidates') or not response.candidates:
+                    print("GeminiTTSProcessor: No candidates in response")
+                    return None
+                    
+                candidate = response.candidates[0]
+                if not hasattr(candidate, 'content') or not candidate.content:
+                    print("GeminiTTSProcessor: No content in candidate")
+                    return None
+                    
+                content = candidate.content
+                if not hasattr(content, 'parts') or not content.parts:
+                    print("GeminiTTSProcessor: No parts in content")
+                    return None
+                    
+                part = content.parts[0]
+                if not hasattr(part, 'inline_data') or not part.inline_data:
+                    print("GeminiTTSProcessor: No inline_data in part")
+                    return None
+                    
+                audio_data = part.inline_data.data
+                print(f"GeminiTTSProcessor: Successfully extracted audio data ({len(audio_data)} bytes)")
+                
+                # Save as WAV file using the wave_file helper function from docs
                 with wave.open(audio_filepath, "wb") as wf:
                     wf.setnchannels(1)  # Mono
-                    wf.setsampwidth(2)  # 16-bit
+                    wf.setsampwidth(2)  # 16-bit  
                     wf.setframerate(24000)  # 24kHz
                     wf.writeframes(audio_data)
+                    
                 print(f"GeminiTTSProcessor: Audio file saved: {audio_filepath}")
                 return audio_filename
+                
             except Exception as e:
                 print(f"GeminiTTSProcessor: Error generating audio file with Gemini TTS: {e}")
                 return None
 
         def get_output_extension(self):
             return self.output_extension
-
+        
 # --- TTS Factory ---
 def get_tts_processor(engine_name="coqui", config: Union[TTSConfig, None] = None, **legacy_kwargs):
     """

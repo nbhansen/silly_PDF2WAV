@@ -299,8 +299,8 @@ class TextCleaner:
 
 **TTS Optimization - Critical for Natural Speech:**
 - Add natural pause markers using ellipses (...) where a speaker would naturally pause
-- Before major topic transitions, add "... ..." for a longer pause
-- After section-ending sentences, add "... ..." before starting new concepts
+- Before major topic transitions, add "... ... ..." for longer pause
+- After section-ending sentences, add "... ... ..." before starting new concepts
 - When introducing lists or examples, add brief pauses: "The following examples... first, second, third"
 - For transition words (however, therefore, moreover), add preceding pause: "... However, the results show"
 - Keep sentences shorter when possible - break overly long academic sentences at natural points
