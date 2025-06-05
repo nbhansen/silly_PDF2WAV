@@ -161,6 +161,10 @@ your_project_folder/
 ├── README.md            # This file
 └── .gitignore           # Specifies intentionally untracked files
 
+## Testing
+I have made some incredibly crude unit-testing hiding out in /tests, you can run the full array:
+./run_tests.sh
+
 ## Troubleshooting
 
 * **`TTSProcessor: Error initializing Coqui TTS model...`**:

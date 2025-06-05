@@ -36,3 +36,5 @@ Desktop.ini
 
 # Other
 *.bak
+.coverage
+__pycache__/
