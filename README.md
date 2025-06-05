@@ -25,7 +25,8 @@ A warning - I am not the best programmer by a long stretch so no doubt you can i
 * Utilizes Google Gemini Pro for advanced text cleaning (removal of headers, footers, artifacts, etc.).
 * Generates natural-sounding speech using Coqui TTS (VITS model) - if thats too light, it also has support for Bark (requires a beefy gpu/cpu) or gTTS (lightweight but kinda crappy)
 * Allows for GPU acceleration for Coqui TTS + Bark TTS if an NVIDIA GPU and CUDA are available. I have not looked into acceleration on AMD or Intel Arc though I would like to.
-* Simple web interface for file upload and audio playback/download.
+* Simple web interface for file upload and audio playbook/download.
+* **Comprehensive test suite** for reliability and development confidence.
 
 ## Setup & Installation
 
@@ -43,7 +44,7 @@ A warning - I am not the best programmer by a long stretch so no doubt you can i
     * **Linux (Debian/Ubuntu):** `sudo apt-get install espeak-ng`
     * **macOS (Homebrew):** `brew install espeak`
     * **Windows:** Download espeak binaries and add to PATH.
-* **FFMPeg**thats great to have anyway, do it brother 
+* **FFMPeg** thats great to have anyway, do it brother 
 
 ### Installation Steps
 
@@ -86,7 +87,7 @@ ALLOWED_EXTENSIONS=pdf
 # Google Gemini API Key
 GOOGLE_AI_API_KEY=your_real_google_api_key_here
 
-# TTS Engine selection: coqui, gtts, or bark
+# TTS Engine selection: coqui, gtts, bark, or gemini
 TTS_ENGINE=coqui
 
 # Coqui TTS config (the default)
@@ -101,11 +102,34 @@ GTTS_TLD=co.uk
 BARK_USE_GPU_IF_AVAILABLE=True
 BARK_USE_SMALL_MODELS=True
 BARK_HISTORY_PROMPT=
+
+# Gemini TTS config (cloud-based, high quality)
+GEMINI_VOICE_NAME=Kore
+GEMINI_STYLE_PROMPT=
 ```
 
 **Important:**  
 - Replace `your_real_google_api_key_here` with your actual Google Gemini API key.
 - Do **not** commit your `.env` file to version control.
+
+## Testing
+
+Run the comprehensive test suite:
+```bash
+./run_tests.sh
+```
+
+Or manually:
+```bash
+pytest tests/ -v --cov=. --cov-report=term-missing
+```
+
+Tests cover:
+- Configuration and TTS engine setup
+- PDF text extraction and cleaning
+- Audio generation and processing
+- Error handling and edge cases
+- Integration workflows
 
 ## Configuration
 
@@ -113,18 +137,15 @@ BARK_HISTORY_PROMPT=
     * You need an API key from Google AI Studio ([https://aistudio.google.com/](https://aistudio.google.com/)).
     * Enter it into the .env file discussed above
 
-2.  **Coqui TTS Models:**
-    * The application uses as default uses Coqui TTS models (e.g., `tts_models/en/vctk/vits`). These models will be downloaded automatically by the `TTS` library on the first run if they are not found in the local cache (`~/.local/share/tts/`). This requires an internet connection for the initial setup. 
-    * Use tts --list-models to see and try out different models. 
-    * If this is too heavy for you, change it to gtts and if you roll with a GIANT gpu, try changing it to Bark. 
+2.  **TTS Engine Selection:**
+    * **Coqui TTS** (default): High-quality, local processing. Models download automatically.
+    * **gTTS**: Lightweight, cloud-based. Good for testing.
+    * **Bark**: Highest quality, very resource-intensive.
+    * **Gemini TTS**: Cloud-based, excellent quality, requires API key.
 
-3.  **(Optional and untested dragon territory PATHS ARE STUPID ON WINDOWS) Tesseract OCR Path (Windows):**
-    * If Tesseract is not automatically found in your PATH on Windows, you might need to uncomment and set the path in `ocr_utils.py` within the `OCRProcessor` class:
-        ```python
-        # if tesseract_cmd:
-        #     pytesseract.pytesseract.tesseract_cmd = tesseract_cmd 
-        ```
-        Set `tesseract_cmd` to your Tesseract executable path (e.g., `r'C:\Program Files\Tesseract-OCR\tesseract.exe'`).
+3.  **Coqui TTS Models:**
+    * Use `tts --list-models` to see available models
+    * Models cache in `~/.local/share/tts/`
 
 ## Running the Application
 
@@ -136,56 +157,45 @@ BARK_HISTORY_PROMPT=
     ```
 4.  Open your web browser and navigate to `http://127.0.0.1:5000/`.
 
-## GPU Acceleration for Coqui TTS
+## GPU Acceleration
 
-* If you have an NVIDIA GPU and have correctly installed NVIDIA drivers, CUDA, and a CUDA-enabled version of PyTorch, GPU acceleration for Coqui TTS will be attempted by default.
-* You can verify your PyTorch CUDA setup by running:
-    ```python
-    import torch
-    print(torch.cuda.is_available())
-    ```
-* The application will print messages to the console indicating whether it's using CPU or GPU for TTS.
+* NVIDIA GPU + CUDA enables acceleration for Coqui TTS and Bark
+* Check CUDA availability: `python -c "import torch; print(torch.cuda.is_available())"`
+* The application shows GPU/CPU usage in console output
 
 ## File Structure
+```
 your_project_folder/
-├── app.py               # Main Flask application file
+├── app.py               # Main Flask application
 ├── processors.py        # Main PDFProcessor orchestrator  
 ├── text_processing.py   # OCRExtractor and TextCleaner classes
 ├── audio_generation.py  # TTSGenerator class
 ├── tts_utils.py         # TTS engine implementations
-├── templates/
-│   └── index.html
-├── uploads/             # For uploaded PDFs (gitignored by default app will create a new one)
-├── audio_outputs/       # For generated audio (gitignored by default app will create a new one)
+├── tts_config.py        # Configuration system
+├── templates/           # HTML templates
+├── tests/               # Test suite
+├── run_tests.sh         # Test runner script
+├── uploads/             # For uploaded PDFs (auto-created)
+├── audio_outputs/       # For generated audio (auto-created)
 ├── requirements.txt     # Python dependencies
-├── README.md            # This file
-└── .gitignore           # Specifies intentionally untracked files
-
-## Testing
-I have made some incredibly crude unit-testing hiding out in /tests, you can run the full array:
-./run_tests.sh
+└── .env                 # Environment configuration (create this)
+```
 
 ## Troubleshooting
 
-* **`TTSProcessor: Error initializing Coqui TTS model...`**:
-    * Ensure you have an internet connection for the first run to download models.
-    * Make sure `espeak` or `espeak-ng` (dependent on your OS) is installed and accessible.
-    * Check for any specific error messages related to PyTorch or CUDA if GPU is enabled.
-* **`OCRProcessor: Tesseract OCR engine not found...`**:
-    * Verify Tesseract is installed and its installation directory is in your system's PATH.
-    * On Windows, consider setting `pytesseract.tesseract_cmd` as mentioned in Configuration.
-* **`pdf2image.exceptions...` errors**:
-    * Ensure Poppler utilities are installed and in your system's PATH.
+* **`TTSProcessor: Error initializing...`**: Check internet connection for model downloads, ensure espeak is installed
+* **`OCRProcessor: Tesseract OCR engine not found...`**: Verify Tesseract installation and PATH
+* **`pdf2image.exceptions...`**: Ensure Poppler utilities are installed and in PATH
+* **Test failures**: Check that all dependencies are installed: `pip install -r requirements.txt`
 
 ## Known Issues / Future Enhancements
 
-* The default Coqui TTS VCTK model might mispronounce certain uncommon words or acronyms. Experimenting with different Coqui TTS models or fine-tuning might be necessary for specific needs. Highly dependent on model but also on the outputted text
-* Error handling could be more granular for user feedback in the web UI.
-* Implement asynchronous task processing (e.g., with Celery) for long-running OCR/TTS tasks to prevent web request timeouts and improve user experience.
-* Status bars and general UX... which would allow me to disable debug mode. I love seeing a good CLI-spam tho. 
-* DEFINITELY some architectural changes to more gracefully and less spaghettily handle for instance: Other LLMs than Gemini (local when??), API TTS for that smooth sexy in the cloud voice
-* tests which i dont know the first thing about but am very keen to learn about
+* TTS models may mispronounce uncommon words or acronyms
+* Error handling could be more granular for web UI feedback
+* Asynchronous task processing needed for long documents
+* Status bars and UX improvements
+* Support for other LLMs besides Gemini
+* LaTeX input support (my dream feature!)
 
 ## My wacky idea that I really wanna do
-Turn this thing into a sexy sexy LaTeX-->Voice beast, thus bypassing the stupid PDF-extract and also enabling people who write academic paper to provide a buttery-smooth audio version for their vision or neurodivergent friends. 
-
+Turn this thing into a sexy sexy LaTeX-->Voice beast, thus bypassing the stupid PDF-extract and also enabling people who write academic papers to provide a buttery-smooth audio version for their vision or neurodivergent friends.
