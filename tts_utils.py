@@ -1,13 +1,130 @@
-# This module provides a unified interface for various TTS engines though should be refactored
+# This module provides a unified interface for various TTS engines with config adapter pattern
 
 import os
 import torch # For checking CUDA availability and setting device
 import numpy # For Bark's add_safe_globals fix
+from dataclasses import dataclass
+from typing import Optional, Dict, Any, Union
+from abc import ABC, abstractmethod
+
+# --- Configuration Classes ---
+@dataclass
+class TTSConfig:
+    """Unified TTS configuration with common parameters and engine-specific sections"""
+    voice_quality: str = "medium"  # low/medium/high
+    speaking_style: str = "neutral"  # casual/professional/narrative  
+    speed: float = 1.0
+    
+    # Engine-specific configs
+    coqui: Optional['CoquiConfig'] = None
+    gtts: Optional['GTTSConfig'] = None
+    bark: Optional['BarkConfig'] = None
+    gemini: Optional['GeminiConfig'] = None
+
+@dataclass
+class CoquiConfig:
+    model_name: Optional[str] = None
+    speaker: Optional[str] = None
+    use_gpu: Optional[bool] = None
+
+@dataclass 
+class GTTSConfig:
+    lang: str = "en"
+    tld: str = "co.uk"
+    slow: bool = False
+
+@dataclass
+class BarkConfig:
+    use_gpu: Optional[bool] = None
+    use_small_models: Optional[bool] = None
+    history_prompt: Optional[str] = None
+
+@dataclass
+class GeminiConfig:
+    voice_name: str = "Kore"
+    style_prompt: Optional[str] = None
+    api_key: Optional[str] = None
+
+# --- Config Adapters ---
+class ConfigAdapter(ABC):
+    """Abstract base for config adapters"""
+    @abstractmethod
+    def adapt(self, config: TTSConfig) -> Dict[str, Any]:
+        pass
+
+class CoquiConfigAdapter(ConfigAdapter):
+    def adapt(self, config: TTSConfig) -> Dict[str, Any]:
+        if config.coqui:
+            return {
+                "model_name": config.coqui.model_name or self._quality_to_model(config.voice_quality),
+                "speaker_idx_to_use": config.coqui.speaker,
+                "use_gpu_if_available": config.coqui.use_gpu if config.coqui.use_gpu is not None else (config.voice_quality == "high")
+            }
+        return {
+            "model_name": self._quality_to_model(config.voice_quality),
+            "use_gpu_if_available": config.voice_quality == "high"
+        }
+    
+    def _quality_to_model(self, quality: str) -> str:
+        mapping = {
+            "low": "tts_models/en/ljspeech/vits",
+            "medium": "tts_models/en/ljspeech/vits", 
+            "high": "tts_models/en/vctk/vits"
+        }
+        return mapping.get(quality, mapping["medium"])
+
+class GTTSConfigAdapter(ConfigAdapter):
+    def adapt(self, config: TTSConfig) -> Dict[str, Any]:
+        if config.gtts:
+            return {
+                "lang": config.gtts.lang,
+                "tld": config.gtts.tld,
+                "slow": config.gtts.slow or (config.speed < 0.8)
+            }
+        return {
+            "lang": "en", 
+            "tld": "co.uk", 
+            "slow": config.speed < 0.8
+        }
+
+class BarkConfigAdapter(ConfigAdapter):
+    def adapt(self, config: TTSConfig) -> Dict[str, Any]:
+        if config.bark:
+            return {
+                "use_gpu_if_available": config.bark.use_gpu if config.bark.use_gpu is not None else (config.voice_quality == "high"),
+                "use_small_models": config.bark.use_small_models if config.bark.use_small_models is not None else (config.voice_quality == "low"),
+                "history_prompt": config.bark.history_prompt
+            }
+        return {
+            "use_gpu_if_available": config.voice_quality == "high",
+            "use_small_models": config.voice_quality == "low"
+        }
+
+class GeminiConfigAdapter(ConfigAdapter):
+    def adapt(self, config: TTSConfig) -> Dict[str, Any]:
+        if config.gemini:
+            return {
+                "voice_name": config.gemini.voice_name,
+                "style_prompt": config.gemini.style_prompt,
+                "api_key": config.gemini.api_key
+            }
+        
+        # Map speaking style to appropriate voice
+        style_to_voice = {
+            "casual": "Puck",
+            "professional": "Charon", 
+            "narrative": "Kore"
+        }
+        
+        return {
+            "voice_name": style_to_voice.get(config.speaking_style, "Kore"),
+            "style_prompt": None,
+            "api_key": None
+        }
 
 # --- Abstract Class for TTS Processors ---
 class BaseTTSProcessor:
     """
-  
     Specific TTS engine wrappers should inherit from this class
     and implement the generate_audio_file method.
     """
@@ -274,41 +391,152 @@ if BARK_AVAILABLE:
         def get_output_extension(self):
             return self.output_extension
 
+# --- Gemini TTS Implementation ---
+try:
+    import google.generativeai as genai
+    from google.generativeai.types import GenerateContentConfig, SpeechConfig, VoiceConfig, PrebuiltVoiceConfig
+    import wave
+    GEMINI_TTS_AVAILABLE = True
+    print("Google Gemini TTS library found and imported successfully.")
+except ImportError:
+    print("Google Gemini TTS library not found. GeminiTTSProcessor will not be available.")
+    GEMINI_TTS_AVAILABLE = False
+
+if GEMINI_TTS_AVAILABLE:
+    class GeminiTTSProcessor(BaseTTSProcessor):
+        def __init__(self, voice_name="Kore", style_prompt=None, api_key=None):
+            super().__init__(voice_name=voice_name, style_prompt=style_prompt, api_key=api_key)
+            self.voice_name = voice_name
+            self.style_prompt = style_prompt
+            self.api_key = api_key or os.getenv('GOOGLE_AI_API_KEY', '')
+            self.output_extension = "wav"
+            self.model = None
+            try:
+                if not self.api_key:
+                    print("GeminiTTSProcessor: WARNING - No API key provided")
+                    return
+                genai.configure(api_key=self.api_key)
+                self.model = genai.GenerativeModel("gemini-2.5-flash-preview-tts")
+                print(f"GeminiTTSProcessor: Initialized with voice '{self.voice_name}'")
+            except Exception as e:
+                print(f"GeminiTTSProcessor: Error initializing Gemini model: {e}")
+                self.model = None
+
+        def generate_audio_file(self, text_to_speak, output_filename_no_ext, audio_dir):
+            if not self.model:
+                print("GeminiTTSProcessor: Model not available. Skipping audio generation.")
+                return None
+            print(f"GeminiTTSProcessor: Attempting Gemini TTS generation for {output_filename_no_ext}.{self.output_extension}")
+            if not text_to_speak or text_to_speak.strip() == "" or \
+               text_to_speak.startswith("LLM cleaning skipped") or text_to_speak.startswith("Error:") or \
+               text_to_speak.startswith("Could not convert") or text_to_speak.startswith("No text could be extracted"):
+                print("GeminiTTSProcessor: Skipping audio generation due to empty or error text.")
+                return None
+            try:
+                os.makedirs(audio_dir, exist_ok=True)
+                audio_filename = f"{output_filename_no_ext}.{self.output_extension}"
+                audio_filepath = os.path.join(audio_dir, audio_filename)
+                # Prepare prompt with optional style guidance
+                prompt = f"{self.style_prompt}: {text_to_speak}" if self.style_prompt else text_to_speak
+                print(f"GeminiTTSProcessor: Generating audio with voice '{self.voice_name}'")
+                response = self.model.generate_content(
+                    prompt,
+                    generation_config=GenerateContentConfig(
+                        response_modalities=["AUDIO"],
+                        speech_config=SpeechConfig(
+                            voice_config=VoiceConfig(
+                                prebuilt_voice=PrebuiltVoiceConfig(
+                                    voice_name=self.voice_name,
+                                )
+                            )
+                        ),
+                    )
+                )
+                # Extract audio data
+                audio_data = response.candidates[0].content.parts[0].inline_data.data
+                # Save as WAV file
+                with wave.open(audio_filepath, "wb") as wf:
+                    wf.setnchannels(1)  # Mono
+                    wf.setsampwidth(2)  # 16-bit
+                    wf.setframerate(24000)  # 24kHz
+                    wf.writeframes(audio_data)
+                print(f"GeminiTTSProcessor: Audio file saved: {audio_filepath}")
+                return audio_filename
+            except Exception as e:
+                print(f"GeminiTTSProcessor: Error generating audio file with Gemini TTS: {e}")
+                return None
+
+        def get_output_extension(self):
+            return self.output_extension
+
 # --- TTS Factory ---
-def get_tts_processor(engine_name="coqui", **kwargs):
+def get_tts_processor(engine_name="coqui", config: Union[TTSConfig, None] = None, **legacy_kwargs):
     """
     Factory function to get an instance of a TTS processor.
+    Supports both new TTSConfig system and legacy kwargs for backward compatibility.
     """
     engine_name_lower = engine_name.lower()
-    print(f"TTSFactory: Attempting to create processor for engine: '{engine_name_lower}' with kwargs: {kwargs}")
+    print(f"TTSFactory: Attempting to create processor for engine: '{engine_name_lower}'")
+
+    # Handle legacy kwargs for backward compatibility
+    if config is None and legacy_kwargs:
+        print(f"TTSFactory: Using legacy kwargs: {legacy_kwargs}")
+        config = TTSConfig()  # Use defaults, rely on adapters and legacy kwargs
+    elif config is None:
+        config = TTSConfig()  # Use all defaults
 
     if engine_name_lower == "coqui":
         if COQUI_TTS_AVAILABLE:
-            print(f"TTSFactory: Creating CoquiTTSProcessor.")
-            return CoquiTTSProcessor(**kwargs)
+            print("TTSFactory: Creating CoquiTTSProcessor.")
+            adapter = CoquiConfigAdapter()
+            adapted_config = adapter.adapt(config)
+            # Merge with legacy kwargs if present (legacy takes precedence)
+            adapted_config.update(legacy_kwargs)
+            return CoquiTTSProcessor(**adapted_config)
         else:
             print("TTSFactory: Coqui TTS selected but not available.")
     elif engine_name_lower == "gtts":
         if GTTS_AVAILABLE:
-            print(f"TTSFactory: Creating GTTSProcessor.")
-            return GTTSProcessor(**kwargs)
+            print("TTSFactory: Creating GTTSProcessor.")
+            adapter = GTTSConfigAdapter()
+            adapted_config = adapter.adapt(config)
+            adapted_config.update(legacy_kwargs)
+            return GTTSProcessor(**adapted_config)
         else:
             print("TTSFactory: gTTS selected but not available.")
     elif engine_name_lower == "bark":
         if BARK_AVAILABLE:
-            print(f"TTSFactory: Creating BarkTTSProcessor.")
-            return BarkTTSProcessor(**kwargs)
+            print("TTSFactory: Creating BarkTTSProcessor.")
+            adapter = BarkConfigAdapter()
+            adapted_config = adapter.adapt(config)
+            adapted_config.update(legacy_kwargs)
+            return BarkTTSProcessor(**adapted_config)
         else:
             print("TTSFactory: Bark selected but not available.")
+    elif engine_name_lower == "gemini":
+        if GEMINI_TTS_AVAILABLE:
+            print("TTSFactory: Creating GeminiTTSProcessor.")
+            adapter = GeminiConfigAdapter()
+            adapted_config = adapter.adapt(config)
+            adapted_config.update(legacy_kwargs)
+            return GeminiTTSProcessor(**adapted_config)
+        else:
+            print("TTSFactory: Gemini TTS selected but not available.")
     
     # Fallback logic
     print(f"TTSFactory: Engine '{engine_name_lower}' not found or not available.")
     if GTTS_AVAILABLE: # Primary fallback
         print("TTSFactory: Defaulting to gTTS.")
-        return GTTSProcessor() # Use gTTS default kwargs
+        adapter = GTTSConfigAdapter()
+        adapted_config = adapter.adapt(config if config else TTSConfig())
+        adapted_config.update(legacy_kwargs)
+        return GTTSProcessor(**adapted_config)
     elif COQUI_TTS_AVAILABLE: # Secondary fallback
         print("TTSFactory: Defaulting to CoquiTTS (as gTTS not available).")
-        return CoquiTTSProcessor() # Use CoquiTTS default kwargs
+        adapter = CoquiConfigAdapter()
+        adapted_config = adapter.adapt(config if config else TTSConfig())
+        adapted_config.update(legacy_kwargs)
+        return CoquiTTSProcessor(**adapted_config)
         
     print("TTSFactory: CRITICAL - No TTS engines available or specified engine not found and no fallback available.")
     return None

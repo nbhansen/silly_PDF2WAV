@@ -4,6 +4,7 @@ import re
 import subprocess
 from typing import Optional, List, Tuple
 from tts_utils import get_tts_processor
+from tts_config import TTSConfig
 
 class SimpleTTSEnhancer:
     """Minimal enhancement - text should already be TTS-optimized by LLM"""
@@ -24,8 +25,8 @@ class SimpleTTSEnhancer:
 class TTSGenerator:
     """Handles text-to-speech generation with MP3 compression support"""
     
-    def __init__(self, engine: str, config: dict):
-        self.processor = get_tts_processor(engine, **config)
+    def __init__(self, engine: str, config: TTSConfig):
+        self.processor = get_tts_processor(engine, config)
         self.engine_name = engine
         self.chunk_size = 20000  # Characters per audio chunk
         

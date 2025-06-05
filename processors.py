@@ -5,6 +5,7 @@ import os
 
 from text_processing import OCRExtractor, TextCleaner
 from audio_generation import TTSGenerator
+from tts_config import TTSConfig
 
 @dataclass
 class ProcessingResult:
@@ -18,11 +19,11 @@ class ProcessingResult:
 class PDFProcessor:
     """Main processor that orchestrates PDF to audio conversion with MP3 combination"""
     
-    def __init__(self, google_api_key: str, tts_engine: str = "coqui", tts_config: Dict = None):
+    def __init__(self, google_api_key: str, tts_engine: str = "coqui", tts_config: TTSConfig = None):
         print("PDFProcessor: Initializing components...")
         self.ocr = OCRExtractor()
         self.cleaner = TextCleaner(google_api_key)
-        self.tts = TTSGenerator(tts_engine, tts_config or {})
+        self.tts = TTSGenerator(tts_engine, tts_config or TTSConfig())
         print("PDFProcessor: Initialization complete")
         
     def process_pdf(self, pdf_path: str, output_name: str, start_page: int = None, end_page: int = None) -> ProcessingResult:

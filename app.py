@@ -1,13 +1,15 @@
-# app.py - Updated with page range support
+# app.py - Updated with TTSConfig system
 import os
 from flask import Flask, render_template, request, redirect, url_for, send_from_directory, jsonify
 from werkzeug.utils import secure_filename
+from tts_utils import TTSConfig, CoquiConfig, GTTSConfig, BarkConfig, GeminiConfig
 
 # --- Load environment variables ---
 from dotenv import load_dotenv
 load_dotenv()
 
-# Import the processor architecture
+# Import the new config system and processor architecture
+from tts_utils import TTSConfig, CoquiConfig, GTTSConfig, BarkConfig
 from processors import PDFProcessor
 
 # --- Configuration ---
@@ -18,30 +20,55 @@ ALLOWED_EXTENSIONS = set(os.getenv('ALLOWED_EXTENSIONS', 'pdf').split(','))
 GOOGLE_AI_API_KEY = os.getenv('GOOGLE_AI_API_KEY', '')
 
 # --- TTS Engine Configuration ---
-_SELECTED_TTS_ENGINE_CONFIG = os.getenv('TTS_ENGINE', 'coqui').lower()
-TTS_ENGINE_KWARGS = {}
+def create_tts_config() -> tuple[TTSConfig, str]:
+    """Create TTS config and return config + engine name for display"""
+    engine = os.getenv('TTS_ENGINE', 'coqui').lower()
+    
+    if engine == "coqui":
+        config = TTSConfig(
+            voice_quality=os.getenv('VOICE_QUALITY', 'medium'),
+            coqui=CoquiConfig(
+                model_name=os.getenv('COQUI_MODEL_NAME'),
+                use_gpu=os.getenv('COQUI_USE_GPU_IF_AVAILABLE', 'True').lower() == 'true'
+            )
+        )
+        return config, "Coqui TTS"
+    elif engine == "gtts":
+        config = TTSConfig(
+            voice_quality=os.getenv('VOICE_QUALITY', 'medium'),
+            gtts=GTTSConfig(
+                lang=os.getenv('GTTS_LANG', 'en'),
+                tld=os.getenv('GTTS_TLD', 'co.uk')
+            )
+        )
+        return config, "gTTS"
+    elif engine == "bark":
+        config = TTSConfig(
+            voice_quality=os.getenv('VOICE_QUALITY', 'medium'),
+            bark=BarkConfig(
+                use_gpu=os.getenv('BARK_USE_GPU_IF_AVAILABLE', 'True').lower() == 'true',
+                use_small_models=os.getenv('BARK_USE_SMALL_MODELS', 'True').lower() == 'true',
+                history_prompt=os.getenv('BARK_HISTORY_PROMPT', None)
+            )
+        )
+        return config, "Bark"
+    elif engine == "gemini":
+        config = TTSConfig(
+            voice_quality=os.getenv('VOICE_QUALITY', 'medium'),
+            speaking_style=os.getenv('SPEAKING_STYLE', 'professional'),
+            gemini=GeminiConfig(
+                voice_name=os.getenv('GEMINI_VOICE_NAME'),
+                style_prompt=os.getenv('GEMINI_STYLE_PROMPT'),
+                api_key=GOOGLE_AI_API_KEY
+            )
+        )
+        return config, "Gemini TTS"
+    else:
+        # Unknown engine, use defaults
+        return TTSConfig(), f"{engine.upper()} (Unknown)"
 
-if _SELECTED_TTS_ENGINE_CONFIG == "coqui":
-    TTS_ENGINE_KWARGS = {
-        "model_name": os.getenv('COQUI_MODEL_NAME', "tts_models/en/ljspeech/vits"),
-        "use_gpu_if_available": os.getenv('COQUI_USE_GPU_IF_AVAILABLE', 'True').lower() == 'true',
-    }
-    SELECTED_TTS_ENGINE = "Coqui TTS"
-elif _SELECTED_TTS_ENGINE_CONFIG == "gtts":
-    TTS_ENGINE_KWARGS = {
-        "lang": os.getenv('GTTS_LANG', "en"),
-        "tld": os.getenv('GTTS_TLD', "co.uk")
-    }
-    SELECTED_TTS_ENGINE = "gTTS"
-elif _SELECTED_TTS_ENGINE_CONFIG == "bark":
-    TTS_ENGINE_KWARGS = {
-        "use_gpu_if_available": os.getenv('BARK_USE_GPU_IF_AVAILABLE', 'True').lower() == 'true',
-        "use_small_models": os.getenv('BARK_USE_SMALL_MODELS', 'True').lower() == 'true',
-        "history_prompt": os.getenv('BARK_HISTORY_PROMPT', None)
-    }
-    SELECTED_TTS_ENGINE = "Bark"
-else:
-    SELECTED_TTS_ENGINE = _SELECTED_TTS_ENGINE_CONFIG.upper()
+tts_config, selected_tts_engine = create_tts_config()
+SELECTED_TTS_ENGINE = selected_tts_engine
 
 # --- Flask App Setup ---
 app = Flask(__name__)
@@ -57,8 +84,8 @@ print("Initializing PDFProcessor...")
 try:
     pdf_processor = PDFProcessor(
         google_api_key=GOOGLE_AI_API_KEY,
-        tts_engine=_SELECTED_TTS_ENGINE_CONFIG,
-        tts_config=TTS_ENGINE_KWARGS
+        tts_engine=os.getenv('TTS_ENGINE', 'coqui').lower(),
+        tts_config=tts_config
     )
     print("PDFProcessor initialized successfully")
     processor_available = True
@@ -66,7 +93,7 @@ except Exception as e:
     print(f"CRITICAL: PDFProcessor initialization failed: {e}")
     pdf_processor = None
     processor_available = False
-    SELECTED_TTS_ENGINE = f"{_SELECTED_TTS_ENGINE_CONFIG.upper()} (Failed to Load)"
+    SELECTED_TTS_ENGINE = f"{SELECTED_TTS_ENGINE} (Failed to Load)"
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -207,7 +234,7 @@ def upload_file():
                 return render_template('result.html', 
                                      audio_files=result.audio_files or [],           
                                      audio_file=result.audio_files[0] if result.audio_files else None,
-                                     combined_mp3_file=result.combined_mp3_file,  # Make sure this is passed
+                                     combined_mp3_file=result.combined_mp3_file,
                                      original_filename=display_filename,
                                      tts_engine=SELECTED_TTS_ENGINE,
                                      file_count=len(result.audio_files) if result.audio_files else 0,
@@ -219,7 +246,6 @@ def upload_file():
             return "Invalid file type. Please upload a PDF file."
     
     return redirect(url_for('index'))
-
 
 @app.errorhandler(413)
 def too_large(e):
