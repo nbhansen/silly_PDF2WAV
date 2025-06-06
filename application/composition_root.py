@@ -39,6 +39,7 @@ def _create_tts_config(engine: str) -> TTSConfig:
             voice_quality=os.getenv('VOICE_QUALITY', 'medium'),
             coqui=CoquiConfig(
                 model_name=os.getenv('COQUI_MODEL_NAME'),
+                speaker=os.getenv('COQUI_SPEAKER'), # Allow explicit speaker selection
                 use_gpu=os.getenv('COQUI_USE_GPU_IF_AVAILABLE', 'True').lower() == 'true'
             )
         )

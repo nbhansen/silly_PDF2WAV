@@ -2,7 +2,7 @@
 from typing import List, Optional, Tuple
 from domain.models import AudioGenerator
 from audio_generation import TTSGenerator
-from tts_config import TTSConfig
+from tts_utils import TTSConfig
 
 class AudioGeneratorAdapter(AudioGenerator):
     """Adapter for existing TTSGenerator to implement domain interface"""

@@ -3,8 +3,7 @@ import os
 import re
 import subprocess
 from typing import Optional, List, Tuple
-from tts_utils import get_tts_processor
-from tts_config import TTSConfig
+from tts_utils import get_tts_processor, TTSConfig
 
 class SimpleTTSEnhancer:
     """Minimal enhancement - text should already be TTS-optimized by LLM"""
