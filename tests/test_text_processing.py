@@ -1,78 +1,74 @@
 # tests/test_text_processing.py
-import sys
+import pytest
+from infrastructure.ocr.tesseract_ocr_provider import TesseractOCRProvider
+from domain.services.text_cleaning_service import TextCleaningService
+from domain.models import PDFInfo, ILLMProvider
 import os
 
-# Add the parent directory to sys.path so we can import our modules
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from text_processing import OCRExtractor, TextCleaner
-from unittest.mock import Mock, patch
-
-def test_ocr_extractor_get_pdf_info():
-    """Test PDF info extraction"""
-    extractor = OCRExtractor()
+def test_tesseract_ocr_provider_get_pdf_info(mocker):
+    """Test PDF info extraction using TesseractOCRProvider"""
+    extractor = TesseractOCRProvider()
     
     # Mock pdfplumber to return known data
-    with patch('text_processing.pdfplumber.open') as mock_open:
-        # Create mock PDF object
-        mock_pdf = Mock()
-        mock_pdf.pages = [Mock(), Mock(), Mock()]  # 3 pages
-        mock_pdf.metadata = {'Title': 'Test Paper', 'Author': 'Test Author'}
-        mock_open.return_value.__enter__.return_value = mock_pdf
-        
-        result = extractor.get_pdf_info("test.pdf")
-        
-        assert result['total_pages'] == 3
-        assert result['title'] == 'Test Paper'
-        assert result['author'] == 'Test Author'
+    mock_open = mocker.patch('infrastructure.ocr.tesseract_ocr_provider.pdfplumber.open')
+    # Create mock PDF object
+    mock_pdf = mocker.Mock()
+    mock_pdf.pages = [mocker.Mock(), mocker.Mock(), mocker.Mock()]  # 3 pages
+    mock_pdf.metadata = {'Title': 'Test Paper', 'Author': 'Test Author'}
+    mock_open.return_value.__enter__.return_value = mock_pdf
+    
+    result = extractor.get_pdf_info("test.pdf")
+    
+    assert result.total_pages == 3
+    assert result.title == 'Test Paper'
+    assert result.author == 'Test Author'
 
-def test_ocr_extractor_error_handling():
-    """Test OCR extractor handles errors gracefully"""
-    extractor = OCRExtractor()
+def test_tesseract_ocr_provider_error_handling(mocker):
+    """Test TesseractOCRProvider handles errors gracefully"""
+    extractor = TesseractOCRProvider()
     
     # Mock pdfplumber to raise an exception
-    with patch('text_processing.pdfplumber.open', side_effect=Exception("File not found")):
-        result = extractor.get_pdf_info("nonexistent.pdf")
-        
-        assert result['total_pages'] == 0
-        assert result['title'] == 'Unknown'
-        assert result['author'] == 'Unknown'
-
-def test_text_cleaner_no_api_key():
-    """Test TextCleaner fallback when no API key provided"""
-    cleaner = TextCleaner("")  # Empty API key
+    mocker.patch('infrastructure.ocr.tesseract_ocr_provider.pdfplumber.open', side_effect=Exception("File not found"))
+    result = extractor.get_pdf_info("nonexistent.pdf")
     
-    assert cleaner.model is None
+    assert result.total_pages == 0
+    assert result.title == 'Unknown'
+    assert result.author == 'Unknown'
+
+def test_text_cleaning_service_no_llm_provider():
+    """Test TextCleaningService fallback when no LLM provider provided"""
+    cleaner = TextCleaningService(llm_provider=None)
     
     # Should use basic fallback
-    result = cleaner.clean("This is test text.\n\nSecond paragraph.")
+    result = cleaner.clean_text("This is test text.\n\nSecond paragraph.")
     
     assert isinstance(result, list)
     assert len(result) > 0
     assert "..." in result[0]  # Should add pause markers
 
-def test_text_cleaner_with_api_key():
-    """Test TextCleaner initialization with API key"""
-    # Mock the genai module to avoid real API calls
-    with patch('text_processing.genai') as mock_genai:
-        mock_model = Mock()
-        mock_genai.GenerativeModel.return_value = mock_model
-        
-        cleaner = TextCleaner("fake_api_key")
-        
-        # Should have initialized model
-        assert cleaner.model is not None
-        mock_genai.configure.assert_called_once_with(api_key="fake_api_key")
-
-def test_text_cleaner_handles_large_text():
-    """Test TextCleaner can handle large text without breaking"""
-    cleaner = TextCleaner("")  # No API key, will use fallback
+def test_text_cleaning_service_with_llm_provider(mocker):
+    """Test TextCleaningService with an LLM provider"""
+    mock_llm_provider = mocker.Mock(spec=ILLMProvider)
+    mock_llm_provider.generate_content.return_value = "Cleaned text from LLM."
     
-    # Create large text 
+    cleaner = TextCleaningService(llm_provider=mock_llm_provider)
+    
+    result = cleaner.clean_text("Raw text to be cleaned.", llm_provider=mock_llm_provider)
+    
+    assert isinstance(result, list)
+    assert len(result) > 0
+    assert result[0] == "Cleaned text from LLM."
+    mock_llm_provider.generate_content.assert_called_once()
+
+def test_text_cleaning_service_handles_large_text_no_llm(mocker):
+    """Test TextCleaningService can handle large text without breaking (no LLM)"""
+    cleaner = TextCleaningService(llm_provider=None)
+    
+    # Create large text
     long_text = ("This is a sentence. " * 100 + "\n\n") * 100  # ~200,000 characters with paragraphs
     
     # Should not crash and should return a list
-    result = cleaner.clean(long_text)
+    result = cleaner.clean_text(long_text)
     
     assert isinstance(result, list)
     assert len(result) >= 1  # At least one chunk
@@ -81,3 +77,32 @@ def test_text_cleaner_handles_large_text():
     
     # Should add pause markers
     assert any("..." in chunk for chunk in result)
+
+def test_text_cleaning_service_handles_large_text_with_llm(mocker):
+    """Test TextCleaningService can handle large text with LLM"""
+    mock_llm_provider = mocker.Mock(spec=ILLMProvider)
+    mock_llm_provider.generate_content.side_effect = lambda x: f"Cleaned: {x}" # Simple mock for LLM
+    
+    cleaner = TextCleaningService(llm_provider=mock_llm_provider, max_chunk_size=1000) # Smaller max_chunk_size for testing
+    
+    long_text = ("This is a sentence. " * 10 + "\n\n") * 5 # ~1000 characters
+    
+    # Mock os.makedirs and open for debug file writing
+    mocker.patch('os.makedirs')
+    mocker.patch('builtins.open', mocker.mock_open())
+    mocker.patch('os.path.exists', return_value=True)
+    
+    result = cleaner.clean_text(long_text)
+    
+    assert isinstance(result, list)
+    assert len(result) >= 1
+    assert all(isinstance(chunk, str) for chunk in result)
+    assert all(len(chunk) > 0 for chunk in result)
+    assert mock_llm_provider.generate_content.call_count > 0
+    assert any("Cleaned:" in chunk for chunk in result)
+    
+    # Clean up debug files if they were created
+    for i in range(mock_llm_provider.generate_content.call_count):
+        debug_path = f"llm_tts_cleaned_chunk_{i+1}_debug.txt"
+        if os.path.exists(debug_path):
+            os.remove(debug_path)
