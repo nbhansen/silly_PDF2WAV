@@ -180,6 +180,9 @@ class AudioGenerationService(AudioGenerator):
             print(f"AudioGenerationService: Error creating combined MP3: {e}")
             return None
     
+    # In domain/services/audio_generation_service.py
+# Replace the _combine_with_concat_demuxer method around line 220
+
     def _combine_with_concat_demuxer(self, input_files: List[str], output_path: str) -> bool:
         """Combine files using FFmpeg concat demuxer (fast method)"""
         try:
@@ -188,8 +191,12 @@ class AudioGenerationService(AudioGenerator):
             
             with open(concat_file, 'w', encoding='utf-8') as f:
                 for input_file in input_files:
+                    # Ensure input_file is a string, not bytes
+                    if isinstance(input_file, bytes):
+                        input_file = input_file.decode('utf-8')
+                    
                     # Use absolute paths and proper escaping
-                    abs_path = os.path.abspath(input_file)
+                    abs_path = os.path.abspath(str(input_file))  # Ensure string
                     # For Windows compatibility, use forward slashes and escape properly
                     escaped_path = abs_path.replace('\\', '/').replace("'", "'\"'\"'")
                     f.write(f"file '{escaped_path}'\n")
@@ -199,11 +206,11 @@ class AudioGenerationService(AudioGenerator):
                 'ffmpeg', '-y',  # -y to overwrite output file
                 '-f', 'concat',
                 '-safe', '0',
-                '-i', concat_file,
+                '-i', str(concat_file),  # Ensure string
                 '-c:a', 'libmp3lame',  # MP3 codec
                 '-b:a', '128k',        # 128 kbps bitrate
                 '-ar', '22050',        # 22.05 kHz sample rate (good for speech)
-                output_path
+                str(output_path)       # Ensure string
             ]
             
             # Run FFmpeg
@@ -224,7 +231,6 @@ class AudioGenerationService(AudioGenerator):
         except Exception as e:
             print(f"AudioGenerationService: Concat demuxer exception: {e}")
             return False
-    
     def _combine_with_concat_filter(self, input_files: List[str], output_path: str) -> bool:
         """Combine files using FFmpeg concat filter (compatible method)"""
         try:
