@@ -2,25 +2,85 @@
 __pycache__/
 *.py[cod]
 *$py.class
-*.egg-info/
-dist/
-build/
 *.so
 *.log
 
 # Virtual environment
 venv/
-venv_tts_py311/ # Or whatever you named your venv
+venv_tts_py311/
+.venv/
+env/
 .env
+ENV/
+env.bak/
+venv.bak/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.cache/
+nosetests.xml
+*.cover
+.hypothesis/
+
+# Type checking
+.mypy_cache/
+.pytype/
+.pyre/
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+.nox/
+.coverage
+.pytest_cache/
 
 # IDE / Editor specific
 .vscode/
 .idea/
 *.sublime-project
 *.sublime-workspace
-nbproject/ # NetBeans
+nbproject/
 *.swp
 *~
+.spyderproject
+.spyproject
+.ropeproject
+
+# OS-specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
 
 # User-generated files & downloaded models
 uploads/
@@ -29,12 +89,53 @@ audio_outputs/
 # but if you download them manually to the project, you might want to ignore that folder.
 # Example: tts_models_local/
 
-# OS-specific
-.DS_Store
-Thumbs.db
-Desktop.ini
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# Debugging files
+pytestdebug.log
 
 # Other
 *.bak
-.coverage
-__pycache__/
+temp_*
+.tmp/
+
+# Project-specific temp files
+llm_tts_cleaned_chunk_*_debug.txt
+temp_*.wav
+temp_*.mp3
