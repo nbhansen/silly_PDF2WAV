@@ -1,45 +1,54 @@
 # application/composition_root.py
 import os
 from application.services.pdf_processing import PDFProcessingService
-from infrastructure.ocr.ocr_extractor_adapter import OCRExtractorAdapter
-from infrastructure.tts.text_cleaner_adapter import TextCleanerAdapter
-from infrastructure.tts.audio_generator_adapter import AudioGeneratorAdapter
-from infrastructure.ocr.page_range_validator_adapter import PageRangeValidatorAdapter
-from tts_utils import TTSConfig, CoquiConfig, GTTSConfig, BarkConfig, GeminiConfig
+from domain.models import TTSConfig, CoquiConfig, GTTSConfig, BarkConfig, GeminiConfig, ITTSEngine
+from infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
+from infrastructure.ocr.tesseract_ocr_provider import TesseractOCRProvider
+from infrastructure.tts.coqui_tts_provider import CoquiTTSProvider
+from infrastructure.tts.gtts_provider import GTTSProvider
+from infrastructure.tts.bark_tts_provider import BarkTTSProvider
+from infrastructure.tts.gemini_tts_provider import GeminiTTSProvider as InfrastructureGeminiTTSProvider
+from domain.services.text_cleaning_service import TextCleaningService
+from domain.services.audio_generation_service import AudioGenerationService
 
 def create_pdf_service_from_env() -> PDFProcessingService:
     """Create fully configured PDF processing service from environment variables"""
     
     # Get config from environment
     google_api_key = os.getenv('GOOGLE_AI_API_KEY', '')
-    tts_engine = os.getenv('TTS_ENGINE', 'coqui').lower()
+    tts_engine_name = os.getenv('TTS_ENGINE', 'coqui').lower()
     
-    # Create TTS config
-    tts_config = _create_tts_config(tts_engine)
-    
-    # Create adapters
-    ocr_extractor = OCRExtractorAdapter()
-    page_validator = PageRangeValidatorAdapter(ocr_extractor._extractor)
-    text_cleaner = TextCleanerAdapter(google_api_key)
-    audio_generator = AudioGeneratorAdapter(tts_engine, tts_config)
+    # Create infrastructure providers
+    ocr_provider = TesseractOCRProvider()
+    llm_provider = GeminiLLMProvider(api_key=google_api_key)
+
+    # Create TTS engine based on environment
+    tts_config = _create_tts_config_dataclass(tts_engine_name)
+    tts_engine = _create_tts_engine_provider(tts_engine_name, tts_config)
+
+    # Create domain services
+    text_cleaner_service = TextCleaningService(llm_provider=llm_provider)
+    audio_generation_service = AudioGenerationService(tts_engine=tts_engine)
     
     # Wire up the service
     return PDFProcessingService(
-        text_extractor=ocr_extractor,
-        text_cleaner=text_cleaner,
-        audio_generator=audio_generator,
-        page_validator=page_validator
+        text_extractor=ocr_provider,
+        text_cleaner=text_cleaner_service,
+        audio_generator=audio_generation_service,
+        page_validator=ocr_provider,
+        llm_provider=llm_provider,
+        tts_engine=tts_engine
     )
 
-def _create_tts_config(engine: str) -> TTSConfig:
-    """Create TTS config based on engine and environment"""
+def _create_tts_config_dataclass(engine: str) -> TTSConfig:
+    """Create TTS config dataclass based on engine and environment"""
     
     if engine == "coqui":
         return TTSConfig(
             voice_quality=os.getenv('VOICE_QUALITY', 'medium'),
             coqui=CoquiConfig(
                 model_name=os.getenv('COQUI_MODEL_NAME'),
-                speaker=os.getenv('COQUI_SPEAKER'), # Allow explicit speaker selection
+                speaker=os.getenv('COQUI_SPEAKER'),
                 use_gpu=os.getenv('COQUI_USE_GPU_IF_AVAILABLE', 'True').lower() == 'true'
             )
         )
@@ -71,3 +80,21 @@ def _create_tts_config(engine: str) -> TTSConfig:
         )
     else:
         return TTSConfig()
+
+def _create_tts_engine_provider(engine_name: str, config: TTSConfig) -> ITTSEngine:
+    """Factory function to get an instance of a TTS engine provider."""
+    engine_name_lower = engine_name.lower()
+    print(f"TTSFactory: Attempting to create provider for engine: '{engine_name_lower}'")
+
+    if engine_name_lower == "coqui":
+        return CoquiTTSProvider(config.coqui or CoquiConfig())
+    elif engine_name_lower == "gtts":
+        return GTTSProvider(config.gtts or GTTSConfig())
+    elif engine_name_lower == "bark":
+        return BarkTTSProvider(config.bark or BarkConfig())
+    elif engine_name_lower == "gemini":
+        return InfrastructureGeminiTTSProvider(config.gemini or GeminiConfig())
+    
+    # Fallback logic
+    print(f"TTSFactory: Engine '{engine_name_lower}' not found or not available. Defaulting to gTTS.")
+    return GTTSProvider(GTTSConfig())

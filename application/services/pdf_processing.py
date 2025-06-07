@@ -1,6 +1,6 @@
 # application/services/pdf_processing_service.py
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from domain.models import (
     ProcessingRequest, ProcessingResult, PDFInfo, PageRange,
@@ -16,12 +16,16 @@ class PDFProcessingService(PDFProcessingServiceInterface):
         text_extractor: TextExtractor,
         text_cleaner: TextCleaner,
         audio_generator: AudioGenerator,
-        page_validator: PageRangeValidator
+        page_validator: PageRangeValidator,
+        llm_provider: Optional[ILLMProvider] = None, # New dependency for TextCleaner
+        tts_engine: Optional[ITTSEngine] = None # New dependency for AudioGenerator
     ):
         self.text_extractor = text_extractor
         self.text_cleaner = text_cleaner
         self.audio_generator = audio_generator
         self.page_validator = page_validator
+        self.llm_provider = llm_provider # Store LLM provider
+        self.tts_engine = tts_engine # Store TTS engine
     
     def process_pdf(self, request: ProcessingRequest) -> ProcessingResult:
         """Core business logic - orchestrates the PDF processing pipeline"""
@@ -29,7 +33,7 @@ class PDFProcessingService(PDFProcessingServiceInterface):
             # Validate inputs
             if not os.path.exists(request.pdf_path):
                 return ProcessingResult(
-                    success=False, 
+                    success=False,
                     error=f"File not found: {request.pdf_path}"
                 )
             
@@ -39,32 +43,35 @@ class PDFProcessingService(PDFProcessingServiceInterface):
             raw_text = self.text_extractor.extract_text(request.pdf_path, request.page_range)
             if self._is_extraction_failed(raw_text):
                 return ProcessingResult(
-                    success=False, 
+                    success=False,
                     error=f"Text extraction failed: {raw_text}"
                 )
             
             self._log_extraction_success(raw_text, request.page_range)
             
             # Step 2: Clean text
-            clean_text_chunks = self.text_cleaner.clean_text(raw_text)
+            # Pass the LLM provider to the text cleaner
+            clean_text_chunks = self.text_cleaner.clean_text(raw_text, self.llm_provider)
             if not self._is_cleaning_successful(clean_text_chunks):
                 return ProcessingResult(
-                    success=False, 
+                    success=False,
                     error="Text cleaning failed - no output from cleaner"
                 )
             
             self._log_cleaning_success(clean_text_chunks)
             
             # Step 3: Generate audio
+            # Pass the TTS engine to the audio generator
             audio_files, combined_mp3 = self.audio_generator.generate_audio(
-                clean_text_chunks, 
+                clean_text_chunks,
                 request.output_name,
-                output_dir="audio_outputs"
+                output_dir="audio_outputs",
+                tts_engine=self.tts_engine # Pass the TTS engine
             )
             
             if not audio_files:
                 return ProcessingResult(
-                    success=False, 
+                    success=False,
                     error="Audio generation failed - no audio files produced"
                 )
             

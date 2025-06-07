@@ -33,6 +33,44 @@ class ProcessingResult:
     error: Optional[str] = None
     debug_info: Optional[Dict[str, Any]] = None
 
+# --- Configuration Models (moved from tts_utils.py) ---
+@dataclass
+class TTSConfig:
+    """Unified TTS configuration with common parameters and engine-specific sections"""
+    voice_quality: str = "medium"  # low/medium/high
+    speaking_style: str = "neutral"  # casual/professional/narrative
+    speed: float = 1.0
+    
+    # Engine-specific configs
+    coqui: Optional['CoquiConfig'] = None
+    gtts: Optional['GTTSConfig'] = None
+    bark: Optional['BarkConfig'] = None
+    gemini: Optional['GeminiConfig'] = None
+
+@dataclass
+class CoquiConfig:
+    model_name: Optional[str] = None
+    speaker: Optional[str] = None
+    use_gpu: Optional[bool] = None
+
+@dataclass
+class GTTSConfig:
+    lang: str = "en"
+    tld: str = "co.uk"
+    slow: bool = False
+
+@dataclass
+class BarkConfig:
+    use_gpu: Optional[bool] = None
+    use_small_models: Optional[bool] = None
+    history_prompt: Optional[str] = None
+
+@dataclass
+class GeminiConfig:
+    voice_name: str = "Kore"
+    style_prompt: Optional[str] = None
+    api_key: Optional[str] = None
+
 # --- Domain Interfaces ---
 
 class TextExtractor(ABC):
@@ -48,19 +86,38 @@ class TextExtractor(ABC):
         """Get basic PDF information"""
         pass
 
+class ILLMProvider(ABC):
+    """Interface for Large Language Model providers"""
+    @abstractmethod
+    def generate_content(self, prompt: str) -> str:
+        """Generates content based on a prompt"""
+        pass
+
+class ITTSEngine(ABC):
+    """Interface for Text-to-Speech engines"""
+    @abstractmethod
+    def generate_audio_data(self, text_to_speak: str) -> bytes:
+        """Generates raw audio data from text"""
+        pass
+
+    @abstractmethod
+    def get_output_format(self) -> str:
+        """Returns the output format (e.g., 'wav', 'mp3')"""
+        pass
+
 class TextCleaner(ABC):
     """Interface for cleaning and optimizing text"""
     
     @abstractmethod
-    def clean_text(self, raw_text: str) -> List[str]:
-        """Clean text and return chunks optimized for TTS"""
+    def clean_text(self, raw_text: str, llm_provider: Optional[ILLMProvider] = None) -> List[str]:
+        """Clean text and return chunks optimized for TTS, optionally using an LLM provider"""
         pass
 
 class AudioGenerator(ABC):
     """Interface for generating audio from text"""
     
     @abstractmethod
-    def generate_audio(self, text_chunks: List[str], output_name: str, output_dir: str) -> tuple[List[str], Optional[str]]:
+    def generate_audio(self, text_chunks: List[str], output_name: str, output_dir: str, tts_engine: ITTSEngine) -> tuple[List[str], Optional[str]]:
         """Generate audio files from text chunks. Returns (individual_files, combined_mp3)"""
         pass
 
