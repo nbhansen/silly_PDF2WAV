@@ -23,14 +23,17 @@ class AudioGenerationService(AudioGenerator):
         except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError):
             return False
     
-    def generate_audio(self, text_chunks: List[str], output_name: str, output_dir: str) -> Tuple[List[str], Optional[str]]:
+    def generate_audio(self, text_chunks: List[str], output_name: str, output_dir: str, tts_engine: Optional[ITTSEngine] = None) -> Tuple[List[str], Optional[str]]:
         """
         Generate separate audio files from text chunks with optional MP3 combination
         
         Returns:
             Tuple of (individual_audio_files, combined_mp3_file)
         """
-        if not self.tts_engine:
+        # Use the passed engine or fall back to the instance one
+        engine_to_use = tts_engine or self.tts_engine
+        
+        if not engine_to_use:
             print("AudioGenerationService: No TTS engine available")
             return [], None
             
@@ -52,9 +55,9 @@ class AudioGenerationService(AudioGenerator):
             print(f"AudioGenerationService: Generating audio for chunk {i+1}/{len(text_chunks)}: {chunk_output_name}")
             
             try:
-                audio_data = self.tts_engine.generate_audio_data(text_chunk)
+                audio_data = engine_to_use.generate_audio_data(text_chunk)
                 if audio_data:
-                    ext = self.tts_engine.get_output_format()
+                    ext = engine_to_use.get_output_format()
                     audio_filename = f"{chunk_output_name}.{ext}"
                     audio_filepath = os.path.join(output_dir, audio_filename)
                     

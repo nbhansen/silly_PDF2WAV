@@ -1,6 +1,6 @@
 # domain/models.py
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from abc import ABC, abstractmethod
 
 # --- Core Domain Models ---
@@ -117,7 +117,7 @@ class AudioGenerator(ABC):
     """Interface for generating audio from text"""
     
     @abstractmethod
-    def generate_audio(self, text_chunks: List[str], output_name: str, output_dir: str, tts_engine: ITTSEngine) -> tuple[List[str], Optional[str]]:
+    def generate_audio(self, text_chunks: List[str], output_name: str, output_dir: str, tts_engine: Optional[ITTSEngine] = None) -> Tuple[List[str], Optional[str]]:
         """Generate audio files from text chunks. Returns (individual_files, combined_mp3)"""
         pass
 

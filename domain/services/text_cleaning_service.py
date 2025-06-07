@@ -12,10 +12,12 @@ class TextCleaningService(TextCleaner):
         self.llm_provider = llm_provider
         self.max_chunk_size = max_chunk_size
 
-    def clean_text(self, raw_text: str) -> List[str]:
+    def clean_text(self, raw_text: str, llm_provider: Optional[ILLMProvider] = None) -> List[str]:
         """
         Clean text with LLM and optimize for TTS in one step.
         """
+        # Use the passed provider or fall back to the instance one
+        provider_to_use = llm_provider or self.llm_provider
         
         if not raw_text.strip():
             print("TextCleaningService: Empty text provided")
@@ -25,13 +27,13 @@ class TextCleaningService(TextCleaner):
             print("TextCleaningService: Skipping cleaning due to upstream error")
             return [raw_text]
         
-        if not self.llm_provider:
+        if not provider_to_use:
             print("TextCleaningService: No LLM provider available, using basic TTS enhancement")
             return self._basic_tts_fallback(raw_text)
         
         # For large texts, clean in chunks with TTS optimization
         if len(raw_text) <= self.max_chunk_size:
-            cleaned_text = self._clean_chunk_for_tts(raw_text)
+            cleaned_text = self._clean_chunk_for_tts(raw_text, provider_to_use)
             return self._chunk_for_audio(cleaned_text)
         else:
             print(f"TextCleaningService: Large text ({len(raw_text):,} chars), processing in chunks")
@@ -42,7 +44,7 @@ class TextCleaningService(TextCleaner):
                 print(f"TextCleaningService: Cleaning and TTS-optimizing chunk {i+1}/{len(initial_chunks)}")
                 if i > 0:
                     time.sleep(1)  # Rate limiting
-                cleaned_chunk = self._clean_chunk_for_tts(chunk)
+                cleaned_chunk = self._clean_chunk_for_tts(chunk, provider_to_use)
                 cleaned_chunks.append(cleaned_chunk)
                 
                 # Write individual debug files (consider if this belongs in domain or infrastructure)
@@ -59,7 +61,7 @@ class TextCleaningService(TextCleaner):
             combined_text = "\n\n... ...\n\n".join(cleaned_chunks)  # Add pauses between major sections
             return self._chunk_for_audio(combined_text)
 
-    def _clean_chunk_for_tts(self, text_chunk: str) -> str:
+    def _clean_chunk_for_tts(self, text_chunk: str, llm_provider: ILLMProvider) -> str:
         """Clean a single chunk with TTS optimization using the LLM provider"""
         if not text_chunk.strip():
             return text_chunk
@@ -67,7 +69,7 @@ class TextCleaningService(TextCleaner):
         prompt = self._get_tts_optimized_prompt(text_chunk)
         
         try:
-            cleaned_text = self.llm_provider.generate_content(prompt)
+            cleaned_text = llm_provider.generate_content(prompt)
             print(f"TextCleaningService: Successfully cleaned and TTS-optimized chunk ({len(cleaned_text):,} chars)")
             return cleaned_text
         except Exception as e:

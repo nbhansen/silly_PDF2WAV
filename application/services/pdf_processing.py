@@ -5,7 +5,8 @@ from typing import Dict, Any, Optional
 from domain.models import (
     ProcessingRequest, ProcessingResult, PDFInfo, PageRange,
     TextExtractor, TextCleaner, AudioGenerator, PageRangeValidator,
-    PDFProcessingService as PDFProcessingServiceInterface
+    PDFProcessingService as PDFProcessingServiceInterface,
+    ILLMProvider, ITTSEngine  # Add these missing imports
 )
 
 class PDFProcessingService(PDFProcessingServiceInterface):
