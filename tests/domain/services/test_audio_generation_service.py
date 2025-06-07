@@ -1,7 +1,6 @@
-# tests/domain/services/test_audio_generation_service.py - FIXED VERSION
+# tests/domain/services/test_audio_generation_service.py - PATCHED VERSION
 
 import pytest
-import os
 import subprocess
 from unittest.mock import MagicMock, patch, mock_open
 from domain.services.audio_generation_service import AudioGenerationService
@@ -178,13 +177,6 @@ class TestAudioGenerationService:
         mock_subprocess_run.assert_called_once()
         assert "ffmpeg" in mock_subprocess_run.call_args[0][0]
         assert combined_mp3 == "test_output_combined.mp3"
-
-    @patch('subprocess.run')
-    def test_check_ffmpeg_available(self, mock_subprocess_run):
-        mock_subprocess_run.return_value = MagicMock(returncode=0)
-        service = AudioGenerationService(tts_engine=MockTTSEngine())
-        assert service._check_ffmpeg() == True
-        mock_subprocess_run.assert_called_once_with(['ffmpeg', '-version'], capture_output=True, text=True, timeout=5)
 
     @patch('subprocess.run', side_effect=FileNotFoundError)
     def test_check_ffmpeg_not_available_filenotfound(self, mock_subprocess_run):

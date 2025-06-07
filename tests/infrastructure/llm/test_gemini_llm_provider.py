@@ -1,21 +1,19 @@
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
-from google.generativeai import types
 
 @pytest.fixture
-def mock_genai_configure():
+def mock_genai_configure(mocker):
     """Mock genai.configure."""
-    with patch('google.generativeai.configure') as mock_configure:
-        yield mock_configure
+    return mocker.patch('google.generativeai.configure')
 
 @pytest.fixture
-def mock_generative_model():
+def mock_generative_model(mocker):
     """Mock genai.GenerativeModel."""
-    with patch('google.generativeai.GenerativeModel') as mock_model_class:
-        mock_model_instance = MagicMock()
-        mock_model_class.return_value = mock_model_instance
-        yield mock_model_instance
+    mock_model_class = mocker.patch('google.generativeai.GenerativeModel')
+    mock_model_instance = MagicMock()
+    mock_model_class.return_value = mock_model_instance
+    return mock_model_instance
 
 @pytest.fixture
 def llm_provider_with_mock_model(mock_genai_configure, mock_generative_model):

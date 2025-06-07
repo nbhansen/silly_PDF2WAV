@@ -87,7 +87,11 @@ def pdf_processing_service(
 # Integration Tests
 class TestPDFProcessingService:
 
-    def test_successful_end_to_end_processing(self, pdf_processing_service, dummy_pdf_path):
+    def test_successful_end_to_end_processing(self, pdf_processing_service, dummy_pdf_path, mocker):
+        mock_extract_text = mocker.patch.object(pdf_processing_service.text_extractor, 'extract_text', return_value="Some extracted text")
+        mock_clean_text = mocker.patch.object(pdf_processing_service.text_cleaner, 'clean_text', return_value=["Cleaned chunk 1.", "Cleaned chunk 2."])
+        mock_generate_audio = mocker.patch.object(pdf_processing_service.audio_generator, 'generate_audio', return_value=(['audio_outputs/chunk1.mp3', 'audio_outputs/chunk2.mp3'], 'audio_outputs/combined.mp3'))
+
         request = ProcessingRequest(
             pdf_path=dummy_pdf_path,
             output_name="test_output",
@@ -106,11 +110,11 @@ class TestPDFProcessingService:
         assert result.debug_info["combined_mp3_created"] is True
         
         # Verify interactions with dependencies
-        pdf_processing_service.text_extractor.extract_text.assert_called_once_with(
+        mock_extract_text.assert_called_once_with(
             dummy_pdf_path, PageRange(start_page=1, end_page=1)
         )
-        pdf_processing_service.text_cleaner.clean_text.assert_called_once()
-        pdf_processing_service.audio_generator.generate_audio.assert_called_once()
+        mock_clean_text.assert_called_once()
+        mock_generate_audio.assert_called_once()
 
     def test_file_not_found_error(self, pdf_processing_service):
         request = ProcessingRequest(
@@ -124,8 +128,10 @@ class TestPDFProcessingService:
         assert result.success is False
         assert "File not found" in result.error
 
-    def test_text_extraction_failure(self, pdf_processing_service, dummy_pdf_path):
-        pdf_processing_service.text_extractor.extract_text.return_value = "Error: OCR failed"
+    def test_text_extraction_failure(self, pdf_processing_service, dummy_pdf_path, mocker):
+        mock_extract_text = mocker.patch.object(pdf_processing_service.text_extractor, 'extract_text', return_value="Error: OCR failed")
+        mock_clean_text = mocker.patch.object(pdf_processing_service.text_cleaner, 'clean_text')
+        mock_generate_audio = mocker.patch.object(pdf_processing_service.audio_generator, 'generate_audio')
         
         request = ProcessingRequest(
             pdf_path=dummy_pdf_path,
@@ -137,12 +143,14 @@ class TestPDFProcessingService:
         
         assert result.success is False
         assert "Text extraction failed" in result.error
-        pdf_processing_service.text_extractor.extract_text.assert_called_once()
-        pdf_processing_service.text_cleaner.clean_text.assert_not_called()
-        pdf_processing_service.audio_generator.generate_audio.assert_not_called()
+        mock_extract_text.assert_called_once()
+        mock_clean_text.assert_not_called()
+        mock_generate_audio.assert_not_called()
 
-    def test_text_cleaning_failure_empty_chunks(self, pdf_processing_service, dummy_pdf_path):
-        pdf_processing_service.text_cleaner.clean_text.return_value = []
+    def test_text_cleaning_failure_empty_chunks(self, pdf_processing_service, dummy_pdf_path, mocker):
+        mock_extract_text = mocker.patch.object(pdf_processing_service.text_extractor, 'extract_text', return_value="Some extracted text")
+        mock_clean_text = mocker.patch.object(pdf_processing_service.text_cleaner, 'clean_text', return_value=[])
+        mock_generate_audio = mocker.patch.object(pdf_processing_service.audio_generator, 'generate_audio')
         
         request = ProcessingRequest(
             pdf_path=dummy_pdf_path,
@@ -154,12 +162,14 @@ class TestPDFProcessingService:
         
         assert result.success is False
         assert "Text cleaning failed - no output from cleaner" in result.error
-        pdf_processing_service.text_extractor.extract_text.assert_called_once()
-        pdf_processing_service.text_cleaner.clean_text.assert_called_once()
-        pdf_processing_service.audio_generator.generate_audio.assert_not_called()
+        mock_extract_text.assert_called_once()
+        mock_clean_text.assert_called_once()
+        mock_generate_audio.assert_not_called()
 
-    def test_audio_generation_failure_no_files(self, pdf_processing_service, dummy_pdf_path):
-        pdf_processing_service.audio_generator.generate_audio.return_value = ([], None)
+    def test_audio_generation_failure_no_files(self, pdf_processing_service, dummy_pdf_path, mocker):
+        mock_extract_text = mocker.patch.object(pdf_processing_service.text_extractor, 'extract_text', return_value="Some extracted text")
+        mock_clean_text = mocker.patch.object(pdf_processing_service.text_cleaner, 'clean_text', return_value=["Cleaned chunk 1."])
+        mock_generate_audio = mocker.patch.object(pdf_processing_service.audio_generator, 'generate_audio', return_value=([], None))
         
         request = ProcessingRequest(
             pdf_path=dummy_pdf_path,
@@ -171,11 +181,15 @@ class TestPDFProcessingService:
         
         assert result.success is False
         assert "Audio generation failed - no audio files produced" in result.error
-        pdf_processing_service.text_extractor.extract_text.assert_called_once()
-        pdf_processing_service.text_cleaner.clean_text.assert_called_once()
-        pdf_processing_service.audio_generator.generate_audio.assert_called_once()
+        mock_extract_text.assert_called_once()
+        mock_clean_text.assert_called_once()
+        mock_generate_audio.assert_called_once()
 
-    def test_processing_with_specific_page_range(self, pdf_processing_service, dummy_pdf_path):
+    def test_processing_with_specific_page_range(self, pdf_processing_service, dummy_pdf_path, mocker):
+        mock_extract_text = mocker.patch.object(pdf_processing_service.text_extractor, 'extract_text', return_value="Some extracted text")
+        mock_clean_text = mocker.patch.object(pdf_processing_service.text_cleaner, 'clean_text', return_value=["Cleaned chunk 1."])
+        mock_generate_audio = mocker.patch.object(pdf_processing_service.audio_generator, 'generate_audio', return_value=(['audio_outputs/chunk1.mp3'], 'audio_outputs/combined.mp3'))
+        
         request = ProcessingRequest(
             pdf_path=dummy_pdf_path,
             output_name="test_output_pages",
@@ -188,11 +202,17 @@ class TestPDFProcessingService:
         assert result.debug_info["page_range"]["start_page"] == 1
         assert result.debug_info["page_range"]["end_page"] == 1
         assert result.debug_info["page_range"]["range_description"] == "1-1"
-        pdf_processing_service.text_extractor.extract_text.assert_called_once_with(
+        mock_extract_text.assert_called_once_with(
             dummy_pdf_path, PageRange(start_page=1, end_page=1)
         )
+        mock_clean_text.assert_called_once()
+        mock_generate_audio.assert_called_once()
 
-    def test_processing_with_full_document_page_range(self, pdf_processing_service, dummy_pdf_path):
+    def test_processing_with_full_document_page_range(self, pdf_processing_service, dummy_pdf_path, mocker):
+        mock_extract_text = mocker.patch.object(pdf_processing_service.text_extractor, 'extract_text', return_value="Some extracted text")
+        mock_clean_text = mocker.patch.object(pdf_processing_service.text_cleaner, 'clean_text', return_value=["Cleaned chunk 1."])
+        mock_generate_audio = mocker.patch.object(pdf_processing_service.audio_generator, 'generate_audio', return_value=(['audio_outputs/chunk1.mp3'], 'audio_outputs/combined.mp3'))
+        
         request = ProcessingRequest(
             pdf_path=dummy_pdf_path,
             output_name="test_output_full",
@@ -203,29 +223,34 @@ class TestPDFProcessingService:
         
         assert result.success is True
         assert result.debug_info["page_range"] == "full_document"
-        pdf_processing_service.text_extractor.extract_text.assert_called_once_with(
+        mock_extract_text.assert_called_once_with(
             dummy_pdf_path, PageRange()
         )
+        mock_clean_text.assert_called_once()
+        mock_generate_audio.assert_called_once()
 
-    def test_get_pdf_info_delegation(self, pdf_processing_service, dummy_pdf_path):
+    def test_get_pdf_info_delegation(self, pdf_processing_service, dummy_pdf_path, mocker):
+        mock_get_pdf_info = mocker.patch.object(pdf_processing_service.text_extractor, 'get_pdf_info', return_value=PDFInfo(total_pages=1, title="Test Title", author="Test Author"))
         pdf_info = pdf_processing_service.get_pdf_info(dummy_pdf_path)
         
         assert pdf_info.total_pages == 1
         assert pdf_info.title == "Test Title"
         assert pdf_info.author == "Test Author"
-        pdf_processing_service.text_extractor.get_pdf_info.assert_called_once_with(dummy_pdf_path)
+        mock_get_pdf_info.assert_called_once_with(dummy_pdf_path)
 
-    def test_validate_page_range_delegation(self, pdf_processing_service, dummy_pdf_path):
+    def test_validate_page_range_delegation(self, pdf_processing_service, dummy_pdf_path, mocker):
+        mock_validate_range = mocker.patch.object(pdf_processing_service.page_validator, 'validate_range', return_value={'valid': True, 'total_pages': 1})
         page_range = PageRange(start_page=1, end_page=1)
         validation_result = pdf_processing_service.validate_page_range(dummy_pdf_path, page_range)
         
         assert validation_result['valid'] is True
         assert validation_result['total_pages'] == 1
-        pdf_processing_service.page_validator.validate_range.assert_called_once_with(dummy_pdf_path, page_range)
+        mock_validate_range.assert_called_once_with(dummy_pdf_path, page_range)
 
-    def test_unexpected_exception_handling(self, pdf_processing_service, dummy_pdf_path):
-        # Simulate an unexpected error during text cleaning
-        pdf_processing_service.text_cleaner.clean_text.side_effect = Exception("Simulated unexpected error")
+    def test_unexpected_exception_handling(self, pdf_processing_service, dummy_pdf_path, mocker):
+        mock_extract_text = mocker.patch.object(pdf_processing_service.text_extractor, 'extract_text', return_value="Some extracted text")
+        mock_clean_text = mocker.patch.object(pdf_processing_service.text_cleaner, 'clean_text', side_effect=Exception("Simulated unexpected error"))
+        mock_generate_audio = mocker.patch.object(pdf_processing_service.audio_generator, 'generate_audio')
         
         request = ProcessingRequest(
             pdf_path=dummy_pdf_path,
@@ -237,6 +262,6 @@ class TestPDFProcessingService:
         
         assert result.success is False
         assert "Processing failed: Simulated unexpected error" in result.error
-        pdf_processing_service.text_extractor.extract_text.assert_called_once()
-        pdf_processing_service.text_cleaner.clean_text.assert_called_once()
-        pdf_processing_service.audio_generator.generate_audio.assert_not_called()
+        mock_extract_text.assert_called_once()
+        mock_clean_text.assert_called_once()
+        mock_generate_audio.assert_not_called()

@@ -42,6 +42,11 @@ def mock_subprocess_run():
         yield mock_run
 
 @pytest.fixture
+def mock_os_remove(mocker):
+    """Mock os.remove."""
+    return mocker.patch("os.remove")
+
+@pytest.fixture
 def gemini_config_valid():
     """Fixture for a valid GeminiConfig."""
     return GeminiConfig(api_key="test_api_key", voice_name="en-US-Neural2-D", style_prompt="friendly")

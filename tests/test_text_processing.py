@@ -106,3 +106,39 @@ def test_text_cleaning_service_handles_large_text_with_llm(mocker):
         debug_path = f"llm_tts_cleaned_chunk_{i+1}_debug.txt"
         if os.path.exists(debug_path):
             os.remove(debug_path)
+
+def test_tesseract_ocr_provider_get_pdf_info_temp_file(mocker, tmp_path):
+    """Test PDF info extraction using TesseractOCRProvider with a temporary file"""
+    extractor = TesseractOCRProvider()
+    
+    # Create a temporary PDF file
+    temp_pdf = tmp_path / "temp_test.pdf"
+    temp_pdf.write_text("%PDF-1.4 mock PDF content")  # Mocking a simple PDF file
+    
+    # Mock pdfplumber to return known data
+    mock_open = mocker.patch('infrastructure.ocr.tesseract_ocr_provider.pdfplumber.open')
+    # Create mock PDF object
+    mock_pdf = mocker.Mock()
+    mock_pdf.pages = [mocker.Mock(), mocker.Mock()]  # 2 pages
+    mock_pdf.metadata = {'Title': 'Temp Test Paper', 'Author': 'Temp Author'}
+    mock_open.return_value.__enter__.return_value = mock_pdf
+    
+    result = extractor.get_pdf_info(str(temp_pdf))
+    
+    assert result.total_pages == 2
+    assert result.title == 'Temp Test Paper'
+    assert result.author == 'Temp Author'
+
+def test_tesseract_ocr_provider_error_handling_temp_file(mocker, tmp_path):
+    """Test TesseractOCRProvider handles errors gracefully with a temporary file"""
+    extractor = TesseractOCRProvider()
+    
+    # Create a temporary PDF file that is empty (simulating a non-existent file)
+    temp_pdf = tmp_path / "empty_test.pdf"
+    temp_pdf.write_text("")
+    
+    result = extractor.get_pdf_info(str(temp_pdf))
+    
+    assert result.total_pages == 0
+    assert result.title == 'Unknown'
+    assert result.author == 'Unknown'
