@@ -52,25 +52,25 @@ flowchart TD
   APP -->|Serve Audio| AUDIO
   APP -->|Store Uploads| UPLOADS
 
-  %% COLORS
-  style UI_LAYER fill:#e5f5fd,stroke:#82c0e9,stroke-width:2px
-  style APP_LAYER fill:#fff9e5,stroke:#ffd966,stroke-width:2px
-  style DOMAIN_LAYER fill:#e6f9e5,stroke:#82e982,stroke-width:2px
-  style INFRA_LAYER fill:#f5e5fa,stroke:#c082e9,stroke-width:2px
+  %% SUBGRAPH COLORS (light backgrounds)
+  style UI_LAYER fill:#fff,stroke:#82c0e9,stroke-width:2px,color:#111
+  style APP_LAYER fill:#fff,stroke:#ffd966,stroke-width:2px,color:#111
+  style DOMAIN_LAYER fill:#fff,stroke:#82e982,stroke-width:2px,color:#111
+  style INFRA_LAYER fill:#fff,stroke:#c082e9,stroke-width:2px,color:#111
 
-  style UI fill:#b8daff
-  style APP fill:#ffe699
-  style APP_SERVICE fill:#ffe699
-  style DOMAIN_SERVICES fill:#b6fcd5
-  style MODELS fill:#b6fcd5
-  style OCR fill:#e0c3fc
-  style PDFPLUMBER fill:#e0c3fc
-  style LLM fill:#e0c3fc
-  style TTS fill:#e0c3fc
-  style AUDIO fill:#fff3cd
-  style UPLOADS fill:#fff3cd
+  %% NODE COLORS (light, with black text)
+  style UI fill:#e3f2fd,stroke:#90caf9,stroke-width:2px,color:#111
+  style APP fill:#fffde7,stroke:#ffe082,stroke-width:2px,color:#111
+  style APP_SERVICE fill:#fffde7,stroke:#ffe082,stroke-width:2px,color:#111
+  style DOMAIN_SERVICES fill:#e8f5e9,stroke:#81c784,stroke-width:2px,color:#111
+  style MODELS fill:#e8f5e9,stroke:#81c784,stroke-width:2px,color:#111
+  style OCR fill:#f3e5f5,stroke:#ba68c8,stroke-width:2px,color:#111
+  style PDFPLUMBER fill:#f3e5f5,stroke:#ba68c8,stroke-width:2px,color:#111
+  style LLM fill:#f3e5f5,stroke:#ba68c8,stroke-width:2px,color:#111
+  style TTS fill:#f3e5f5,stroke:#ba68c8,stroke-width:2px,color:#111
+  style AUDIO fill:#f5f5f5,stroke:#bdbdbd,stroke-width:2px,color:#111
+  style UPLOADS fill:#f5f5f5,stroke:#bdbdbd,stroke-width:2px,color:#111
 ```
-
 ## Key Layers
 
 - **UI:** Web interface for uploading PDFs and playing audio.
