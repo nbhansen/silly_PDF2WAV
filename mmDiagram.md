@@ -2,28 +2,30 @@
 
 ```mermaid
 flowchart TD
-    UI[Web UI (Flask Templates)] -->|User uploads PDF| APP[Flask App (app.py)]
-    APP -->|Process PDF| APP_SERVICE[Application Layer (pdf_processing.py)]
-    APP_SERVICE -->|PDF Extraction| OCR[OCR Provider (Tesseract)]
-    APP_SERVICE -->|Text Extraction| PDFPLUMBER[PDFPlumber]
-    APP_SERVICE -->|Text Cleaning| LLM[LLM Provider (Gemini LLM)]
-    APP_SERVICE -->|Generate Audio| TTS[TTS Providers (Coqui, gTTS, Bark, Gemini TTS)]
-    
-    subgraph Domain Layer
-        MODELS[Models & Data Classes]
-        DOMAIN_SERVICES[Business Logic Services]
-    end
-    APP_SERVICE --> DOMAIN_SERVICES
-    DOMAIN_SERVICES --> MODELS
+  UI["Web UI (Flask Templates)"]
+  APP["Flask App (app.py)"]
+  APP_SERVICE["Application Layer (pdf_processing.py)"]
+  OCR["OCR Provider (Tesseract)"]
+  PDFPLUMBER["PDFPlumber"]
+  LLM["LLM Provider (Gemini LLM)"]
+  TTS["TTS Providers (Coqui, gTTS, Bark, Gemini TTS)"]
+  AUDIO["audio_outputs/"]
+  UPLOADS["uploads/"]
+  MODELS["Models & Data Classes"]
+  DOMAIN_SERVICES["Business Logic Services"]
 
-    subgraph Infrastructure Layer
-        OCR
-        LLM
-        TTS
-    end
+  UI -->|User uploads PDF| APP
+  APP -->|Process PDF| APP_SERVICE
+  APP_SERVICE -->|PDF Extraction| OCR
+  APP_SERVICE -->|Text Extraction| PDFPLUMBER
+  APP_SERVICE -->|Text Cleaning| LLM
+  APP_SERVICE -->|Generate Audio| TTS
 
-    APP -->|Serve Audio| AUDIO[(audio_outputs/)]
-    APP -->|Store Uploads| UPLOADS[(uploads/)]
+  APP_SERVICE --> DOMAIN_SERVICES
+  DOMAIN_SERVICES --> MODELS
+
+  APP -->|Serve Audio| AUDIO
+  APP -->|Store Uploads| UPLOADS
 ```
 
 ## Key Layers
