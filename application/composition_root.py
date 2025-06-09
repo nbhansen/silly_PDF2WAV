@@ -1,7 +1,7 @@
-# application/composition_root.py - Updated for async support
+# application/composition_root.py - Updated for async support with Piper
 import os
 from application.services.pdf_processing import PDFProcessingService
-from domain.models import TTSConfig, CoquiConfig, GTTSConfig, BarkConfig, GeminiConfig, ITTSEngine
+from domain.models import TTSConfig, CoquiConfig, GTTSConfig, BarkConfig, GeminiConfig, PiperConfig, ITTSEngine
 from infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
 from infrastructure.ocr.tesseract_ocr_provider import TesseractOCRProvider
 from infrastructure.tts.coqui_tts_provider import CoquiTTSProvider
@@ -31,11 +31,11 @@ def create_pdf_service_from_env() -> PDFProcessingService:
     audio_generation_service = AudioGenerationService(tts_engine=tts_engine)
     
     # Log async capabilities
-    if audio_generation_service.use_async:
+    if hasattr(audio_generation_service, 'use_async') and audio_generation_service.use_async:
         print("CompositionRoot: Async audio processing is available and enabled")
-        print(f"CompositionRoot: Max concurrent requests: {audio_generation_service.max_concurrent_requests}")
+        print(f"CompositionRoot: Max concurrent requests: {getattr(audio_generation_service, 'max_concurrent_requests', 'N/A')}")
     else:
-        print("CompositionRoot: Async audio processing not available, using optimized synchronous processing")
+        print("CompositionRoot: Using synchronous audio processing")
     
     # Wire up the service
     return PDFProcessingService(
@@ -57,6 +57,20 @@ def _create_tts_config_dataclass(engine: str) -> TTSConfig:
                 model_name=os.getenv('COQUI_MODEL_NAME'),
                 speaker=os.getenv('COQUI_SPEAKER'),
                 use_gpu=os.getenv('COQUI_USE_GPU_IF_AVAILABLE', 'True').lower() == 'true'
+            )
+        )
+    elif engine == "piper":
+        return TTSConfig(
+            voice_quality=os.getenv('VOICE_QUALITY', 'medium'),
+            piper=PiperConfig(
+                model_path=os.getenv('PIPER_MODEL_PATH'),
+                config_path=os.getenv('PIPER_CONFIG_PATH'), 
+                speaker_id=int(os.getenv('PIPER_SPEAKER_ID')) if os.getenv('PIPER_SPEAKER_ID') else None,
+                length_scale=float(os.getenv('PIPER_SPEED', '1.0')),
+                noise_scale=float(os.getenv('PIPER_NOISE_SCALE', '0.667')),
+                noise_w=float(os.getenv('PIPER_NOISE_W', '0.8')),
+                sentence_silence=float(os.getenv('PIPER_SENTENCE_SILENCE', '0.2')),
+                download_dir=os.getenv('PIPER_MODELS_DIR', 'piper_models')
             )
         )
     elif engine == "gtts":
@@ -93,7 +107,10 @@ def _create_tts_engine_provider(engine_name: str, config: TTSConfig) -> ITTSEngi
     engine_name_lower = engine_name.lower()
     print(f"TTSFactory: Attempting to create provider for engine: '{engine_name_lower}'")
 
-    if engine_name_lower == "coqui":
+    if engine_name_lower == "piper":
+        from infrastructure.tts.piper_tts_provider import PiperTTSProvider
+        return PiperTTSProvider(config.piper or PiperConfig())
+    elif engine_name_lower == "coqui":
         return CoquiTTSProvider(config.coqui or CoquiConfig())
     elif engine_name_lower == "gtts":
         return GTTSProvider(config.gtts or GTTSConfig())
@@ -102,8 +119,21 @@ def _create_tts_engine_provider(engine_name: str, config: TTSConfig) -> ITTSEngi
     elif engine_name_lower == "gemini":
         return InfrastructureGeminiTTSProvider(config.gemini or GeminiConfig())
     
-    # Fallback logic
-    print(f"TTSFactory: Engine '{engine_name_lower}' not found or not available. Defaulting to gTTS.")
+    # Enhanced fallback logic - try Piper if available, then gTTS
+    print(f"TTSFactory: Engine '{engine_name_lower}' not found. Trying fallbacks...")
+    
+    # Try Piper first (best open source option)
+    try:
+        from infrastructure.tts.piper_tts_provider import PIPER_AVAILABLE
+        if PIPER_AVAILABLE:
+            print("TTSFactory: Falling back to Piper TTS")
+            from infrastructure.tts.piper_tts_provider import PiperTTSProvider
+            return PiperTTSProvider(PiperConfig())
+    except ImportError:
+        pass
+    
+    # Fall back to gTTS as last resort
+    print("TTSFactory: Falling back to gTTS")
     return GTTSProvider(GTTSConfig())
 
 # Optional: Environment variable configuration for async settings
