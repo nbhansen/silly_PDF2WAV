@@ -6,7 +6,8 @@ import tempfile
 import subprocess
 from google import genai
 from google.genai import types
-from domain.models import ITTSEngine, GeminiConfig
+from domain.interfaces import ITTSEngine
+from domain.config import GeminiConfig
 
 try:
     # Ensure genai is imported for Client and types

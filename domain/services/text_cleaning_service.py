@@ -1,9 +1,9 @@
-# domain/services/text_cleaning_service.py
+# domain/services/text_cleaning_service.py - Updated imports
 import time
 import re
 from typing import Optional, List, Dict, Any
 
-from domain.models import TextCleaner, ILLMProvider
+from domain.interfaces import TextCleaner, ILLMProvider
 
 class TextCleaningService(TextCleaner):
     """Pure business logic for cleaning and optimizing text for TTS."""

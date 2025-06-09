@@ -1,26 +1,12 @@
-# infrastructure/tts/piper_tts_provider.py - FIXED VERSION
+# infrastructure/tts/piper_tts_provider.py - Updated imports
 import os
 import subprocess
 import tempfile
 import json
 import urllib.request
 from typing import Optional, Dict, Any
-from domain.models import ITTSEngine
-from dataclasses import dataclass
-
-@dataclass
-class PiperConfig:
-    """Configuration for Piper TTS"""
-    model_name: str = "en_US-lessac-medium"  # Model identifier
-    model_path: Optional[str] = None  # Path to .onnx model file
-    config_path: Optional[str] = None  # Path to .onnx.json config file
-    speaker_id: Optional[int] = None  # For multi-speaker models
-    length_scale: float = 1.0  # Speed control (1.0 = normal, <1.0 = faster, >1.0 = slower)
-    noise_scale: float = 0.667  # Variability in speech
-    noise_w: float = 0.8  # Pronunciation variability
-    sentence_silence: float = 0.2  # Silence between sentences (seconds)
-    use_gpu: bool = False  # Currently Piper is CPU-optimized
-    download_dir: str = "piper_models"  # Directory to store downloaded models
+from domain.interfaces import ITTSEngine
+from domain.config import PiperConfig
 
 # Check for Piper availability with correct import paths
 PIPER_AVAILABLE = False
@@ -73,7 +59,7 @@ if PIPER_AVAILABLE:
             if PIPER_METHOD == "python_library":
                 self._init_python_library()
             
-            print(f"PiperTTSProvider: Initialized with model {self.model_path}")
+            print(f"PiperTTSProvider: Initialized with model {self.config.model_name}")
             print(f"PiperTTSProvider: Method: {PIPER_METHOD}")
             print(f"PiperTTSProvider: Speed: {config.length_scale}, Noise: {config.noise_scale}")
         
@@ -92,8 +78,8 @@ if PIPER_AVAILABLE:
         
         def _ensure_default_model(self) -> tuple[str, str]:
             """Download and return path to default English model"""
-            # Default to high-quality English model
-            model_name = self.config.model_name or "en_US-lessac-medium"
+            # Use model name from config
+            model_name = self.config.model_name
             model_file = f"{model_name}.onnx"
             config_file = f"{model_name}.onnx.json"
             

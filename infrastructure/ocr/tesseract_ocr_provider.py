@@ -1,10 +1,10 @@
-# infrastructure/ocr/tesseract_ocr_provider.py
 import pytesseract
 from pdf2image import convert_from_path
 import pdfplumber
 from typing import Optional, List, Dict, Any
 
-from domain.models import TextExtractor, PDFInfo, PageRange, PageRangeValidator
+from domain.models import PDFInfo, PageRange
+from domain.interfaces import TextExtractor, PageRangeValidator
 
 class TesseractOCRProvider(TextExtractor, PageRangeValidator):
     """Direct implementation of TextExtractor and PageRangeValidator using Tesseract OCR and pdfplumber."""
@@ -24,7 +24,7 @@ class TesseractOCRProvider(TextExtractor, PageRangeValidator):
         else:
             print("TesseractOCRProvider: Processing entire PDF")
             return self._extract_full_pdf(pdf_path)
-    
+        
     def _extract_with_page_range(self, pdf_path: str, start_page: int = None, end_page: int = None) -> str:
         """Extract from specified page range"""
         try:

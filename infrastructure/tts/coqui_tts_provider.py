@@ -2,7 +2,8 @@
 import os
 import torch
 from typing import Optional, Dict, Any
-from domain.models import ITTSEngine, CoquiConfig
+from domain.interfaces import ITTSEngine
+from domain.config import CoquiConfig
 
 try:
     from TTS.api import TTS as CoquiTTS_API

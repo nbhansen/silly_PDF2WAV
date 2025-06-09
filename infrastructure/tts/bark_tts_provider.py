@@ -2,7 +2,9 @@
 import os
 import torch
 import numpy # For Bark's add_safe_globals fix
-from domain.models import ITTSEngine, BarkConfig
+from domain.interfaces import ITTSEngine
+from domain.config import BarkConfig
+
 
 try:
     from bark import SAMPLE_RATE as BARK_SAMPLE_RATE, generate_audio, preload_models

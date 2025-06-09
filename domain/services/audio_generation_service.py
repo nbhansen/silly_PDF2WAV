@@ -1,9 +1,9 @@
-# domain/services/audio_generation_service.py - Enhanced with Async Integration
+# domain/services/audio_generation_service.py - Updated imports
 import os
 import re
 import subprocess
 from typing import Optional, List, Tuple
-from domain.models import AudioGenerator, ITTSEngine
+from domain.interfaces import AudioGenerator, ITTSEngine
 
 class AudioGenerationService(AudioGenerator):
     """Enhanced audio generation with async performance optimizations."""

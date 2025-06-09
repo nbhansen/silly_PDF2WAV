@@ -1,8 +1,8 @@
-# infrastructure/llm/gemini_llm_provider.py
+# infrastructure/llm/gemini_llm_provider.py - Updated imports
 import os
 import google.generativeai as genai
 from google.generativeai import types
-from domain.models import ILLMProvider
+from domain.interfaces import ILLMProvider
 
 class GeminiLLMProvider(ILLMProvider):
     """Direct implementation of ILLMProvider for Google Gemini"""

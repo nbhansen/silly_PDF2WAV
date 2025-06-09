@@ -1,6 +1,7 @@
 # infrastructure/tts/gtts_provider.py
 import os
-from domain.models import ITTSEngine, GTTSConfig
+from domain.interfaces import ITTSEngine
+from domain.config import GTTSConfig
 
 try:
     from gtts import gTTS
