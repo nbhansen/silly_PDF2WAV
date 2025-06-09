@@ -1,4 +1,4 @@
-# domain/services/audio_generation_service.py
+# domain/services/audio_generation_service.py - Enhanced with Async Integration
 import os
 import re
 import subprocess
@@ -6,41 +6,62 @@ from typing import Optional, List, Tuple
 from domain.models import AudioGenerator, ITTSEngine
 
 class AudioGenerationService(AudioGenerator):
-    """Pure business logic for generating audio from text chunks."""
+    """Enhanced audio generation with async performance optimizations."""
     
     def __init__(self, tts_engine: ITTSEngine):
         self.tts_engine = tts_engine
         self.chunk_size = 20000  # Characters per audio chunk
         self.ffmpeg_available = self._check_ffmpeg()
-        print(f"AudioGenerationService: FFmpeg available: {self.ffmpeg_available}")
-    
-    def _check_ffmpeg(self) -> bool:
-        """Check if FFmpeg is available on the system"""
-        try:
-            result = subprocess.run(['ffmpeg', '-version'],
-                                  capture_output=True, text=True, timeout=5)
-            return result.returncode == 0
-        except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError):
-            return False
-    
-    def generate_audio(self, text_chunks: List[str], output_name: str, output_dir: str, tts_engine: Optional[ITTSEngine] = None) -> Tuple[List[str], Optional[str]]:
-        """
-        Generate separate audio files from text chunks with optional MP3 combination
         
-        Returns:
-            Tuple of (individual_audio_files, combined_mp3_file)
+        # Performance settings
+        self.use_async = self._check_async_support()
+        self.max_concurrent_requests = 4  # Increased from 3 since we now have smaller chunks
+        
+        print(f"AudioGenerationService: FFmpeg available: {self.ffmpeg_available}")
+        print(f"AudioGenerationService: Async support: {self.use_async}")
+    
+    def generate_audio(self, text_chunks: List[str], output_name: str, output_dir: str, 
+                      tts_engine: Optional[ITTSEngine] = None) -> Tuple[List[str], Optional[str]]:
         """
-        # Use the passed engine or fall back to the instance one
+        Generate audio with automatic performance optimization
+        """
         engine_to_use = tts_engine or self.tts_engine
         
         if not engine_to_use:
             print("AudioGenerationService: No TTS engine available")
             return [], None
-            
+        
+        # Choose processing strategy based on chunk count and engine type
+        valid_chunks = [c for c in text_chunks if c.strip() and not c.startswith("Error") and not c.startswith("LLM cleaning skipped")]
+        chunk_count = len(valid_chunks)
+        
+        print(f"AudioGenerationService: Processing {chunk_count} valid chunks from {len(text_chunks)} total")
+        
+        if chunk_count <= 1:
+            print("AudioGenerationService: Using single-chunk processing")
+            return self._generate_audio_sync(text_chunks, output_name, output_dir, engine_to_use)
+        
+        elif self.use_async and (chunk_count >= 2 and self._is_rate_limited_engine(engine_to_use)):
+            print(f"AudioGenerationService: Using async processing for {chunk_count} chunks (rate-limited engine)")
+            return self._generate_audio_async_wrapper(text_chunks, output_name, output_dir, engine_to_use)
+        
+        elif self.use_async and chunk_count > 3:
+            print(f"AudioGenerationService: Using async processing for {chunk_count} chunks")
+            return self._generate_audio_async_wrapper(text_chunks, output_name, output_dir, engine_to_use)
+        
+        elif chunk_count <= 3:
+            print(f"AudioGenerationService: Using synchronous processing for {chunk_count} chunks")
+            return self._generate_audio_sync(text_chunks, output_name, output_dir, engine_to_use)
+        else:
+            print(f"AudioGenerationService: Using optimized sync processing for {chunk_count} chunks")
+            return self._generate_audio_optimized_sync(text_chunks, output_name, output_dir, engine_to_use)
+    
+    def _generate_audio_sync(self, text_chunks: List[str], output_name: str, output_dir: str, 
+                            engine_to_use: ITTSEngine) -> Tuple[List[str], Optional[str]]:
+        """Original synchronous processing (unchanged for compatibility)"""
         os.makedirs(output_dir, exist_ok=True)
         generated_files = []
         
-        # Generate individual audio files
         for i, text_chunk in enumerate(text_chunks):
             if not text_chunk.strip():
                 print(f"AudioGenerationService: Skipping empty chunk {i+1}")
@@ -50,7 +71,6 @@ class AudioGenerationService(AudioGenerator):
                 print(f"AudioGenerationService: Skipping error chunk {i+1}")
                 continue
             
-            # Generate filename for this chunk
             chunk_output_name = f"{output_name}_part{i+1:02d}"
             print(f"AudioGenerationService: Generating audio for chunk {i+1}/{len(text_chunks)}: {chunk_output_name}")
             
@@ -71,19 +91,127 @@ class AudioGenerationService(AudioGenerator):
             except Exception as e:
                 print(f"AudioGenerationService: Error generating audio for chunk {i+1}: {e}")
         
+        return self._finalize_audio_files(generated_files, output_name, output_dir)
+    
+    def _generate_audio_optimized_sync(self, text_chunks: List[str], output_name: str, output_dir: str, 
+                                      engine_to_use: ITTSEngine) -> Tuple[List[str], Optional[str]]:
+        """Optimized sync processing with intelligent batching and fallback"""
+        os.makedirs(output_dir, exist_ok=True)
+        generated_files = []
+        
+        # Add intelligent delays for rate-limited engines
+        delay_between_requests = self._get_optimal_delay(engine_to_use)
+        
+        for i, text_chunk in enumerate(text_chunks):
+            if not text_chunk.strip() or text_chunk.startswith("Error") or text_chunk.startswith("LLM cleaning skipped"):
+                continue
+            
+            # Add delay between requests for rate-limited engines
+            if i > 0 and delay_between_requests > 0:
+                import time
+                print(f"AudioGenerationService: Rate limiting delay: {delay_between_requests}s")
+                time.sleep(delay_between_requests)
+            
+            chunk_output_name = f"{output_name}_part{i+1:02d}"
+            
+            try:
+                audio_data = engine_to_use.generate_audio_data(text_chunk)
+                if audio_data:
+                    ext = engine_to_use.get_output_format()
+                    audio_filename = f"{chunk_output_name}.{ext}"
+                    audio_filepath = os.path.join(output_dir, audio_filename)
+                    
+                    with open(audio_filepath, "wb") as f:
+                        f.write(audio_data)
+                    
+                    generated_files.append(audio_filename)
+                    print(f"AudioGenerationService: Generated {audio_filename}")
+                    
+            except Exception as e:
+                error_str = str(e)
+                if self._is_rate_limit_error(error_str):
+                    print(f"AudioGenerationService: Rate limit hit, implementing exponential backoff")
+                    # Implement progressive delay
+                    delay_between_requests = min(delay_between_requests * 2, 30)  # Cap at 30s
+                else:
+                    print(f"AudioGenerationService: Error generating audio for chunk {i+1}: {e}")
+        
+        return self._finalize_audio_files(generated_files, output_name, output_dir)
+    
+    def _generate_audio_async_wrapper(self, text_chunks: List[str], output_name: str, output_dir: str, 
+                                     engine_to_use: ITTSEngine) -> Tuple[List[str], Optional[str]]:
+        """Wrapper for async processing"""
+        try:
+            # Import the async function from the async module
+            from .async_audio_generation_service import run_async_audio_generation
+            print(f"AudioGenerationService: Using async processing with {self.max_concurrent_requests} concurrent requests")
+            return run_async_audio_generation(
+                text_chunks, output_name, output_dir, engine_to_use, self.max_concurrent_requests
+            )
+        except ImportError as e:
+            print(f"AudioGenerationService: Async support not available ({e}), falling back to optimized sync")
+            return self._generate_audio_optimized_sync(text_chunks, output_name, output_dir, engine_to_use)
+        except Exception as e:
+            print(f"AudioGenerationService: Async processing failed ({e}), falling back to optimized sync")
+            return self._generate_audio_optimized_sync(text_chunks, output_name, output_dir, engine_to_use)
+    
+    def _finalize_audio_files(self, generated_files: List[str], output_name: str, 
+                             output_dir: str) -> Tuple[List[str], Optional[str]]:
+        """Common logic for finalizing audio files"""
         print(f"AudioGenerationService: Generated {len(generated_files)} individual audio files")
         
-        # Create combined MP3 if requested
         combined_mp3 = None
         if len(generated_files) >= 1:
             if len(generated_files) == 1:
-                # Single file - convert to MP3
                 combined_mp3 = self._convert_single_to_mp3(generated_files[0], output_name, output_dir)
             else:
-                # Multiple files - combine to MP3
                 combined_mp3 = self._create_combined_mp3(generated_files, output_name, output_dir)
         
         return generated_files, combined_mp3
+    
+    def _is_rate_limited_engine(self, engine: ITTSEngine) -> bool:
+        """Check if engine is likely to have rate limits"""
+        engine_class_name = engine.__class__.__name__.lower()
+        rate_limited_engines = ["gemini", "openai", "elevenlabs"]
+        return any(name in engine_class_name for name in rate_limited_engines)
+    
+    def _get_optimal_delay(self, engine: ITTSEngine) -> float:
+        """Get optimal delay between requests for engine type"""
+        if not self._is_rate_limited_engine(engine):
+            return 0.0
+        
+        engine_class_name = engine.__class__.__name__.lower()
+        
+        if "gemini" in engine_class_name:
+            return 2.0  # Start with 2s for Gemini in sync mode
+        elif "openai" in engine_class_name:
+            return 1.0
+        else:
+            return 1.5  # Conservative default
+    
+    def _is_rate_limit_error(self, error_str: str) -> bool:
+        """Check if error indicates rate limiting"""
+        rate_limit_indicators = ["429", "RESOURCE_EXHAUSTED", "quota", "rate limit", "too many requests"]
+        return any(indicator in error_str.lower() for indicator in rate_limit_indicators)
+    
+    def _check_async_support(self) -> bool:
+        """Check if async dependencies are available"""
+        try:
+            import asyncio
+            import aiofiles
+            import nest_asyncio
+            return True
+        except ImportError:
+            return False
+    
+    def _check_ffmpeg(self) -> bool:
+        """Check if FFmpeg is available on the system"""
+        try:
+            result = subprocess.run(['ffmpeg', '-version'],
+                                  capture_output=True, text=True, timeout=5)
+            return result.returncode == 0
+        except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError):
+            return False
     
     def _convert_single_to_mp3(self, audio_file: str, base_name: str, output_dir: str) -> Optional[str]:
         """Convert a single audio file to MP3 format"""
@@ -140,10 +268,9 @@ class AudioGenerationService(AudioGenerator):
             return None
         
         try:
-            # Prepare file paths - FIX: Use absolute paths to avoid path confusion
+            # Prepare file paths - Use absolute paths to avoid path confusion
             input_files = []
             for f in audio_files:
-                # Convert to absolute path to avoid path issues
                 if os.path.isabs(f):
                     input_files.append(f)
                 else:
@@ -180,9 +307,6 @@ class AudioGenerationService(AudioGenerator):
             print(f"AudioGenerationService: Error creating combined MP3: {e}")
             return None
     
-    # In domain/services/audio_generation_service.py
-# Replace the _combine_with_concat_demuxer method around line 220
-
     def _combine_with_concat_demuxer(self, input_files: List[str], output_path: str) -> bool:
         """Combine files using FFmpeg concat demuxer (fast method)"""
         try:
@@ -231,6 +355,7 @@ class AudioGenerationService(AudioGenerator):
         except Exception as e:
             print(f"AudioGenerationService: Concat demuxer exception: {e}")
             return False
+    
     def _combine_with_concat_filter(self, input_files: List[str], output_path: str) -> bool:
         """Combine files using FFmpeg concat filter (compatible method)"""
         try:

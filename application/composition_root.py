@@ -1,4 +1,4 @@
-# application/composition_root.py
+# application/composition_root.py - Updated for async support
 import os
 from application.services.pdf_processing import PDFProcessingService
 from domain.models import TTSConfig, CoquiConfig, GTTSConfig, BarkConfig, GeminiConfig, ITTSEngine
@@ -12,7 +12,7 @@ from domain.services.text_cleaning_service import TextCleaningService
 from domain.services.audio_generation_service import AudioGenerationService
 
 def create_pdf_service_from_env() -> PDFProcessingService:
-    """Create fully configured PDF processing service from environment variables"""
+    """Create fully configured PDF processing service from environment variables with async support"""
     
     # Get config from environment
     google_api_key = os.getenv('GOOGLE_AI_API_KEY', '')
@@ -26,9 +26,16 @@ def create_pdf_service_from_env() -> PDFProcessingService:
     tts_config = _create_tts_config_dataclass(tts_engine_name)
     tts_engine = _create_tts_engine_provider(tts_engine_name, tts_config)
 
-    # Create domain services
+    # Create domain services (enhanced with async support)
     text_cleaner_service = TextCleaningService(llm_provider=llm_provider)
     audio_generation_service = AudioGenerationService(tts_engine=tts_engine)
+    
+    # Log async capabilities
+    if audio_generation_service.use_async:
+        print("CompositionRoot: Async audio processing is available and enabled")
+        print(f"CompositionRoot: Max concurrent requests: {audio_generation_service.max_concurrent_requests}")
+    else:
+        print("CompositionRoot: Async audio processing not available, using optimized synchronous processing")
     
     # Wire up the service
     return PDFProcessingService(
@@ -98,3 +105,11 @@ def _create_tts_engine_provider(engine_name: str, config: TTSConfig) -> ITTSEngi
     # Fallback logic
     print(f"TTSFactory: Engine '{engine_name_lower}' not found or not available. Defaulting to gTTS.")
     return GTTSProvider(GTTSConfig())
+
+# Optional: Environment variable configuration for async settings
+def _get_async_config_from_env():
+    """Get async configuration from environment variables (optional)"""
+    return {
+        'max_concurrent_requests': int(os.getenv('MAX_CONCURRENT_TTS_REQUESTS', '3')),
+        'enable_async': os.getenv('ENABLE_ASYNC_AUDIO', 'True').lower() == 'true'
+    }

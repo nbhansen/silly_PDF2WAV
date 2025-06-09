@@ -1,6 +1,7 @@
 # infrastructure/tts/gemini_tts_provider.py
 import os
 import wave
+import time
 import tempfile
 import subprocess
 from google import genai
@@ -27,13 +28,19 @@ if GEMINI_TTS_AVAILABLE:
             self.output_format = "wav"  # We'll convert everything to WAV for consistency
             self.client = None
             
+            # Rate limiting settings
+            self.last_request_time = 0
+            self.min_request_interval = 2.0  # Minimum 2 seconds between requests
+            self.max_retries = 3
+            self.base_retry_delay = 16  # Start with API suggested delay
+            
             try:
                 if not self.api_key:
                     print("GeminiTTSProvider: WARNING - No API key provided")
                     return
                     
                 self.client = genai.Client(api_key=self.api_key)
-                print(f"GeminiTTSProvider: Initialized with voice '{self.voice_name}'")
+                print(f"GeminiTTSProvider: Initialized with voice '{self.voice_name}' and rate limiting")
             except Exception as e:
                 print(f"GeminiTTSProvider: Error initializing Gemini client: {e}")
                 self.client = None
@@ -43,71 +50,130 @@ if GEMINI_TTS_AVAILABLE:
                 print("GeminiTTSProvider: Client not available. Skipping audio generation.")
                 return b""
                 
-            print(f"GeminiTTSProvider: Attempting Gemini TTS generation.")
+            print(f"GeminiTTSProvider: Attempting Gemini TTS generation with rate limiting.")
             
             if not text_to_speak or text_to_speak.strip() == "" or \
                text_to_speak.startswith("LLM cleaning skipped") or text_to_speak.startswith("Error:") or \
                text_to_speak.startswith("Could not convert") or text_to_speak.startswith("No text could be extracted"):
                 print("GeminiTTSProvider: Skipping audio generation due to empty or error text.")
                 return b""
-                
-            try:
-                # Prepare prompt with optional style guidance
-                prompt = f"{self.style_prompt}: {text_to_speak}" if self.style_prompt else text_to_speak
-                
-                print(f"GeminiTTSProvider: Generating audio with voice '{self.voice_name}'")
-                
-                response = self.client.models.generate_content(
-                    model="gemini-2.5-flash-preview-tts",
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        response_modalities=["AUDIO"],
-                        speech_config=types.SpeechConfig(
-                            voice_config=types.VoiceConfig(
-                                prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                                    voice_name=self.voice_name,
-                                )
+            
+            # Apply rate limiting before making request
+            self._apply_rate_limit()
+            
+            # Retry logic with exponential backoff
+            for attempt in range(self.max_retries):
+                try:
+                    return self._make_tts_request(text_to_speak, attempt)
+                except Exception as e:
+                    if self._is_rate_limit_error(e):
+                        retry_delay = self._calculate_retry_delay(e, attempt)
+                        print(f"GeminiTTSProvider: Rate limit hit (attempt {attempt + 1}/{self.max_retries}). "
+                              f"Waiting {retry_delay}s before retry...")
+                        time.sleep(retry_delay)
+                        continue
+                    else:
+                        print(f"GeminiTTSProvider: Non-rate-limit error on attempt {attempt + 1}: {e}")
+                        if attempt == self.max_retries - 1:
+                            # Last attempt failed
+                            return b""
+                        time.sleep(2 ** attempt)  # Simple exponential backoff for other errors
+                        continue
+            
+            print(f"GeminiTTSProvider: All {self.max_retries} attempts failed")
+            return b""
+
+        def _apply_rate_limit(self):
+            """Ensure minimum time between requests"""
+            current_time = time.time()
+            time_since_last = current_time - self.last_request_time
+            
+            if time_since_last < self.min_request_interval:
+                sleep_time = self.min_request_interval - time_since_last
+                print(f"GeminiTTSProvider: Rate limiting - waiting {sleep_time:.1f}s")
+                time.sleep(sleep_time)
+            
+            self.last_request_time = time.time()
+
+        def _make_tts_request(self, text_to_speak: str, attempt: int) -> bytes:
+            """Make the actual TTS request"""
+            # Prepare prompt with optional style guidance
+            prompt = f"{self.style_prompt}: {text_to_speak}" if self.style_prompt else text_to_speak
+            
+            print(f"GeminiTTSProvider: Making TTS request (attempt {attempt + 1}) with voice '{self.voice_name}'")
+            
+            response = self.client.models.generate_content(
+                model="gemini-2.5-flash-preview-tts",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_modalities=["AUDIO"],
+                    speech_config=types.SpeechConfig(
+                        voice_config=types.VoiceConfig(
+                            prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                                voice_name=self.voice_name,
                             )
-                        ),
-                    )
+                        )
+                    ),
                 )
-                
-                # Extract audio data with error handling
-                if not hasattr(response, 'candidates') or not response.candidates:
-                    print("GeminiTTSProvider: No candidates in response")
-                    return b""
-                    
-                candidate = response.candidates[0]
-                if not hasattr(candidate, 'content') or not candidate.content:
-                    print("GeminiTTSProvider: No content in candidate")
-                    return b""
-                    
-                content = candidate.content
-                if not hasattr(content, 'parts') or not content.parts:
-                    print("GeminiTTSProvider: No parts in content")
-                    return b""
-                    
-                part = content.parts[0]
-                if not hasattr(part, 'inline_data') or not part.inline_data:
-                    print("GeminiTTSProvider: No inline_data in part")
-                    return b""
-                    
-                raw_audio_data = part.inline_data.data
-                print(f"GeminiTTSProvider: Successfully extracted raw audio data ({len(raw_audio_data)} bytes)")
-                
-                # Detect and convert the audio format to WAV
-                converted_wav_data = self._convert_to_wav(raw_audio_data)
-                
-                if converted_wav_data:
-                    print(f"GeminiTTSProvider: Successfully converted to WAV format ({len(converted_wav_data)} bytes)")
-                    return converted_wav_data
-                else:
-                    print("GeminiTTSProvider: Failed to convert audio to WAV format")
-                    return b""
-                
-            except Exception as e:
-                print(f"GeminiTTSProvider: Error generating audio data with Gemini TTS: {e}")
+            )
+            
+            # Extract audio data with error handling
+            if not hasattr(response, 'candidates') or not response.candidates:
+                print("GeminiTTSProvider: No candidates in response")
                 return b""
+                
+            candidate = response.candidates[0]
+            if not hasattr(candidate, 'content') or not candidate.content:
+                print("GeminiTTSProvider: No content in candidate")
+                return b""
+                
+            content = candidate.content
+            if not hasattr(content, 'parts') or not content.parts:
+                print("GeminiTTSProvider: No parts in content")
+                return b""
+                
+            part = content.parts[0]
+            if not hasattr(part, 'inline_data') or not part.inline_data:
+                print("GeminiTTSProvider: No inline_data in part")
+                return b""
+                
+            raw_audio_data = part.inline_data.data
+            print(f"GeminiTTSProvider: Successfully extracted raw audio data ({len(raw_audio_data)} bytes)")
+            
+            # Detect and convert the audio format to WAV
+            converted_wav_data = self._convert_to_wav(raw_audio_data)
+            
+            if converted_wav_data:
+                print(f"GeminiTTSProvider: Successfully converted to WAV format ({len(converted_wav_data)} bytes)")
+                return converted_wav_data
+            else:
+                print("GeminiTTSProvider: Failed to convert audio to WAV format")
+                return b""
+
+        def _is_rate_limit_error(self, error) -> bool:
+            """Check if error is a rate limit error"""
+            error_str = str(error)
+            return "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "quota" in error_str.lower()
+
+        def _calculate_retry_delay(self, error, attempt: int) -> float:
+            """Calculate retry delay based on error and attempt number"""
+            error_str = str(error)
+            
+            # Try to extract retry delay from API response
+            if 'retryDelay' in error_str:
+                try:
+                    # Look for patterns like 'retryDelay': '16s'
+                    import re
+                    match = re.search(r"'retryDelay':\s*'(\d+)s'", error_str)
+                    if match:
+                        api_suggested_delay = int(match.group(1))
+                        # Add some jitter and respect attempt number
+                        return api_suggested_delay + (attempt * 2)
+                except:
+                    pass
+            
+            # Fallback to exponential backoff
+            return self.base_retry_delay * (2 ** attempt)
 
         def _convert_to_wav(self, raw_audio_data: bytes) -> bytes:
             """Convert raw PCM audio data to proper WAV format"""

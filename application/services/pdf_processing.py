@@ -1,4 +1,4 @@
-# application/services/pdf_processing_service.py
+# application/services/pdf_processing.py - Updated for async support
 import os
 from typing import Dict, Any, Optional
 
@@ -6,11 +6,11 @@ from domain.models import (
     ProcessingRequest, ProcessingResult, PDFInfo, PageRange,
     TextExtractor, TextCleaner, AudioGenerator, PageRangeValidator,
     PDFProcessingService as PDFProcessingServiceInterface,
-    ILLMProvider, ITTSEngine  # Add these missing imports
+    ILLMProvider, ITTSEngine
 )
 
 class PDFProcessingService(PDFProcessingServiceInterface):
-    """Pure business logic for PDF to audio conversion"""
+    """Pure business logic for PDF to audio conversion with async support"""
     
     def __init__(
         self,
@@ -18,18 +18,18 @@ class PDFProcessingService(PDFProcessingServiceInterface):
         text_cleaner: TextCleaner,
         audio_generator: AudioGenerator,
         page_validator: PageRangeValidator,
-        llm_provider: Optional[ILLMProvider] = None, # New dependency for TextCleaner
-        tts_engine: Optional[ITTSEngine] = None # New dependency for AudioGenerator
+        llm_provider: Optional[ILLMProvider] = None,
+        tts_engine: Optional[ITTSEngine] = None
     ):
         self.text_extractor = text_extractor
         self.text_cleaner = text_cleaner
         self.audio_generator = audio_generator
         self.page_validator = page_validator
-        self.llm_provider = llm_provider # Store LLM provider
-        self.tts_engine = tts_engine # Store TTS engine
+        self.llm_provider = llm_provider
+        self.tts_engine = tts_engine
     
     def process_pdf(self, request: ProcessingRequest) -> ProcessingResult:
-        """Core business logic - orchestrates the PDF processing pipeline"""
+        """Core business logic - orchestrates the PDF processing pipeline with async optimization"""
         try:
             # Validate inputs
             if not os.path.exists(request.pdf_path):
@@ -50,8 +50,7 @@ class PDFProcessingService(PDFProcessingServiceInterface):
             
             self._log_extraction_success(raw_text, request.page_range)
             
-            # Step 2: Clean text
-            # Pass the LLM provider to the text cleaner
+            # Step 2: Clean text (with optimized chunking)
             clean_text_chunks = self.text_cleaner.clean_text(raw_text, self.llm_provider)
             if not self._is_cleaning_successful(clean_text_chunks):
                 return ProcessingResult(
@@ -61,13 +60,12 @@ class PDFProcessingService(PDFProcessingServiceInterface):
             
             self._log_cleaning_success(clean_text_chunks)
             
-            # Step 3: Generate audio
-            # Pass the TTS engine to the audio generator
+            # Step 3: Generate audio (automatically chooses async/sync based on chunk count and engine)
             audio_files, combined_mp3 = self.audio_generator.generate_audio(
                 clean_text_chunks,
                 request.output_name,
                 output_dir="audio_outputs",
-                tts_engine=self.tts_engine # Pass the TTS engine
+                tts_engine=self.tts_engine
             )
             
             if not audio_files:
@@ -133,11 +131,13 @@ class PDFProcessingService(PDFProcessingServiceInterface):
         combined_mp3: str,
         page_range: PageRange
     ) -> Dict[str, Any]:
+        # Enhanced debug info with async processing details
         debug_info = {
             "raw_text_length": len(raw_text),
             "text_chunks_count": len(clean_text_chunks),
             "audio_files_count": len(audio_files),
-            "combined_mp3_created": combined_mp3 is not None
+            "combined_mp3_created": combined_mp3 is not None,
+            "processing_method": self._determine_processing_method(clean_text_chunks)
         }
         
         if not page_range.is_full_document():
@@ -151,7 +151,20 @@ class PDFProcessingService(PDFProcessingServiceInterface):
         
         return debug_info
     
-    # --- Logging methods (could be injected logger in real implementation) ---
+    def _determine_processing_method(self, clean_text_chunks: list) -> str:
+        """Determine which processing method was likely used"""
+        valid_chunk_count = len([c for c in clean_text_chunks if c.strip() and not c.startswith("Error")])
+        
+        if valid_chunk_count <= 1:
+            return "single_chunk"
+        elif valid_chunk_count <= 2:
+            return "synchronous"
+        elif hasattr(self.audio_generator, 'use_async') and self.audio_generator.use_async:
+            return "async_concurrent"
+        else:
+            return "optimized_synchronous"
+    
+    # --- Logging methods ---
     
     def _log_processing_start(self, request: ProcessingRequest):
         page_info = ""
@@ -166,7 +179,8 @@ class PDFProcessingService(PDFProcessingServiceInterface):
         print(f"PDFProcessingService: Extracted {len(raw_text):,} characters from PDF{page_info}")
     
     def _log_cleaning_success(self, clean_text_chunks: list):
-        print(f"PDFProcessingService: Text cleaning produced {len(clean_text_chunks)} chunks")
+        valid_chunks = len([c for c in clean_text_chunks if c.strip() and not c.startswith("Error")])
+        print(f"PDFProcessingService: Text cleaning produced {len(clean_text_chunks)} chunks ({valid_chunks} valid)")
     
     def _log_processing_complete(self, audio_files: list, combined_mp3: str):
         print(f"PDFProcessingService: Processing complete! Generated {len(audio_files)} audio files")

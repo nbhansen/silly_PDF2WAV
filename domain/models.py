@@ -70,6 +70,9 @@ class GeminiConfig:
     voice_name: str = "Kore"
     style_prompt: Optional[str] = None
     api_key: Optional[str] = None
+    min_request_interval: float = 2.0
+    max_retries: int = 3
+    base_retry_delay: int = 16
 
 # --- Domain Interfaces ---
 

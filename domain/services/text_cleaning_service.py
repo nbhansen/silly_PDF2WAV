@@ -34,7 +34,7 @@ class TextCleaningService(TextCleaner):
         # For large texts, clean in chunks with TTS optimization
         if len(raw_text) <= self.max_chunk_size:
             cleaned_text = self._clean_chunk_for_tts(raw_text, provider_to_use)
-            return self._chunk_for_audio(cleaned_text)
+            return self._chunk_for_audio_optimized(cleaned_text)
         else:
             print(f"TextCleaningService: Large text ({len(raw_text):,} chars), processing in chunks")
             initial_chunks = self._smart_split(raw_text, self.max_chunk_size)
@@ -57,9 +57,9 @@ class TextCleaningService(TextCleaner):
                 except Exception as e:
                     print(f"TextCleaningService: Failed to write debug file: {e}")
             
-            # Combine cleaned chunks with section pauses
+            # Combine cleaned chunks with section pauses and re-chunk for optimal TTS size
             combined_text = "\n\n... ...\n\n".join(cleaned_chunks)  # Add pauses between major sections
-            return self._chunk_for_audio(combined_text)
+            return self._chunk_for_audio_optimized(combined_text)
 
     def _clean_chunk_for_tts(self, text_chunk: str, llm_provider: ILLMProvider) -> str:
         """Clean a single chunk with TTS optimization using the LLM provider"""
@@ -123,55 +123,135 @@ Cleaned and TTS-optimized text:"""
         print("TextCleaningService: Using basic TTS fallback (no LLM)")
         # Just do basic paragraph enhancement
         text = re.sub(r'\n\s*\n', '\n\n... ', text)
-        return self._chunk_for_audio(text)
+        return self._chunk_for_audio_optimized(text)
     
-    def _chunk_for_audio(self, text: str) -> List[str]:
-        """Split TTS-optimized text into audio-appropriate chunks"""
-        # The text is already TTS-optimized, so we can be more aggressive about preserving structure
-        target_size = 80000  # Larger chunks since they're already optimized
+    def _chunk_for_audio_optimized(self, text: str) -> List[str]:
+        """Split TTS-optimized text into very small chunks that TTS APIs can handle"""
+        # Ultra-aggressive chunking for problematic TTS APIs
+        # Target 30-60 seconds of audio per chunk to avoid rate limiting completely
+        target_size = 3000    # Much smaller - roughly 30-60 seconds of audio
+        max_chunk_size = 5000   # Very strict hard limit
         
         if len(text) <= target_size:
             print("TextCleaningService: Text fits in single audio chunk")
             return [text]
         
-        print(f"TextCleaningService: Splitting TTS-optimized text ({len(text):,} chars) for audio")
+        print(f"TextCleaningService: Splitting TTS-optimized text ({len(text):,} chars) into very small TTS-friendly chunks")
         
-        # Split on major pause markers first (section breaks)
-        major_sections = text.split('\n\n... ...\n\n')
+        # First pass: split on major section breaks
+        sections = text.split('\n\n... ...\n\n')
+        all_chunks = []
         
-        chunks = []
-        current_chunk = ""
-        
-        for i, section in enumerate(major_sections):
+        for section in sections:
             section = section.strip()
             if not section:
                 continue
-                
-            if len(current_chunk) + len(section) > target_size:
+            
+            # If section is small enough, keep it
+            if len(section) <= max_chunk_size:
+                all_chunks.append(section)
+            else:
+                # Section is too large, force split it
+                forced_chunks = self._force_split_large_text(section, target_size, max_chunk_size)
+                all_chunks.extend(forced_chunks)
+        
+        print(f"TextCleaningService: Split TTS-optimized text into {len(all_chunks)} very small TTS-friendly chunks")
+        
+        # Log chunk sizes for debugging
+        for i, chunk in enumerate(all_chunks):
+            print(f"  Chunk {i+1}: {len(chunk):,} chars")
+        
+        return all_chunks
+    
+    def _force_split_large_text(self, text: str, target_size: int, max_size: int) -> List[str]:
+        """Force split large text into small chunks regardless of content structure"""
+        chunks = []
+        
+        # First try to split on pause markers
+        pause_parts = text.split('... ...')
+        current_chunk = ""
+        
+        for part in pause_parts:
+            part = part.strip()
+            if not part:
+                continue
+            
+            potential = current_chunk + "... ..." + part if current_chunk else part
+            
+            if len(potential) <= max_size:
+                current_chunk = potential
+            else:
+                # Save current chunk if it exists
                 if current_chunk:
                     chunks.append(current_chunk.strip())
                 
-                # If single section is still too large, split it further
-                if len(section) > target_size:
-                    sub_chunks = self._split_large_section(section, target_size)
-                    chunks.extend(sub_chunks)
+                # If this part is still too large, split it by sentences
+                if len(part) > max_size:
+                    sentence_chunks = self._force_split_by_sentences(part, target_size, max_size)
+                    chunks.extend(sentence_chunks)
                     current_chunk = ""
                 else:
-                    current_chunk = section
-            else:
-                if current_chunk:
-                    current_chunk += "\n\n... ...\n\n" + section
-                else:
-                    current_chunk = section
+                    current_chunk = part
         
         if current_chunk:
             chunks.append(current_chunk.strip())
         
-        print(f"TextCleaningService: Split TTS-optimized text into {len(chunks)} audio chunks")
         return chunks
     
-    def _split_large_section(self, section: str, max_size: int) -> List[str]:
-        """Split a large section while preserving TTS markers"""
+    def _force_split_by_sentences(self, text: str, target_size: int, max_size: int) -> List[str]:
+        """Force split by sentences with very strict size limits"""
+        import re
+        sentences = re.split(r'(?<=[.!?])\s+', text)
+        
+        chunks = []
+        current_chunk = ""
+        
+        for sentence in sentences:
+            potential = current_chunk + " " + sentence if current_chunk else sentence
+            
+            if len(potential) <= max_size:
+                current_chunk = potential
+            else:
+                # Save current chunk
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                
+                # If single sentence is still too large, split it by words
+                if len(sentence) > max_size:
+                    word_chunks = self._force_split_by_words(sentence, target_size, max_size)
+                    chunks.extend(word_chunks)
+                    current_chunk = ""
+                else:
+                    current_chunk = sentence
+        
+        if current_chunk:
+            chunks.append(current_chunk.strip())
+        
+        return chunks
+    
+    def _force_split_by_words(self, text: str, target_size: int, max_size: int) -> List[str]:
+        """Last resort: force split by words with strict size limits"""
+        words = text.split()
+        chunks = []
+        current_chunk = ""
+        
+        for word in words:
+            potential = current_chunk + " " + word if current_chunk else word
+            
+            if len(potential) <= max_size:
+                current_chunk = potential
+            else:
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                current_chunk = word
+        
+        if current_chunk:
+            chunks.append(current_chunk.strip())
+        
+        return chunks
+    
+    def _split_large_section_optimized(self, section: str, target_size: int) -> List[str]:
+        """Split large sections more aggressively to reduce chunk count"""
         # Try to split on existing pause markers first
         pause_splits = section.split('... ...')
         
@@ -185,10 +265,17 @@ Cleaned and TTS-optimized text:"""
                 
             potential = current_chunk + "... ..." + part if current_chunk else part
             
-            if len(potential) > max_size:
+            if len(potential) > target_size:
                 if current_chunk:
                     chunks.append(current_chunk.strip())
-                current_chunk = part
+                
+                # If this single part is still too large, split on sentences
+                if len(part) > target_size:
+                    sentence_chunks = self._split_on_sentences(part, target_size)
+                    chunks.extend(sentence_chunks)
+                    current_chunk = ""
+                else:
+                    current_chunk = part
             else:
                 current_chunk = potential
         
@@ -196,6 +283,35 @@ Cleaned and TTS-optimized text:"""
             chunks.append(current_chunk.strip())
         
         return chunks
+    
+    def _split_on_sentences(self, text: str, max_size: int) -> List[str]:
+        """Last resort: split on sentence boundaries"""
+        sentences = re.split(r'(?<=[.!?])\s+', text)
+        
+        chunks = []
+        current = ""
+        
+        for sentence in sentences:
+            if len(current + " " + sentence) > max_size:
+                if current:
+                    chunks.append(current.strip())
+                current = sentence
+            else:
+                current = current + " " + sentence if current else sentence
+        
+        if current:
+            chunks.append(current.strip())
+        
+        return chunks
+    
+    # Legacy method - kept for backward compatibility but now calls optimized version
+    def _chunk_for_audio(self, text: str) -> List[str]:
+        """Legacy method - now calls optimized version"""
+        return self._chunk_for_audio_optimized(text)
+    
+    def _split_large_section(self, section: str, max_size: int) -> List[str]:
+        """Legacy method - now calls optimized version"""
+        return self._split_large_section_optimized(section, max_size)
     
     def _smart_split(self, text: str, max_size: int) -> List[str]:
         """Split text at sentence boundaries for initial processing"""
