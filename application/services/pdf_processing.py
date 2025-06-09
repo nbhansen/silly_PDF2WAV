@@ -1,9 +1,10 @@
-# application/services/pdf_processing.py - Updated for async support
+# application/services/pdf_processing.py - Updated for async support with FIXED IMPORTS
 import os
 from typing import Dict, Any, Optional
 
-from domain.models import (
-    ProcessingRequest, ProcessingResult, PDFInfo, PageRange,
+# FIXED: Split imports correctly between models and interfaces
+from domain.models import ProcessingRequest, ProcessingResult, PDFInfo, PageRange
+from domain.interfaces import (
     TextExtractor, TextCleaner, AudioGenerator, PageRangeValidator,
     PDFProcessingService as PDFProcessingServiceInterface,
     ILLMProvider, ITTSEngine
