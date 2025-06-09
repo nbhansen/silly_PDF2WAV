@@ -1,4 +1,4 @@
-# domain/models.py
+# domain/models.py - Updated with correct PiperConfig
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any, Tuple
 from abc import ABC, abstractmethod
@@ -78,7 +78,8 @@ class GeminiConfig:
 
 @dataclass
 class PiperConfig:
-    """Configuration for Piper TTS"""
+    """Configuration for Piper TTS - Updated with correct defaults"""
+    model_name: str = "en_US-lessac-medium"  # Model identifier
     model_path: Optional[str] = None  # Path to .onnx model file  
     config_path: Optional[str] = None  # Path to .onnx.json config file
     speaker_id: Optional[int] = None  # For multi-speaker models
@@ -87,6 +88,7 @@ class PiperConfig:
     noise_w: float = 0.8  # Pronunciation variability
     sentence_silence: float = 0.2  # Seconds of silence between sentences
     download_dir: str = "piper_models"  # Model storage directory
+    use_gpu: bool = False  # Piper is CPU-optimized
 
 # --- Domain Interfaces ---
 

@@ -85,6 +85,9 @@ Desktop.ini
 # User-generated files & downloaded models
 uploads/
 audio_outputs/
+piper_models/
+
+
 # Coqui TTS models are typically cached in ~/.local/share/tts/
 # but if you download them manually to the project, you might want to ignore that folder.
 # Example: tts_models_local/
