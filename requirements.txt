@@ -7,7 +7,7 @@ pytesseract==0.3.13
 pytest==8.4.0
 pytest-cov==6.1.1
 python-dotenv==1.1.0
-google-generativeai>=0.8.0
+google-genai>=0.1.0
 aiofiles==24.1.0
 nest-asyncio==1.6.0
 # piper-tts might need binary install on some platforms like Fedora
