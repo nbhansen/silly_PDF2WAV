@@ -1,4 +1,4 @@
-# domain/services/ssml_generation_service.py - SSML Generation for Academic Content
+# domain/services/ssml_generation_service.py - Complete SSML Generation for Academic Content
 import re
 from typing import Dict, List, Optional
 from domain.interfaces import ISSMLGenerator, SSMLCapability
@@ -6,12 +6,6 @@ from domain.interfaces import ISSMLGenerator, SSMLCapability
 class SSMLGenerationService(ISSMLGenerator):
     """
     Service for generating SSML markup optimized for academic content
-    
-    This service creates SSML that enhances the listening experience of 
-    research papers, technical documents, and academic texts by:
-    - Adding natural pauses and emphasis
-    - Improving pronunciation of numbers, dates, and technical terms
-    - Structuring content for better comprehension
     """
     
     def __init__(self, target_capability: SSMLCapability = SSMLCapability.ADVANCED):
@@ -23,13 +17,6 @@ class SSMLGenerationService(ISSMLGenerator):
     def generate_ssml_for_academic_content(self, text: str, target_capability: SSMLCapability) -> str:
         """
         Generate SSML markup optimized for academic content
-        
-        Args:
-            text: Clean academic text
-            target_capability: Target SSML support level
-            
-        Returns:
-            Text with appropriate SSML markup
         """
         if target_capability == SSMLCapability.NONE:
             return text
@@ -101,7 +88,7 @@ class SSMLGenerationService(ISSMLGenerator):
         return text
     
     def add_natural_pauses(self, text: str) -> str:
-        """Add appropriate pause markup for natural speech flow - FIXED VERSION"""
+        """Add appropriate pause markup for natural speech flow"""
         
         # Replace existing pause markers with SSML breaks
         text = re.sub(r'\.{3}\s*\.{3}', '<break time="1s"/>', text)
@@ -150,10 +137,9 @@ class SSMLGenerationService(ISSMLGenerator):
         )
         
         return text
-
     
     def emphasize_key_terms(self, text: str) -> str:
-        """Add emphasis markup for important academic terms - FIXED VERSION"""
+        """Add emphasis markup for important academic terms"""
         
         # Avoid double-processing already emphasized text
         def add_emphasis_if_not_present(word, text_content):
@@ -177,7 +163,6 @@ class SSMLGenerationService(ISSMLGenerator):
             text = add_emphasis_if_not_present(word, text)
         
         return text
-
     
     def _add_prosody_for_technical_terms(self, text: str) -> str:
         """Add prosody markup for technical terms and acronyms"""
@@ -299,7 +284,7 @@ class SSMLGenerationService(ISSMLGenerator):
         }
 
 
-class AcademicSSMLEnhancer:
+class AcademicSSMLEnhancer(SSMLGenerationService):
     """
     Enhanced SSML generator specifically tuned for academic papers
     
@@ -308,8 +293,18 @@ class AcademicSSMLEnhancer:
     """
     
     def __init__(self, document_type: str = "research_paper"):
+        super().__init__(SSMLCapability.ADVANCED)
         self.document_type = document_type
-        self.ssml_generator = SSMLGenerationService()
+    
+    def generate_ssml_for_academic_content(self, text: str, target_capability: SSMLCapability) -> str:
+        """Override to provide academic-specific enhancement"""
+        if self.document_type == "research_paper":
+            return self.enhance_research_paper(text, target_capability)
+        elif self.document_type == "literature_review":
+            return self.enhance_literature_review(text, target_capability)
+        else:
+            # Fall back to parent implementation
+            return super().generate_ssml_for_academic_content(text, target_capability)
     
     def enhance_research_paper(self, text: str, target_capability: SSMLCapability) -> str:
         """Generate SSML specifically optimized for research papers"""
@@ -322,7 +317,7 @@ class AcademicSSMLEnhancer:
         ssml_text = self._enhance_discussion(ssml_text, target_capability)
         
         # Apply general academic enhancements
-        return self.ssml_generator.generate_ssml_for_academic_content(ssml_text, target_capability)
+        return super().generate_ssml_for_academic_content(ssml_text, target_capability)
     
     def enhance_literature_review(self, text: str, target_capability: SSMLCapability) -> str:
         """Generate SSML optimized for literature reviews"""
@@ -332,7 +327,7 @@ class AcademicSSMLEnhancer:
         ssml_text = self._enhance_citations_heavy_content(ssml_text, target_capability)
         ssml_text = self._enhance_comparative_language(ssml_text, target_capability)
         
-        return self.ssml_generator.generate_ssml_for_academic_content(ssml_text, target_capability)
+        return super().generate_ssml_for_academic_content(ssml_text, target_capability)
     
     def _enhance_abstract(self, text: str, capability: SSMLCapability) -> str:
         """Add specific enhancements for abstract sections"""
@@ -404,18 +399,18 @@ class AcademicSSMLEnhancer:
         return text
 
 
-# Usage examples and testing functions
+# Testing functions
 def test_ssml_generation():
     """Test SSML generation with sample academic content"""
     
     sample_text = """
     Introduction. This study investigates the correlation between machine learning 
-    algorithms and computational efficiency. ... However, previous research has 
-    shown mixed results. ... Furthermore, the methodology used in earlier studies 
+    algorithms and computational efficiency. However, previous research has 
+    shown mixed results. Furthermore, the methodology used in earlier studies 
     was limited.
     
     Results. We found a 73.2 percent increase in efficiency during 2024. 
-    The statistical analysis revealed F(2, 47) = 15.3, p < 0.001. ... 
+    The statistical analysis revealed F(2, 47) = 15.3, p < 0.001. 
     Therefore, the null hypothesis was rejected.
     """
     

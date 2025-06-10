@@ -6,7 +6,7 @@ import time
 import subprocess
 from typing import List, Tuple, Optional
 from concurrent.futures import ThreadPoolExecutor
-from domain.models import ITTSEngine
+from domain.interfaces import ITTSEngine
 
 class AsyncAudioGenerationService:
     """Async version of AudioGenerationService for better performance with rate-limited APIs"""
