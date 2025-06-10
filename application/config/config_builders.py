@@ -1,25 +1,19 @@
-# application/config/config_builders.py - Environment-Aware Config Builders
+# application/config/config_builders.py - Simplified
 import os
 from abc import ABC, abstractmethod
 from typing import TypeVar, Generic
-from domain.config import (
-    TTSConfig, CoquiConfig, GTTSConfig, BarkConfig, GeminiConfig, PiperConfig
-)
+from domain.config import GeminiConfig, PiperConfig
 
 T = TypeVar('T')
 
 class ConfigBuilder(ABC, Generic[T]):
-    """Base class for configuration builders"""
-    
     @classmethod
     @abstractmethod
     def from_env(cls) -> T:
-        """Build configuration from environment variables"""
         pass
     
     @staticmethod
     def _get_bool(env_var: str, default: bool = False) -> bool:
-        """Helper to parse boolean environment variables"""
         value = os.getenv(env_var)
         if value is None:
             return default
@@ -27,64 +21,25 @@ class ConfigBuilder(ABC, Generic[T]):
     
     @staticmethod
     def _get_float(env_var: str, default: float) -> float:
-        """Helper to parse float environment variables"""
         value = os.getenv(env_var)
         if value is None:
             return default
         try:
             return float(value)
         except ValueError:
-            print(f"Warning: Invalid float value for {env_var}: {value}, using default {default}")
             return default
     
     @staticmethod
     def _get_int(env_var: str, default: int) -> int:
-        """Helper to parse int environment variables"""
         value = os.getenv(env_var)
         if value is None:
             return default
         try:
             return int(value)
         except ValueError:
-            print(f"Warning: Invalid int value for {env_var}: {value}, using default {default}")
             return default
 
-class CoquiConfigBuilder(ConfigBuilder[CoquiConfig]):
-    """Builds CoquiConfig from environment variables"""
-    
-    @classmethod
-    def from_env(cls) -> CoquiConfig:
-        return CoquiConfig(
-            model_name=os.getenv('COQUI_MODEL_NAME') or CoquiConfig.model_name,
-            speaker=os.getenv('COQUI_SPEAKER'),
-            use_gpu=cls._get_bool('COQUI_USE_GPU_IF_AVAILABLE', CoquiConfig.use_gpu)
-        )
-
-class GTTSConfigBuilder(ConfigBuilder[GTTSConfig]):
-    """Builds GTTSConfig from environment variables"""
-    
-    @classmethod
-    def from_env(cls) -> GTTSConfig:
-        return GTTSConfig(
-            lang=os.getenv('GTTS_LANG') or GTTSConfig.lang,
-            tld=os.getenv('GTTS_TLD') or GTTSConfig.tld,
-            slow=cls._get_bool('GTTS_SLOW', GTTSConfig.slow)
-        )
-
-class BarkConfigBuilder(ConfigBuilder[BarkConfig]):
-    """Builds BarkConfig from environment variables"""
-    
-    @classmethod
-    def from_env(cls) -> BarkConfig:
-        return BarkConfig(
-            use_gpu=cls._get_bool('BARK_USE_GPU_IF_AVAILABLE', BarkConfig.use_gpu),
-            use_small_models=cls._get_bool('BARK_USE_SMALL_MODELS', BarkConfig.use_small_models),
-            history_prompt=os.getenv('BARK_HISTORY_PROMPT')
-        )
-
 class GeminiConfigBuilder(ConfigBuilder[GeminiConfig]):
-    """Builds GeminiConfig from environment variables"""
-    
     @classmethod
     def from_env(cls) -> GeminiConfig:
         return GeminiConfig(
@@ -97,8 +52,6 @@ class GeminiConfigBuilder(ConfigBuilder[GeminiConfig]):
         )
 
 class PiperConfigBuilder(ConfigBuilder[PiperConfig]):
-    """Builds PiperConfig from environment variables"""
-    
     @classmethod
     def from_env(cls) -> PiperConfig:
         return PiperConfig(

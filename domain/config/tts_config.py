@@ -11,29 +11,8 @@ class TTSConfig:
     enable_ssml: bool = True  # SSML support
     
     # Engine-specific configs
-    coqui: Optional['CoquiConfig'] = None
-    gtts: Optional['GTTSConfig'] = None
-    bark: Optional['BarkConfig'] = None
     gemini: Optional['GeminiConfig'] = None
     piper: Optional['PiperConfig'] = None
-
-@dataclass
-class CoquiConfig:
-    model_name: str = "tts_models/en/ljspeech/vits"
-    speaker: Optional[str] = None
-    use_gpu: bool = True
-
-@dataclass
-class GTTSConfig:
-    lang: str = "en"
-    tld: str = "co.uk"
-    slow: bool = False
-
-@dataclass
-class BarkConfig:
-    use_gpu: bool = True
-    use_small_models: bool = True
-    history_prompt: Optional[str] = None
 
 @dataclass
 class GeminiConfig:
@@ -56,4 +35,4 @@ class PiperConfig:
     noise_w: float = 0.8  # Pronunciation variability
     sentence_silence: float = 0.2  # Seconds of silence between sentences
     download_dir: str = "piper_models"
-    use_gpu: bool = False  # Piper is CPU-optimized
+    use_gpu: bool = True  # Piper is CPU-optimized
