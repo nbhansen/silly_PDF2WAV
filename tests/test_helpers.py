@@ -1,7 +1,7 @@
 # tests/test_helpers.py
-from domain.models import (
+from domain.interfaces import (
     ITTSEngine, ILLMProvider, TextExtractor, PageRangeValidator, 
-    PDFInfo, PageRange, ProcessingRequest
+PDFInfo, PageRange, ProcessingRequest
 )
 from typing import Dict, Any, List
 
