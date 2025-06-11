@@ -7,9 +7,10 @@ from dotenv import load_dotenv
 # Load environment variables first
 load_dotenv()
 
-# Import new configuration system
+# Import new configuration system and errors
 from application.config.system_config import SystemConfig
 from domain.models import ProcessingRequest, PageRange
+from domain.errors import ErrorCode, invalid_page_range_error, file_size_error, unsupported_file_type_error
 from application.composition_root import create_pdf_service_from_env
 
 # Initialize configuration and validate early
@@ -140,6 +141,11 @@ def upload_file():
         if not page_range.is_full_document():
             validation = pdf_service.validate_page_range(pdf_path, page_range)
             if not validation.get('valid', False):
+                # Clean up file before returning error
+                try:
+                    os.remove(pdf_path)
+                except:
+                    pass
                 return f"Error: {validation.get('error', 'Invalid page range')}"
         
         # Create processing request
@@ -149,16 +155,16 @@ def upload_file():
             page_range=page_range
         )
         
-        # Use service
+        # Use service with structured error handling
         result = pdf_service.process_pdf(request_model)
         
-        # Clean up
+        # Clean up uploaded file
         try:
             os.remove(pdf_path)
         except:
             pass
         
-        # Handle result
+        # Handle result with structured errors
         if result.success:
             display_filename = original_filename
             if not page_range.is_full_document():
@@ -172,12 +178,62 @@ def upload_file():
                                  file_count=len(result.audio_files) if result.audio_files else 0,
                                  debug_info=result.debug_info)
         else:
-            error_message = result.error if hasattr(result, 'error') else "Unknown error occurred"
-            return f"Error: {error_message}"
+            # Handle structured errors with appropriate user messages
+            error_message = _get_user_friendly_error_message(result.error)
+            retry_suggestion = _get_retry_suggestion(result.error)
+            
+            if retry_suggestion:
+                return f"Error: {error_message}<br><br>💡 Suggestion: {retry_suggestion}"
+            else:
+                return f"Error: {error_message}"
             
     except Exception as e:
         print(f"Upload processing error: {e}")
-        return f"An error occurred: {str(e)}"
+        return f"An unexpected error occurred: {str(e)}"
+
+def _get_user_friendly_error_message(error: 'ApplicationError') -> str:
+    """Convert technical error to user-friendly message"""
+    if error.code == ErrorCode.FILE_NOT_FOUND:
+        return "The uploaded file could not be found or accessed."
+    elif error.code == ErrorCode.TEXT_EXTRACTION_FAILED:
+        return "Could not extract text from the PDF. The file might be corrupted, image-only, or password-protected."
+    elif error.code == ErrorCode.TEXT_CLEANING_FAILED:
+        return "Failed to process the extracted text for audio conversion."
+    elif error.code == ErrorCode.AUDIO_GENERATION_FAILED:
+        return "Failed to generate audio from the text. This might be a temporary issue with the text-to-speech service."
+    elif error.code == ErrorCode.TTS_ENGINE_ERROR:
+        return "Text-to-speech service encountered an error. This might be temporary."
+    elif error.code == ErrorCode.LLM_PROVIDER_ERROR:
+        return "Text cleaning service encountered an error. This might be temporary."
+    elif error.code == ErrorCode.INVALID_PAGE_RANGE:
+        return f"Invalid page range: {error.details}"
+    elif error.code == ErrorCode.FILE_SIZE_ERROR:
+        return str(error.message)
+    elif error.code == ErrorCode.UNSUPPORTED_FILE_TYPE:
+        return "Only PDF files are supported for conversion."
+    else:
+        return error.message
+
+def _get_retry_suggestion(error: 'ApplicationError') -> str:
+    """Get retry suggestion based on error type"""
+    if error.retryable:
+        if error.code in [ErrorCode.TTS_ENGINE_ERROR, ErrorCode.AUDIO_GENERATION_FAILED]:
+            return "Please try again in a few moments. If the problem persists, the text-to-speech service might be temporarily unavailable."
+        elif error.code == ErrorCode.LLM_PROVIDER_ERROR:
+            return "Please try again in a few moments, or disable text cleaning in your configuration."
+        elif error.code == ErrorCode.TEXT_CLEANING_FAILED:
+            return "Try again or consider disabling text cleaning (set ENABLE_TEXT_CLEANING=False) if the problem persists."
+        else:
+            return "This error might be temporary. Please try again."
+    else:
+        if error.code == ErrorCode.TEXT_EXTRACTION_FAILED:
+            return "Try a different PDF file, or ensure the PDF is not password-protected or image-only."
+        elif error.code == ErrorCode.FILE_SIZE_ERROR:
+            return f"Please use a smaller PDF file (maximum {app_config.max_file_size_mb}MB)."
+        elif error.code == ErrorCode.INVALID_PAGE_RANGE:
+            return "Please check the page numbers and try again."
+    
+    return ""
 
 @app.errorhandler(413)
 def too_large(e):

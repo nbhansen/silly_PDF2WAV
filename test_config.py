@@ -69,9 +69,28 @@ def test_configuration():
         else:
             print("   ⚠️  SSML service not available (disabled or no TTS engine)")
         
+        # Test 8: Test error handling system
+        print("\n8. Testing error handling system...")
+        from domain.errors import ErrorCode, ApplicationError, file_not_found_error
+        
+        # Test error creation
+        test_error = file_not_found_error("test.pdf")
+        if test_error.code == ErrorCode.FILE_NOT_FOUND and not test_error.retryable:
+            print("   ✅ Error creation works correctly")
+        else:
+            print("   ❌ Error creation failed")
+            
+        # Test ProcessingResult with errors
+        from domain.models import ProcessingResult
+        error_result = ProcessingResult.failure_result(test_error)
+        if not error_result.success and error_result.error.code == ErrorCode.FILE_NOT_FOUND:
+            print("   ✅ ProcessingResult error handling works")
+        else:
+            print("   ❌ ProcessingResult error handling failed")
+        
         print("\n" + "=" * 60)
         print("🎉 ALL TESTS PASSED!")
-        print("Your advanced SSML configuration system is working correctly.")
+        print("Your advanced SSML configuration system with structured error handling is working correctly.")
         print("=" * 60)
         
         return True

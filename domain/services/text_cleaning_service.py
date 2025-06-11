@@ -1,19 +1,21 @@
+# domain/services/text_cleaning_service.py - Updated with structured error handling
 import time
 import re
 from typing import Optional, List
 
 from domain.interfaces import TextCleaner, ILLMProvider
+from domain.errors import llm_provider_error
 
 class TextCleaningService(TextCleaner):
-    """Simplified text cleaning service - SSML logic moved to pipeline"""
+    """Simplified text cleaning service focusing on core text processing"""
     
     def __init__(self, llm_provider: Optional[ILLMProvider] = None, max_chunk_size: int = 100000):
         self.llm_provider = llm_provider
         self.max_chunk_size = max_chunk_size
-        print(f"TextCleaningService: Initialized (SSML handling moved to pipeline)")
+        print(f"TextCleaningService: Initialized with LLM provider: {llm_provider is not None}")
 
     def clean_text(self, raw_text: str, llm_provider: Optional[ILLMProvider] = None) -> List[str]:
-        """Clean text for TTS - no SSML logic here"""
+        """Clean text for TTS - core responsibility only"""
         provider_to_use = llm_provider or self.llm_provider
         
         if not raw_text.strip():
@@ -48,33 +50,37 @@ class TextCleaningService(TextCleaner):
         return self._chunk_for_audio(combined_text)
     
     def _clean_chunk_for_tts(self, text_chunk: str, llm_provider: ILLMProvider) -> str:
-        """Clean a single chunk - simplified prompt"""
+        """Clean a single chunk using LLM with proper error handling"""
         if not text_chunk.strip():
             return text_chunk
             
-        prompt = f"""Clean this academic text for text-to-speech:
+        prompt = f"""Clean this academic text for text-to-speech conversion:
 
-**Tasks:**
-- Remove headers, footers, page numbers, citations
-- Add natural pause markers (...) for speech flow
-- Optimize for audio comprehension
+TASKS:
+- Remove headers, footers, page numbers, citations like [1], [2]
+- Remove artifacts like "Figure 1", "Table 2", etc.
+- Add natural pause markers (...) after transition words and between sections
+- Keep all important content but optimize for listening
+- Make it flow naturally when spoken aloud
 
-Text:
----
+TEXT TO CLEAN:
 {text_chunk}
----
 
-Cleaned text:"""
+CLEANED TEXT:"""
         
         try:
             cleaned_text = llm_provider.generate_content(prompt)
+            if not cleaned_text or cleaned_text.strip() == "":
+                print("TextCleaningService: LLM returned empty response, using fallback")
+                return self._basic_tts_fallback(text_chunk)[0]
             return cleaned_text
         except Exception as e:
             print(f"TextCleaningService: LLM cleaning failed: {e}")
+            # Return fallback instead of propagating error - text cleaning failure shouldn't stop processing
             return self._basic_tts_fallback(text_chunk)[0]
 
     def _smart_split(self, text: str, max_chunk_size: int) -> List[str]:
-        """Split text intelligently (same implementation as before)"""
+        """Split text intelligently at natural boundaries"""
         if len(text) <= max_chunk_size:
             return [text]
         
@@ -84,7 +90,7 @@ Cleaned text:"""
         while len(remaining_text) > max_chunk_size:
             chunk_end = max_chunk_size
             
-            # Find good split points
+            # Find good split points in order of preference
             paragraph_break = remaining_text.rfind('\n\n', 0, chunk_end)
             if paragraph_break > max_chunk_size // 2:
                 split_point = paragraph_break + 2
@@ -106,7 +112,7 @@ Cleaned text:"""
             
             remaining_text = remaining_text[split_point:].strip()
             
-            # Safety check
+            # Safety check to prevent infinite loops
             if len(remaining_text) >= len(chunk):
                 if len(remaining_text) > max_chunk_size:
                     chunks.append(remaining_text[:max_chunk_size])

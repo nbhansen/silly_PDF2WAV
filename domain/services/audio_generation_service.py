@@ -1,4 +1,4 @@
-# domain/services/audio_generation_service.py - Cleaned up with proper engine preferences
+# domain/services/audio_generation_service.py - Fixed to respect engine preferences
 import os
 import re
 import subprocess
@@ -6,7 +6,7 @@ from typing import Optional, List, Tuple
 from domain.interfaces import AudioGenerator, ITTSEngine
 
 class AudioGenerationService(AudioGenerator):
-    """Enhanced audio generation with intelligent sync/async selection based on engine preferences."""
+    """Enhanced audio generation with proper sync/async selection based on engine preferences."""
     
     def __init__(self, tts_engine: ITTSEngine):
         self.tts_engine = tts_engine
@@ -44,28 +44,42 @@ class AudioGenerationService(AudioGenerator):
         
         # Decide processing strategy based on engine preference and settings
         if self._should_use_async(engine_to_use, chunk_count):
-            print(f"AudioGenerationService: Using async processing for {chunk_count} chunks")
             return self._generate_audio_async_wrapper(text_chunks, output_name, output_dir, engine_to_use)
         else:
-            print(f"AudioGenerationService: Using sync processing for {chunk_count} chunks")
             return self._generate_audio_optimized_sync(text_chunks, output_name, output_dir, engine_to_use)
     
     def _should_use_async(self, engine: ITTSEngine, chunk_count: int) -> bool:
-        """Determine if async processing should be used"""
+        """Determine if async processing should be used - FIXED to respect engine preferences"""
         if not self.use_async:
+            print(f"AudioGenerationService: Async disabled in configuration")
             return False
             
         # Check if user forces async
         if self._force_async():
+            print(f"AudioGenerationService: Async processing forced by configuration")
             return True
-            
-        # Respect engine preference
-        if hasattr(engine, 'prefers_sync_processing') and engine.prefers_sync_processing():
-            # For sync-preferring engines, only use async for many chunks or rate-limited engines
-            return chunk_count > 6 or self._is_rate_limited_engine(engine)
         
-        # For async-preferring engines, use async for multiple chunks
-        return chunk_count >= 2
+        # Get engine name for logging
+        engine_name = engine.__class__.__name__
+            
+        # RESPECT ENGINE PREFERENCE FIRST - This is the key fix!
+        if hasattr(engine, 'prefers_sync_processing') and engine.prefers_sync_processing():
+            print(f"AudioGenerationService: {engine_name} prefers sync processing")
+            # For sync-preferring engines (like Piper), only use async for very large jobs
+            if chunk_count > 10:
+                print(f"AudioGenerationService: Large job ({chunk_count} chunks), overriding sync preference")
+                return True
+            else:
+                print(f"AudioGenerationService: Using sync processing as preferred by {engine_name}")
+                return False
+        
+        # For async-preferring engines (like Gemini), use async for multiple chunks
+        if chunk_count >= 2:
+            print(f"AudioGenerationService: Using async processing for {chunk_count} chunks with {engine_name}")
+            return True
+        
+        print(f"AudioGenerationService: Using sync processing for single chunk with {engine_name}")
+        return False
     
     def _async_enabled_in_env(self) -> bool:
         """Check if async is enabled in environment"""
@@ -77,9 +91,11 @@ class AudioGenerationService(AudioGenerator):
     
     def _generate_audio_sync(self, text_chunks: List[str], output_name: str, output_dir: str, 
                             engine_to_use: ITTSEngine) -> Tuple[List[str], Optional[str]]:
-        """Synchronous processing - reliable for all engines"""
+        """Synchronous processing - reliable for all engines, especially local ones like Piper"""
         os.makedirs(output_dir, exist_ok=True)
         generated_files = []
+        
+        print(f"AudioGenerationService: Using synchronous processing with {engine_to_use.__class__.__name__}")
         
         for i, text_chunk in enumerate(text_chunks):
             if not text_chunk.strip():
@@ -104,7 +120,7 @@ class AudioGenerationService(AudioGenerator):
                         f.write(audio_data)
                     
                     generated_files.append(audio_filename)
-                    print(f"AudioGenerationService: Generated {audio_filename}")
+                    print(f"AudioGenerationService: Generated {audio_filename} ({len(audio_data)} bytes)")
                 else:
                     print(f"AudioGenerationService: Failed to generate audio data for chunk {i+1}")
             except Exception as e:
@@ -120,6 +136,10 @@ class AudioGenerationService(AudioGenerator):
         
         # Add intelligent delays for rate-limited engines
         delay_between_requests = self._get_optimal_delay(engine_to_use)
+        
+        print(f"AudioGenerationService: Using optimized sync processing with {engine_to_use.__class__.__name__}")
+        if delay_between_requests > 0:
+            print(f"AudioGenerationService: Rate limiting enabled: {delay_between_requests}s between requests")
         
         for i, text_chunk in enumerate(text_chunks):
             if not text_chunk.strip() or text_chunk.startswith("Error") or text_chunk.startswith("LLM cleaning skipped"):
@@ -144,7 +164,7 @@ class AudioGenerationService(AudioGenerator):
                         f.write(audio_data)
                     
                     generated_files.append(audio_filename)
-                    print(f"AudioGenerationService: Generated {audio_filename}")
+                    print(f"AudioGenerationService: Generated {audio_filename} ({len(audio_data)} bytes)")
                     
             except Exception as e:
                 error_str = str(e)

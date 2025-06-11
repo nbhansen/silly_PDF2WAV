@@ -1,4 +1,4 @@
-# infrastructure/tts/gemini_tts_provider.py - Enhanced with Full SSML Support
+# infrastructure/tts/gemini_tts_provider.py - Fixed imports
 import os
 import wave
 import time
@@ -6,9 +6,7 @@ import tempfile
 import subprocess
 import re
 from typing import List, Dict, Any
-from google import genai
-from google.genai import types
-from domain.interfaces import ITTSEngine, ISSMLProcessor, SSMLCapability
+from domain.interfaces import ITTSEngine, SSMLCapability  # FIXED: Removed ISSMLProcessor
 from domain.config import GeminiConfig
 
 try:
@@ -23,8 +21,8 @@ except ImportError as e:
     GEMINI_TTS_AVAILABLE = False
 
 if GEMINI_TTS_AVAILABLE:
-    class GeminiTTSProvider(ITTSEngine, ISSMLProcessor):
-        """Enhanced Gemini TTS Provider with full SSML support"""
+    class GeminiTTSProvider(ITTSEngine):  # FIXED: Only implement ITTSEngine
+        """Gemini TTS Provider with full SSML support"""
         
         def __init__(self, config: GeminiConfig):
             self.voice_name = config.voice_name
@@ -38,13 +36,6 @@ if GEMINI_TTS_AVAILABLE:
             self.min_request_interval = config.min_request_interval
             self.max_retries = config.max_retries
             self.base_retry_delay = config.base_retry_delay
-            
-            # SSML configuration
-            self.ssml_capability = SSMLCapability.FULL
-            self.supported_ssml_tags = [
-                'speak', 'break', 'emphasis', 'prosody', 'say-as', 'voice', 
-                'audio', 'mark', 'p', 's', 'sub', 'phoneme', 'lexicon'
-            ]
             
             try:
                 if not self.api_key:
@@ -73,8 +64,8 @@ if GEMINI_TTS_AVAILABLE:
                 print("GeminiTTSProvider: Skipping audio generation due to empty or error text.")
                 return b""
             
-            # Process text for Gemini (validate SSML)
-            processed_text = self.process_text_for_engine(text_to_speak)
+            # Process text for Gemini (Gemini supports full SSML)
+            processed_text = self._process_text_for_gemini(text_to_speak)
             
             # Apply rate limiting before making request
             self._apply_rate_limit()
@@ -103,75 +94,31 @@ if GEMINI_TTS_AVAILABLE:
         def get_output_format(self) -> str:
             return self.output_format
 
-        # === ISSMLProcessor Implementation ===
+        def prefers_sync_processing(self) -> bool:
+            return False  # Cloud API, benefits from async processing
 
-        def get_ssml_capability(self) -> SSMLCapability:
-            """Gemini supports full SSML specification"""
-            return SSMLCapability.FULL
+        def supports_ssml(self) -> bool:
+            return True  # Gemini supports full SSML
 
-        def get_supported_tags(self) -> List[str]:
-            """Gemini supports all standard SSML tags"""
-            return self.supported_ssml_tags.copy()
+        # === SSML Processing ===
 
-        def process_ssml(self, ssml_text: str) -> str:
+        def _process_text_for_gemini(self, text: str) -> str:
             """
-            Process SSML for Gemini - validate and enhance
-            Gemini supports full SSML, so we mainly validate and optimize
+            Process text for Gemini - Gemini supports full SSML, so minimal processing needed
             """
-            if not '<' in ssml_text:
-                return ssml_text
+            if not '<' in text:
+                return text
                 
-            print(f"GeminiTTSProvider: Processing SSML input ({len(ssml_text)} chars)")
+            print(f"GeminiTTSProvider: Processing SSML input ({len(text)} chars)")
             
-            # Step 1: Ensure proper SSML document structure
-            processed_text = self._ensure_proper_ssml_structure(ssml_text)
+            # Gemini supports full SSML, so we mainly just validate structure
+            processed_text = self._ensure_proper_ssml_structure(text)
             
-            # Step 2: Validate and enhance SSML for Gemini
-            processed_text = self._validate_and_enhance_ssml(processed_text)
-            
-            # Step 3: Optimize for Gemini's specific features
-            processed_text = self._optimize_for_gemini(processed_text)
-            
-            print(f"GeminiTTSProvider: SSML processed and validated ({len(ssml_text)} -> {len(processed_text)} chars)")
+            print(f"GeminiTTSProvider: SSML processed ({len(text)} -> {len(processed_text)} chars)")
             return processed_text
 
-        def validate_ssml(self, ssml_text: str) -> Dict[str, Any]:
-            """Comprehensive SSML validation for Gemini"""
-            errors = []
-            warnings = []
-            suggestions = []
-            
-            if not '<' in ssml_text:
-                return {'valid': True, 'errors': [], 'warnings': [], 'suggestions': []}
-            
-            # Check document structure
-            if not ssml_text.strip().startswith('<speak>'):
-                warnings.append("SSML should be wrapped in <speak> tags for best results")
-            
-            if '<speak>' in ssml_text and '</speak>' not in ssml_text:
-                errors.append("Unclosed <speak> tag")
-            
-            # Validate specific tag formats
-            self._validate_break_tags(ssml_text, errors, warnings)
-            self._validate_prosody_tags(ssml_text, errors, warnings)
-            self._validate_say_as_tags(ssml_text, errors, warnings)
-            self._validate_voice_tags(ssml_text, errors, warnings, suggestions)
-            
-            # Check for nested structure issues
-            self._validate_tag_nesting(ssml_text, errors)
-            
-            return {
-                'valid': len(errors) == 0,
-                'errors': errors,
-                'warnings': warnings,
-                'suggestions': suggestions,
-                'gemini_optimized': True
-            }
-
-        # === SSML Processing Helper Methods ===
-
         def _ensure_proper_ssml_structure(self, ssml_text: str) -> str:
-            """Ensure proper SSML document structure"""
+            """Ensure proper SSML document structure for Gemini"""
             text = ssml_text.strip()
             
             # Wrap in speak tags if not already wrapped
@@ -184,239 +131,6 @@ if GEMINI_TTS_AVAILABLE:
                 text = f'{text}</speak>'
             
             return text
-
-        def _validate_and_enhance_ssml(self, ssml_text: str) -> str:
-            """Validate and enhance SSML for Gemini compatibility"""
-            text = ssml_text
-            
-            # Fix common SSML issues
-            text = self._fix_break_tags(text)
-            text = self._fix_emphasis_tags(text)
-            text = self._fix_prosody_tags(text)
-            text = self._fix_say_as_tags(text)
-            text = self._fix_voice_tags(text)
-            
-            return text
-
-        def _optimize_for_gemini(self, ssml_text: str) -> str:
-            """Optimize SSML specifically for Gemini TTS"""
-            text = ssml_text
-            
-            # Add Gemini-specific optimizations
-            text = self._optimize_voice_selection(text)
-            text = self._optimize_prosody_for_academic_content(text)
-            text = self._add_gemini_specific_features(text)
-            
-            return text
-
-        def _fix_break_tags(self, text: str) -> str:
-            """Fix and validate break tags for Gemini"""
-            def fix_break(match):
-                time_value = match.group(1)
-                
-                # Gemini supports: Ns, Nms, weak, medium, strong, x-weak, x-strong
-                if re.match(r'^\d+(\.\d+)?(s|ms)$', time_value):
-                    return f'<break time="{time_value}"/>'
-                elif time_value in ['weak', 'medium', 'strong', 'x-weak', 'x-strong']:
-                    return f'<break strength="{time_value}"/>'
-                else:
-                    # Try to convert invalid formats
-                    if time_value.isdigit():
-                        return f'<break time="{time_value}ms"/>'
-                    else:
-                        return '<break strength="medium"/>'  # Default fallback
-            
-            text = re.sub(r'<break\s+(?:time|strength)="([^"]*)"[^>]*/?>', fix_break, text)
-            return text
-
-        def _fix_emphasis_tags(self, text: str) -> str:
-            """Fix emphasis tags for Gemini"""
-            def fix_emphasis(match):
-                level = match.group(1) if match.group(1) else 'moderate'
-                content = match.group(2)
-                
-                # Gemini supports: strong, moderate, reduced
-                gemini_levels = ['strong', 'moderate', 'reduced']
-                if level in gemini_levels:
-                    return f'<emphasis level="{level}">{content}</emphasis>'
-                else:
-                    # Map other levels to Gemini-supported ones
-                    level_map = {
-                        'x-strong': 'strong',
-                        'x-weak': 'reduced',
-                        'none': 'moderate'
-                    }
-                    mapped_level = level_map.get(level, 'moderate')
-                    return f'<emphasis level="{mapped_level}">{content}</emphasis>'
-            
-            text = re.sub(r'<emphasis(?:\s+level="([^"]*)")?>([^<]*)</emphasis>', fix_emphasis, text)
-            return text
-
-        def _fix_prosody_tags(self, text: str) -> str:
-            """Fix prosody tags for Gemini (full support)"""
-            def fix_prosody(match):
-                attributes = match.group(1)
-                content = match.group(2)
-                
-                # Gemini supports rate, pitch, volume with various formats
-                fixed_attrs = []
-                
-                # Process rate attribute
-                rate_match = re.search(r'rate="([^"]*)"', attributes)
-                if rate_match:
-                    rate = rate_match.group(1)
-                    if rate in ['x-slow', 'slow', 'medium', 'fast', 'x-fast'] or \
-                       re.match(r'^\d+(\.\d+)?%?$', rate):
-                        fixed_attrs.append(f'rate="{rate}"')
-                
-                # Process pitch attribute
-                pitch_match = re.search(r'pitch="([^"]*)"', attributes)
-                if pitch_match:
-                    pitch = pitch_match.group(1)
-                    if pitch in ['x-low', 'low', 'medium', 'high', 'x-high'] or \
-                       re.match(r'^[+-]?\d+(\.\d+)?(Hz|%)?$', pitch):
-                        fixed_attrs.append(f'pitch="{pitch}"')
-                
-                # Process volume attribute
-                volume_match = re.search(r'volume="([^"]*)"', attributes)
-                if volume_match:
-                    volume = volume_match.group(1)
-                    if volume in ['silent', 'x-soft', 'soft', 'medium', 'loud', 'x-loud'] or \
-                       re.match(r'^[+-]?\d+(\.\d+)?(dB)?$', volume):
-                        fixed_attrs.append(f'volume="{volume}"')
-                
-                if fixed_attrs:
-                    return f'<prosody {" ".join(fixed_attrs)}>{content}</prosody>'
-                else:
-                    return content  # No valid attributes, return content only
-            
-            text = re.sub(r'<prosody([^>]*)>([^<]*)</prosody>', fix_prosody, text)
-            return text
-
-        def _fix_say_as_tags(self, text: str) -> str:
-            """Fix say-as tags for Gemini"""
-            def fix_say_as(match):
-                interpret_as = match.group(1)
-                format_attr = match.group(2) if match.group(2) else ''
-                content = match.group(3)
-                
-                # Gemini supports extensive say-as types
-                supported_types = [
-                    'characters', 'spell-out', 'cardinal', 'number', 'ordinal',
-                    'digits', 'fraction', 'unit', 'date', 'time', 'telephone',
-                    'address', 'interjection', 'expletive'
-                ]
-                
-                if interpret_as in supported_types:
-                    if format_attr:
-                        return f'<say-as interpret-as="{interpret_as}" {format_attr}>{content}</say-as>'
-                    else:
-                        return f'<say-as interpret-as="{interpret_as}">{content}</say-as>'
-                else:
-                    # Try to map unsupported types
-                    type_map = {
-                        'verbatim': 'spell-out',
-                        'alpha': 'characters',
-                        'numeric': 'number'
-                    }
-                    mapped_type = type_map.get(interpret_as, 'characters')
-                    return f'<say-as interpret-as="{mapped_type}">{content}</say-as>'
-            
-            text = re.sub(r'<say-as\s+interpret-as="([^"]*)"([^>]*)>([^<]*)</say-as>', fix_say_as, text)
-            return text
-
-        def _fix_voice_tags(self, text: str) -> str:
-            """Fix voice tags for Gemini"""
-            def fix_voice(match):
-                attributes = match.group(1)
-                content = match.group(2)
-                
-                # Extract name attribute (primary for Gemini)
-                name_match = re.search(r'name="([^"]*)"', attributes)
-                if name_match:
-                    voice_name = name_match.group(1)
-                    # Keep the voice tag as Gemini supports voice changes
-                    return f'<voice name="{voice_name}">{content}</voice>'
-                else:
-                    # No name attribute, remove voice tag but keep content
-                    return content
-            
-            text = re.sub(r'<voice([^>]*)>([^<]*)</voice>', fix_voice, text)
-            return text
-
-        def _optimize_voice_selection(self, text: str) -> str:
-            """Optimize voice selection for Gemini"""
-            # If no voice tags present and we have a preferred voice, we could add it
-            # But generally, the main voice is set via the API call
-            return text
-
-        def _optimize_prosody_for_academic_content(self, text: str) -> str:
-            """Add Gemini-specific prosody optimizations for academic content"""
-            # Add subtle prosody enhancements for better academic narration
-            
-            # Slow down technical terms (simple heuristic)
-            text = re.sub(r'\b([A-Z]{3,})\b', r'<prosody rate="90%">\1</prosody>', text)
-            
-            # Add slight emphasis to transition words if not already emphasized
-            transition_words = ['however', 'therefore', 'furthermore', 'moreover', 'consequently']
-            for word in transition_words:
-                if f'<emphasis' not in text or word not in text:
-                    pattern = f'\\b{word}\\b'
-                    if re.search(pattern, text, re.IGNORECASE):
-                        text = re.sub(pattern, f'<prosody pitch="+2%" rate="95%">{word}</prosody>', 
-                                    text, flags=re.IGNORECASE)
-            
-            return text
-
-        def _add_gemini_specific_features(self, text: str) -> str:
-            """Add Gemini-specific SSML features"""
-            # Could add audio effects, marks, or other Gemini-specific enhancements
-            # For now, keep it simple and focus on compatibility
-            return text
-
-        def _validate_break_tags(self, text: str, errors: List[str], warnings: List[str]):
-            """Validate break tags"""
-            breaks = re.findall(r'<break\s+(?:time|strength)="([^"]*)"[^>]*/?>', text)
-            for break_value in breaks:
-                if not (re.match(r'^\d+(\.\d+)?(s|ms)$', break_value) or 
-                       break_value in ['weak', 'medium', 'strong', 'x-weak', 'x-strong']):
-                    errors.append(f"Invalid break value: {break_value}")
-
-        def _validate_prosody_tags(self, text: str, errors: List[str], warnings: List[str]):
-            """Validate prosody tags"""
-            prosody_tags = re.findall(r'<prosody([^>]*)>', text)
-            for attrs in prosody_tags:
-                if not any(attr in attrs for attr in ['rate=', 'pitch=', 'volume=']):
-                    warnings.append("Prosody tag without recognized attributes")
-
-        def _validate_say_as_tags(self, text: str, errors: List[str], warnings: List[str]):
-            """Validate say-as tags"""
-            say_as_tags = re.findall(r'<say-as\s+interpret-as="([^"]*)"', text)
-            supported_types = [
-                'characters', 'spell-out', 'cardinal', 'number', 'ordinal',
-                'digits', 'fraction', 'unit', 'date', 'time', 'telephone'
-            ]
-            for interpret_as in say_as_tags:
-                if interpret_as not in supported_types:
-                    warnings.append(f"Potentially unsupported say-as type: {interpret_as}")
-
-        def _validate_voice_tags(self, text: str, errors: List[str], warnings: List[str], suggestions: List[str]):
-            """Validate voice tags"""
-            voice_tags = re.findall(r'<voice([^>]*)>', text)
-            for attrs in voice_tags:
-                if 'name=' not in attrs:
-                    errors.append("Voice tag missing name attribute")
-                else:
-                    suggestions.append("Consider using Gemini's built-in voices for best quality")
-
-        def _validate_tag_nesting(self, text: str, errors: List[str]):
-            """Validate proper tag nesting"""
-            # Simple validation for common nesting issues
-            # This could be more sophisticated
-            if '<emphasis>' in text and '</emphasis>' not in text:
-                errors.append("Unclosed emphasis tag")
-            if '<prosody>' in text and '</prosody>' not in text:
-                errors.append("Unclosed prosody tag")
 
         # === Audio Generation Methods ===
 
@@ -663,7 +377,7 @@ if GEMINI_TTS_AVAILABLE:
 
 else:
     # Fallback when Gemini TTS is not available
-    class GeminiTTSProvider(ITTSEngine, ISSMLProcessor):
+    class GeminiTTSProvider(ITTSEngine):
         def __init__(self, config: GeminiConfig):
             print("GeminiTTSProvider: Google Gemini TTS library not available.")
         
@@ -674,13 +388,8 @@ else:
         def get_output_format(self) -> str:
             return "wav"
         
-        def get_ssml_capability(self) -> SSMLCapability:
-            return SSMLCapability.NONE
-        
-        def get_supported_tags(self) -> List[str]:
-            return []
-        
-        def process_ssml(self, ssml_text: str) -> str:
-            return ssml_text
         def prefers_sync_processing(self) -> bool:
             return False  # Cloud API, benefits from async
+        
+        def supports_ssml(self) -> bool:
+            return False
