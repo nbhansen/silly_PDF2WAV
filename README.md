@@ -21,6 +21,8 @@ The project follows a layered or hexagonal architecture, promoting separation of
 *   **`infrastructure/`**: This layer provides implementations for external concerns and integrations. It contains adapters for interacting with external systems such as LLM providers, OCR engines, and TTS services. Examples include `infrastructure/llm/gemini_llm_provider.py` for LLM integration and `infrastructure/tts/gemini_tts_provider.py` for TTS services.
 
 ## Project structure
+
+```
 pdf_to_audio_app/
 ├── .gitignore
 ├── app.py
@@ -92,6 +94,7 @@ pdf_to_audio_app/
     └── infrastructure/
         └── tts/
             └── test_gemini_tts_provider.py
+```
 
 ## Setup and Installation
 
