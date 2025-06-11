@@ -20,18 +20,9 @@ The project follows a layered or hexagonal architecture, promoting separation of
 *   **`application/`**: This layer orchestrates the domain services to implement specific use cases and application workflows. It acts as an intermediary between the domain and infrastructure layers, handling dependency injection and application-specific configurations. Key files include `application/composition_root.py` for setting up dependencies and `application/services/pdf_processing.py` for the main PDF processing flow.
 *   **`infrastructure/`**: This layer provides implementations for external concerns and integrations. It contains adapters for interacting with external systems such as LLM providers, OCR engines, and TTS services. Examples include `infrastructure/llm/gemini_llm_provider.py` for LLM integration and `infrastructure/tts/gemini_tts_provider.py` for TTS services.
 
-## Project structure
-
+## Project structure /main folders only)
 ```
 pdf_to_audio_app/
-├── .gitignore
-├── app.py
-├── CHANGELOG.md
-├── CONTRIBUTING.md
-├── LICENSE
-├── README.md
-├── requirements.txt
-├── run_tests.sh
 ├── application/
 │   ├── __init__.py
 │   ├── composition_root.py
@@ -69,31 +60,10 @@ pdf_to_audio_app/
 │   │   └── piper_tts_provider.py
 │   └── web/
 │       └── __init__.py
-├── piper/
 ├── templates/
 │   ├── index.html
 │   └── result.html
 └── tests/
-    ├── __init__.py
-    ├── conftest.py
-    ├── test_audio_generation.py
-    ├── test_config.py
-    ├── test_helpers.py
-    ├── test_processors.py
-    ├── test_ssml_complete.py
-    ├── test_text_processing.py
-    ├── tests_integration.py
-    ├── application/
-    │   └── services/
-    │       └── test_pdf_processing.py
-    ├── domain/
-    │   ├── test_models.py
-    │   └── services/
-    │       ├── test_audio_generation_simple.py
-    │       └── test_text_cleaning_simple.py
-    └── infrastructure/
-        └── tts/
-            └── test_gemini_tts_provider.py
 ```
 
 ## Setup and Installation
