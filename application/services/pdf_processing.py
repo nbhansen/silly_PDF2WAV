@@ -1,3 +1,4 @@
+# application/services/pdf_processing.py - Updated with Advanced SSML Service
 import os
 from typing import Dict, Any, Optional
 
@@ -7,10 +8,10 @@ from domain.interfaces import (
     PDFProcessingService as PDFProcessingServiceInterface,
     ILLMProvider, ITTSEngine
 )
-from domain.services.ssml_pipeline import SSMLPipeline
+from domain.services.academic_ssml_service import AcademicSSMLService
 
 class PDFProcessingService(PDFProcessingServiceInterface):
-    """Simplified PDF processing service using SSML pipeline"""
+    """PDF processing service with integrated advanced SSML enhancement"""
     
     def __init__(
         self,
@@ -18,20 +19,29 @@ class PDFProcessingService(PDFProcessingServiceInterface):
         text_cleaner: TextCleaner,
         audio_generator: AudioGenerator,
         page_validator: PageRangeValidator,
-        ssml_pipeline: SSMLPipeline,  # NEW: Centralized SSML
         llm_provider: Optional[ILLMProvider] = None,
-        tts_engine: Optional[ITTSEngine] = None
+        tts_engine: Optional[ITTSEngine] = None,
+        enable_ssml: bool = True,
+        document_type: str = "research_paper"
     ):
         self.text_extractor = text_extractor
         self.text_cleaner = text_cleaner
         self.audio_generator = audio_generator
         self.page_validator = page_validator
-        self.ssml_pipeline = ssml_pipeline  # NEW
         self.llm_provider = llm_provider
         self.tts_engine = tts_engine
+        
+        # Initialize SSML service if enabled and TTS engine available
+        self.ssml_service = None
+        if enable_ssml and tts_engine:
+            self.ssml_service = AcademicSSMLService(tts_engine, document_type)
+        elif enable_ssml:
+            print("PDFProcessingService: SSML enabled but no TTS engine available")
+        else:
+            print("PDFProcessingService: SSML disabled via configuration")
     
     def process_pdf(self, request: ProcessingRequest) -> ProcessingResult:
-        """Simplified business logic with centralized SSML processing"""
+        """Process PDF with advanced SSML enhancement"""
         try:
             if not os.path.exists(request.pdf_path):
                 return ProcessingResult(success=False, error=f"File not found: {request.pdf_path}")
@@ -45,19 +55,24 @@ class PDFProcessingService(PDFProcessingServiceInterface):
             
             self._log_extraction_success(raw_text, request.page_range)
             
-            # Step 2: Clean text (no SSML logic here)
+            # Step 2: Clean text
             clean_text_chunks = self.text_cleaner.clean_text(raw_text, self.llm_provider)
             if not self._is_cleaning_successful(clean_text_chunks):
                 return ProcessingResult(success=False, error="Text cleaning failed")
             
             self._log_cleaning_success(clean_text_chunks)
             
-            # Step 3: SSML processing (centralized)
-            ssml_chunks = self.ssml_pipeline.process_text_chunks(clean_text_chunks)
+            # Step 3: Enhance with advanced SSML
+            enhanced_chunks = clean_text_chunks
+            if self.ssml_service:
+                enhanced_chunks = self.ssml_service.enhance_text_chunks(clean_text_chunks)
+                print(f"PDFProcessingService: Applied advanced SSML enhancement to {len(enhanced_chunks)} chunks")
+            else:
+                print("PDFProcessingService: Processing without SSML enhancement")
             
             # Step 4: Generate audio
             audio_files, combined_mp3 = self.audio_generator.generate_audio(
-                ssml_chunks,
+                enhanced_chunks,
                 request.output_name,
                 output_dir="audio_outputs",
                 tts_engine=self.tts_engine
@@ -88,7 +103,7 @@ class PDFProcessingService(PDFProcessingServiceInterface):
     def validate_page_range(self, pdf_path: str, page_range: PageRange) -> Dict[str, Any]:
         return self.page_validator.validate_range(pdf_path, page_range)
     
-    # === Helper methods (unchanged logic, simplified debug info) ===
+    # === Helper methods ===
     
     def _is_extraction_failed(self, raw_text: str) -> bool:
         return not raw_text or raw_text.startswith("Error")
@@ -103,9 +118,14 @@ class PDFProcessingService(PDFProcessingServiceInterface):
             "text_chunks_count": len(clean_text_chunks),
             "audio_files_count": len(audio_files),
             "combined_mp3_created": combined_mp3 is not None,
-            "ssml_enabled": self.ssml_pipeline.is_enabled(),
-            "ssml_capability": self.ssml_pipeline.get_capability().value
+            "ssml_enhancement": "enabled" if self.ssml_service else "disabled"
         }
+        
+        # Add SSML capability info if service is available
+        if self.ssml_service:
+            ssml_info = self.ssml_service.get_capability_info()
+            debug_info["ssml_capability"] = ssml_info["capability"]
+            debug_info["ssml_features"] = ssml_info["features_enabled"]
         
         if not page_range.is_full_document():
             debug_info["page_range"] = {

@@ -1,12 +1,10 @@
-# domain/config/__init__.py
+# domain/config/__init__.py - Updated imports for simplified configuration
 from .tts_config import (
-    TTSConfig, 
     GeminiConfig, 
     PiperConfig
 )
 
 __all__ = [
-    'TTSConfig',
     'GeminiConfig',
     'PiperConfig'
 ]

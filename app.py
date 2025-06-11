@@ -1,31 +1,40 @@
-# app.py - Clean Architecture Version
+# app.py - Updated to use SystemConfig
 import os
 from flask import Flask, render_template, request, redirect, url_for, send_from_directory, jsonify
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 
-# Load environment variables
+# Load environment variables first
 load_dotenv()
 
-# Import new clean architecture
+# Import new configuration system
+from application.config.system_config import SystemConfig
 from domain.models import ProcessingRequest, PageRange
 from application.composition_root import create_pdf_service_from_env
 
-# Configuration
-UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', 'uploads')
-AUDIO_FOLDER = os.getenv('AUDIO_FOLDER', 'audio_outputs')
-ALLOWED_EXTENSIONS = set(os.getenv('ALLOWED_EXTENSIONS', 'pdf').split(','))
+# Initialize configuration and validate early
+try:
+    app_config = SystemConfig.from_env()
+    print("Configuration loaded successfully!")
+except Exception as e:
+    print(f"FATAL: Configuration error - {e}")
+    print("Please fix your environment variables before starting the application.")
+    exit(1)
 
-# Flask App Setup
+# Flask App Setup using validated configuration
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['AUDIO_FOLDER'] = AUDIO_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB
+app.config['UPLOAD_FOLDER'] = app_config.upload_folder
+app.config['AUDIO_FOLDER'] = app_config.audio_folder
+app.config['MAX_CONTENT_LENGTH'] = app_config.max_file_size_mb * 1024 * 1024
 
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(AUDIO_FOLDER, exist_ok=True)
+# Create directories
+os.makedirs(app_config.upload_folder, exist_ok=True)
+os.makedirs(app_config.audio_folder, exist_ok=True)
 
-# Initialize service using clean architecture
+# Allowed file extensions
+ALLOWED_EXTENSIONS = {'pdf'}
+
+# Initialize PDF processing service
 print("Initializing PDF Processing Service...")
 try:
     pdf_service = create_pdf_service_from_env()
@@ -133,14 +142,14 @@ def upload_file():
             if not validation.get('valid', False):
                 return f"Error: {validation.get('error', 'Invalid page range')}"
         
-        # Create processing request (domain model)
+        # Create processing request
         request_model = ProcessingRequest(
             pdf_path=pdf_path,
             output_name=base_filename_no_ext,
             page_range=page_range
         )
         
-        # Use service (pure business logic)
+        # Use service
         result = pdf_service.process_pdf(request_model)
         
         # Clean up
@@ -159,11 +168,12 @@ def upload_file():
                                  audio_files=result.audio_files or [],           
                                  combined_mp3_file=result.combined_mp3_file,
                                  original_filename=display_filename,
-                                 tts_engine=os.getenv('TTS_ENGINE', 'coqui'),
+                                 tts_engine=app_config.tts_engine.value,
                                  file_count=len(result.audio_files) if result.audio_files else 0,
                                  debug_info=result.debug_info)
         else:
-            return f"Error: {result.error}"
+            error_message = result.error if hasattr(result, 'error') else "Unknown error occurred"
+            return f"Error: {error_message}"
             
     except Exception as e:
         print(f"Upload processing error: {e}")
@@ -171,7 +181,7 @@ def upload_file():
 
 @app.errorhandler(413)
 def too_large(e):
-    return "File is too large. Maximum file size is 100MB.", 413
+    return f"File is too large. Maximum file size is {app_config.max_file_size_mb}MB.", 413
 
 @app.errorhandler(Exception)
 def handle_exception(e):
@@ -180,5 +190,6 @@ def handle_exception(e):
 
 if __name__ == '__main__':
     print("Starting Flask development server...")
-    print(f"TTS Engine: {os.getenv('TTS_ENGINE', 'coqui')}")
+    print(f"TTS Engine: {app_config.tts_engine.value}")
+    print(f"Text Cleaning: {'Enabled' if app_config.enable_text_cleaning else 'Disabled'}")
     app.run(debug=True, host='0.0.0.0', port=5000)

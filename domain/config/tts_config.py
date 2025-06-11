@@ -1,21 +1,10 @@
-# domain/config/tts_config.py - Pure Configuration Data Classes
+# domain/config/tts_config.py - Simplified Engine-Specific Configuration
 from dataclasses import dataclass
 from typing import Optional
 
 @dataclass
-class TTSConfig:
-    """Unified TTS configuration with common parameters and engine-specific sections"""
-    voice_quality: str = "medium"  # low/medium/high
-    speaking_style: str = "neutral"  # casual/professional/narrative
-    speed: float = 1.0
-    enable_ssml: bool = True  # SSML support
-    
-    # Engine-specific configs
-    gemini: Optional['GeminiConfig'] = None
-    piper: Optional['PiperConfig'] = None
-
-@dataclass
 class GeminiConfig:
+    """Configuration for Gemini TTS engine"""
     voice_name: str = "Kore"
     style_prompt: Optional[str] = None
     api_key: Optional[str] = None
@@ -25,7 +14,7 @@ class GeminiConfig:
 
 @dataclass
 class PiperConfig:
-    """Configuration for Piper TTS"""
+    """Configuration for Piper TTS engine"""
     model_name: str = "en_US-lessac-medium"
     model_path: Optional[str] = None
     config_path: Optional[str] = None
@@ -35,4 +24,4 @@ class PiperConfig:
     noise_w: float = 0.8  # Pronunciation variability
     sentence_silence: float = 0.2  # Seconds of silence between sentences
     download_dir: str = "piper_models"
-    use_gpu: bool = True  # Piper is CPU-optimized
+    use_gpu: bool = True  # Piper is CPU-optimized, but keeping for compatibility

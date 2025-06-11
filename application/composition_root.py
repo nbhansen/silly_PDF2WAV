@@ -1,94 +1,110 @@
 # application/composition_root.py
-import os
+from application.config.system_config import SystemConfig, TTSEngine
 from application.services.pdf_processing import PDFProcessingService
-from application.config import TTSConfigFactory
-from domain.interfaces import ITTSEngine
-from domain.services.ssml_pipeline import SSMLPipeline, SSMLConfig, create_ssml_pipeline
-from infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
+from domain.interfaces import ITTSEngine, ILLMProvider
 from infrastructure.ocr.tesseract_ocr_provider import TesseractOCRProvider
+from infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
 from domain.services.text_cleaning_service import TextCleaningService
 from domain.services.audio_generation_service import AudioGenerationService
 
 def create_pdf_service_from_env() -> PDFProcessingService:
-    """Create PDFProcessingService with configuration from environment variables."""  
-    # Get basic config
-    google_api_key = os.getenv('GOOGLE_AI_API_KEY', '')
-    tts_engine_name = os.getenv('TTS_ENGINE', 'piper').lower()  # Default to piper
+    """
+    Main entry point: Create PDF service with configuration from environment
     
-    print(f"CompositionRoot: Initializing with TTS engine: {tts_engine_name}")
-    
-    # Create the core providers
-    ocr_provider = TesseractOCRProvider()
-    llm_provider = GeminiLLMProvider(api_key=google_api_key)
-    tts_engine = _create_tts_engine(tts_engine_name)
-    
-    # Create SSML pipeline (keep for now, but simplified)
-    ssml_config = SSMLConfig(
-        enabled=os.getenv('ENABLE_SSML', 'True').lower() in ('true', '1', 'yes'),
-        document_type=os.getenv('DOCUMENT_TYPE', 'research_paper')
-    )
-    ssml_pipeline = create_ssml_pipeline(tts_engine, ssml_config)
-    
-    # Create domain services
-    text_cleaner = TextCleaningService(llm_provider=llm_provider)
-    audio_generator = AudioGenerationService(tts_engine=tts_engine)
-    
-    print(f"CompositionRoot: TTS={tts_engine_name}, SSML={ssml_pipeline.is_enabled()}")
-    
-    return PDFProcessingService(
-        text_extractor=ocr_provider,
-        text_cleaner=text_cleaner,
-        audio_generator=audio_generator,
-        page_validator=ocr_provider,
-        ssml_pipeline=ssml_pipeline,
-        llm_provider=llm_provider,
-        tts_engine=tts_engine
-    )
+    This replaces all the complex configuration building logic with simple,
+    validated configuration loading.
+    """
+    try:
+        # Load and validate configuration from environment
+        config = SystemConfig.from_env()
+        config.print_summary()  # Show what we loaded
+        
+        # Create providers
+        text_extractor = TesseractOCRProvider()
+        llm_provider = _create_llm_provider(config)
+        tts_engine = _create_tts_engine(config)
+        
+        # Create services
+        text_cleaner = TextCleaningService(
+            llm_provider=llm_provider if config.enable_text_cleaning else None
+        )
+        
+        audio_generator = AudioGenerationService(tts_engine=tts_engine)
+        
+        # Assemble the complete service
+        return PDFProcessingService(
+            text_extractor=text_extractor,
+            text_cleaner=text_cleaner,
+            audio_generator=audio_generator,
+            page_validator=text_extractor,  # Same instance serves both roles
+            llm_provider=llm_provider,
+            tts_engine=tts_engine,
+            enable_ssml=config.enable_ssml,
+            document_type=config.document_type
+        )
+        
+    except ValueError as e:
+        print(f"CONFIGURATION ERROR: {e}")
+        print("\nPlease check your environment variables and try again.")
+        raise
+    except Exception as e:
+        print(f"SERVICE INITIALIZATION ERROR: {e}")
+        raise
 
-def _create_tts_engine(engine_name: str) -> ITTSEngine:
-    """Create TTS engine - ONLY PIPER AND GEMINI"""
-    engine_name = engine_name.lower()
+def _create_tts_engine(config: SystemConfig) -> ITTSEngine:
+    """Create TTS engine based on configuration"""
     
-    if engine_name == "piper":
-        print("TTSFactory: Creating Piper TTS engine")
+    if config.tts_engine == TTSEngine.PIPER:
+        print("Creating Piper TTS engine...")
         from infrastructure.tts.piper_tts_provider import PiperTTSProvider
-        config = TTSConfigFactory.create_config('piper')
-        return PiperTTSProvider(config.piper)
+        return PiperTTSProvider(config.get_piper_config())
     
-    elif engine_name == "gemini":
-        print("TTSFactory: Creating Gemini TTS engine")
+    elif config.tts_engine == TTSEngine.GEMINI:
+        print("Creating Gemini TTS engine...")
         from infrastructure.tts.gemini_tts_provider import GeminiTTSProvider
-        config = TTSConfigFactory.create_config('gemini')
-        return GeminiTTSProvider(config.gemini)
+        return GeminiTTSProvider(config.get_gemini_config())
     
     else:
-        # No fallbacks - be explicit about what's supported
-        raise ValueError(
-            f"Unsupported TTS engine: '{engine_name}'. "
-            f"Supported engines: piper, gemini. "
-            f"Set TTS_ENGINE environment variable to 'piper' or 'gemini'."
-        )
+        # This should never happen due to validation, but be explicit
+        raise ValueError(f"Unsupported TTS engine: {config.tts_engine}")
 
-# Optional: Keep this if you actually use it for testing
+def _create_llm_provider(config: SystemConfig) -> ILLMProvider:
+    """Create LLM provider if API key is available"""
+    
+    if config.gemini_api_key and config.gemini_api_key != "YOUR_GOOGLE_AI_API_KEY":
+        print("Creating Gemini LLM provider for text cleaning...")
+        return GeminiLLMProvider(config.gemini_api_key)
+    else:
+        print("No LLM provider available (Gemini API key not set)")
+        return None
+
+# Keep these for backwards compatibility if needed
 def validate_engine_config(engine_name: str) -> dict:
-    """Quick validation - only if you actually use this"""
+    """Quick validation helper"""
     try:
-        engine = _create_tts_engine(engine_name)
-        return {
-            'valid': True,
-            'engine': engine_name,
-            'available': True
-        }
+        # Try to create a config with this engine
+        import os
+        old_engine = os.getenv('TTS_ENGINE')
+        os.environ['TTS_ENGINE'] = engine_name
+        
+        try:
+            config = SystemConfig.from_env()
+            tts_engine = _create_tts_engine(config)
+            return {
+                'valid': True,
+                'engine': engine_name,
+                'available': True
+            }
+        finally:
+            # Restore original
+            if old_engine:
+                os.environ['TTS_ENGINE'] = old_engine
+            elif 'TTS_ENGINE' in os.environ:
+                del os.environ['TTS_ENGINE']
+                
     except Exception as e:
         return {
             'valid': False,
             'engine': engine_name,
             'error': str(e)
         }
-
-# DELETE ALL THE REST - unless you specifically use these functions:
-# - get_available_engines() 
-# - create_test_ssml_pipeline()
-# - get_ssml_configuration_guide()
-# - test_ssml_pipeline_integration()
-# - _log_service_configuration()
