@@ -200,6 +200,14 @@ class ITTSEngine(ABC):
             })
         
         return capabilities
+    def prefers_sync_processing(self) -> bool:
+        """
+        Whether this engine works better with synchronous processing
+        
+        Returns:
+            True for local engines (Piper, Coqui), False for cloud engines (Gemini, OpenAI)
+        """
+        return True  # Safe default - most engines work fine sync
 
 # === Audio Processing Interfaces ===
 

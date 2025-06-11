@@ -682,3 +682,5 @@ else:
         
         def process_ssml(self, ssml_text: str) -> str:
             return ssml_text
+        def prefers_sync_processing(self) -> bool:
+            return False  # Cloud API, benefits from async

@@ -495,3 +495,5 @@ else:
         
         def process_ssml(self, ssml_text: str) -> str:
             return ssml_text
+        def prefers_sync_processing(self) -> bool:
+            return True  # Local engine, subprocess-based
