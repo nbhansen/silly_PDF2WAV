@@ -2,7 +2,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Tuple, Optional
 from enum import Enum
-from .models import PDFInfo, PageRange, ProcessingRequest, ProcessingResult
+from .models import PDFInfo, PageRange, ProcessingRequest, ProcessingResult, FileInfo, CleanupResult
 
 # === SSML Support Enums ===
 
@@ -209,4 +209,34 @@ class PDFProcessingService(ABC):
         Returns:
             Validation result dictionary
         """
+        pass
+
+    ## Additional methods for cleanup and file management can be added here
+
+class FileManager(ABC):
+    """Domain interface for file lifecycle management"""
+    
+    @abstractmethod
+    def cleanup_old_files(self, max_age_hours: float) -> CleanupResult:
+        """Remove files older than max_age_hours"""
+        pass
+    
+    @abstractmethod
+    def get_file_info(self, filename: str) -> Optional[FileInfo]:
+        """Get information about a specific file"""
+        pass
+    
+    @abstractmethod
+    def list_managed_files(self) -> List[FileInfo]:
+        """List all files under management"""
+        pass
+    
+    @abstractmethod
+    def schedule_cleanup(self, filename: str, delay_hours: float) -> bool:
+        """Schedule a file for deletion after delay_hours"""
+        pass
+    
+    @abstractmethod
+    def get_total_disk_usage(self) -> int:
+        """Get total bytes used by managed files"""
         pass

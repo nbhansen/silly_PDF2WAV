@@ -28,6 +28,12 @@ class SystemConfig:
     max_concurrent_requests: int = 4
     chunk_size: int = 20000
     
+    # File management settings
+    enable_file_cleanup: bool = True
+    max_file_age_hours: float = 24.0  # Clean up files older than 24 hours
+    auto_cleanup_interval_hours: float = 6.0  # Run cleanup every 6 hours
+    max_disk_usage_mb: int = 1000  # Maximum disk usage before forced cleanup
+    
     # Gemini specific
     gemini_api_key: Optional[str] = None
     gemini_voice_name: str = "Kore"
@@ -62,6 +68,13 @@ class SystemConfig:
             enable_async_audio=cls._parse_bool('ENABLE_ASYNC_AUDIO', True),
             max_concurrent_requests=cls._parse_int('MAX_CONCURRENT_TTS_REQUESTS', 4, min_val=1, max_val=20),
             chunk_size=cls._parse_int('CHUNK_SIZE', 20000, min_val=1000, max_val=100000),
+            
+            # File management
+            enable_file_cleanup=cls._parse_bool('ENABLE_FILE_CLEANUP', True),
+            max_file_age_hours=cls._parse_float('MAX_FILE_AGE_HOURS', 24.0, min_val=0.1, max_val=168.0),  # Max 1 week
+            auto_cleanup_interval_hours=cls._parse_float('AUTO_CLEANUP_INTERVAL_HOURS', 6.0, min_val=0.1, max_val=24.0),
+            max_disk_usage_mb=cls._parse_int('MAX_DISK_USAGE_MB', 1000, min_val=10, max_val=10000),
+            
             gemini_api_key=os.getenv('GOOGLE_AI_API_KEY'),
             gemini_voice_name=os.getenv('GEMINI_VOICE_NAME', 'Kore'),
             gemini_min_request_interval=cls._parse_float('GEMINI_MIN_REQUEST_INTERVAL', 2.0, min_val=0.1, max_val=10.0),
@@ -106,6 +119,15 @@ class SystemConfig:
         valid_doc_types = ['research_paper', 'literature_review', 'general']
         if self.document_type not in valid_doc_types:
             raise ValueError(f"DOCUMENT_TYPE must be one of: {valid_doc_types}, got: {self.document_type}")
+        
+        # Validate file management settings
+        if self.enable_file_cleanup:
+            if self.max_file_age_hours <= 0:
+                raise ValueError("MAX_FILE_AGE_HOURS must be positive when file cleanup is enabled")
+            if self.auto_cleanup_interval_hours <= 0:
+                raise ValueError("AUTO_CLEANUP_INTERVAL_HOURS must be positive when file cleanup is enabled")
+            if self.max_disk_usage_mb <= 0:
+                raise ValueError("MAX_DISK_USAGE_MB must be positive when file cleanup is enabled")
     
     @staticmethod
     def _parse_bool(env_var: str, default: bool) -> bool:
@@ -184,6 +206,13 @@ class SystemConfig:
         print(f"Max Concurrent: {self.max_concurrent_requests}")
         print(f"Upload Folder: {self.upload_folder}")
         print(f"Audio Folder: {self.audio_folder}")
+        
+        # File management
+        print(f"File Cleanup: {'Enabled' if self.enable_file_cleanup else 'Disabled'}")
+        if self.enable_file_cleanup:
+            print(f"Max File Age: {self.max_file_age_hours} hours")
+            print(f"Cleanup Interval: {self.auto_cleanup_interval_hours} hours")
+            print(f"Max Disk Usage: {self.max_disk_usage_mb} MB")
         
         if self.tts_engine == TTSEngine.GEMINI:
             api_key_status = "Set" if self.gemini_api_key else "Missing"

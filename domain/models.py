@@ -1,6 +1,7 @@
 # domain/models.py - Updated with structured error handling
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any
+from datetime import datetime
 
 # Import error types
 from .errors import ApplicationError
@@ -77,3 +78,31 @@ class ProcessingResult:
         if self.error:
             return self.error.code.value
         return None
+    
+@dataclass
+class FileInfo:
+    """Information about a managed file"""
+    filename: str
+    full_path: str
+    size_bytes: int
+    created_at: datetime
+    last_accessed: Optional[datetime] = None
+    
+    @property
+    def size_mb(self) -> float:
+        return self.size_bytes / (1024 * 1024)
+    
+    @property
+    def age_hours(self) -> float:
+        return (datetime.now() - self.created_at).total_seconds() / 3600
+
+@dataclass 
+class CleanupResult:
+    """Result of a cleanup operation"""
+    files_removed: int
+    bytes_freed: int
+    errors: list[str]
+    
+    @property
+    def mb_freed(self) -> float:
+        return self.bytes_freed / (1024 * 1024)

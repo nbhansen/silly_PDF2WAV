@@ -1,4 +1,4 @@
-# application/services/pdf_processing.py - Updated with structured error handling
+# application/services/pdf_processing.py - Updated with structured error handling and file management
 import os
 from typing import Dict, Any, Optional
 
@@ -6,7 +6,7 @@ from domain.models import ProcessingRequest, ProcessingResult, PDFInfo, PageRang
 from domain.interfaces import (
     TextExtractor, TextCleaner, AudioGenerator, PageRangeValidator,
     PDFProcessingService as PDFProcessingServiceInterface,
-    ILLMProvider, ITTSEngine
+    ILLMProvider, ITTSEngine, FileManager
 )
 from domain.services.academic_ssml_service import AcademicSSMLService
 from domain.errors import (
@@ -15,7 +15,7 @@ from domain.errors import (
 )
 
 class PDFProcessingService(PDFProcessingServiceInterface):
-    """PDF processing service with integrated advanced SSML enhancement"""
+    """PDF processing service with integrated advanced SSML enhancement and file lifecycle management"""
     
     def __init__(
         self,
@@ -25,6 +25,7 @@ class PDFProcessingService(PDFProcessingServiceInterface):
         page_validator: PageRangeValidator,
         llm_provider: Optional[ILLMProvider] = None,
         tts_engine: Optional[ITTSEngine] = None,
+        file_manager: Optional[FileManager] = None,
         enable_ssml: bool = True,
         document_type: str = "research_paper"
     ):
@@ -34,6 +35,7 @@ class PDFProcessingService(PDFProcessingServiceInterface):
         self.page_validator = page_validator
         self.llm_provider = llm_provider
         self.tts_engine = tts_engine
+        self.file_manager = file_manager
         
         # Initialize SSML service if enabled and TTS engine available
         self.ssml_service = None
@@ -43,9 +45,19 @@ class PDFProcessingService(PDFProcessingServiceInterface):
             print("PDFProcessingService: SSML enabled but no TTS engine available")
         else:
             print("PDFProcessingService: SSML disabled via configuration")
+        
+        # Log file management status
+        if file_manager:
+            try:
+                stats = file_manager.get_stats()
+                print(f"PDFProcessingService: File management enabled - {stats['total_files']} files, {stats['total_size_mb']:.1f} MB")
+            except Exception as e:
+                print(f"PDFProcessingService: File management enabled but stats failed: {e}")
+        else:
+            print("PDFProcessingService: File management disabled")
     
     def process_pdf(self, request: ProcessingRequest) -> ProcessingResult:
-        """Process PDF with advanced SSML enhancement and structured error handling"""
+        """Process PDF with advanced SSML enhancement, structured error handling, and file lifecycle management"""
         try:
             # Step 0: Validate file exists
             if not os.path.exists(request.pdf_path):
@@ -80,7 +92,7 @@ class PDFProcessingService(PDFProcessingServiceInterface):
             else:
                 print("PDFProcessingService: Processing without SSML enhancement")
             
-            # Step 4: Generate audio
+            # Step 4: Generate audio (AudioGenerationService will handle file registration automatically)
             try:
                 audio_files, combined_mp3 = self.audio_generator.generate_audio(
                     enhanced_chunks,
@@ -97,14 +109,16 @@ class PDFProcessingService(PDFProcessingServiceInterface):
             
             self._log_processing_complete(audio_files, combined_mp3)
             
-            # Success!
+            # Success! Build debug info including file management stats
+            debug_info = self._build_debug_info(
+                raw_text, clean_text_chunks, audio_files, 
+                combined_mp3, request.page_range
+            )
+            
             return ProcessingResult.success_result(
                 audio_files=audio_files,
                 combined_mp3=combined_mp3,
-                debug_info=self._build_debug_info(
-                    raw_text, clean_text_chunks, audio_files, 
-                    combined_mp3, request.page_range
-                )
+                debug_info=debug_info
             )
             
         except Exception as e:
@@ -121,6 +135,39 @@ class PDFProcessingService(PDFProcessingServiceInterface):
     
     def validate_page_range(self, pdf_path: str, page_range: PageRange) -> Dict[str, Any]:
         return self.page_validator.validate_range(pdf_path, page_range)
+    
+    def cleanup_old_files(self, max_age_hours: Optional[float] = None) -> Optional[dict]:
+        """Manually trigger file cleanup"""
+        if not self.file_manager:
+            return None
+        
+        try:
+            # Use configured default if not specified
+            if max_age_hours is None:
+                max_age_hours = 24.0  # Default to 24 hours
+            
+            result = self.file_manager.cleanup_old_files(max_age_hours)
+            
+            return {
+                'files_removed': result.files_removed,
+                'mb_freed': result.mb_freed,
+                'errors': result.errors,
+                'success': len(result.errors) == 0
+            }
+        except Exception as e:
+            print(f"PDFProcessingService: Manual cleanup failed: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    def get_file_management_stats(self) -> Optional[dict]:
+        """Get current file management statistics"""
+        if not self.file_manager:
+            return None
+        
+        try:
+            return self.file_manager.get_stats()
+        except Exception as e:
+            print(f"PDFProcessingService: Failed to get file stats: {e}")
+            return None
     
     # === Helper methods ===
     
@@ -145,6 +192,19 @@ class PDFProcessingService(PDFProcessingServiceInterface):
             ssml_info = self.ssml_service.get_capability_info()
             debug_info["ssml_capability"] = ssml_info["capability"]
             debug_info["ssml_features"] = ssml_info["features_enabled"]
+        
+        # Add file management stats if available
+        if self.file_manager:
+            try:
+                file_stats = self.file_manager.get_stats()
+                debug_info['file_management'] = {
+                    'total_managed_files': file_stats['total_files'],
+                    'total_disk_usage_mb': file_stats['total_size_mb'],
+                    'oldest_file_hours': file_stats['oldest_file_hours'],
+                    'scheduled_deletions': file_stats['scheduled_deletions']
+                }
+            except Exception as e:
+                debug_info['file_management'] = {'error': str(e)}
         
         if not page_range.is_full_document():
             debug_info["page_range"] = {

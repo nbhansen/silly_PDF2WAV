@@ -1,5 +1,9 @@
-# app.py - Updated to use SystemConfig
+# app.py - Updated to use SystemConfig with File Management
 import os
+import signal
+import sys
+import atexit
+from typing import Optional
 from flask import Flask, render_template, request, redirect, url_for, send_from_directory, jsonify
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
@@ -12,6 +16,7 @@ from application.config.system_config import SystemConfig
 from domain.models import ProcessingRequest, PageRange
 from domain.errors import ErrorCode, invalid_page_range_error, file_size_error, unsupported_file_type_error
 from application.composition_root import create_pdf_service_from_env
+from infrastructure.file.cleanup_scheduler import FileCleanupScheduler
 
 # Initialize configuration and validate early
 try:
@@ -35,12 +40,24 @@ os.makedirs(app_config.audio_folder, exist_ok=True)
 # Allowed file extensions
 ALLOWED_EXTENSIONS = {'pdf'}
 
+# Global cleanup scheduler
+cleanup_scheduler: Optional[FileCleanupScheduler] = None
+
 # Initialize PDF processing service
 print("Initializing PDF Processing Service...")
 try:
     pdf_service = create_pdf_service_from_env()
     print("PDF Processing Service initialized successfully")
     processor_available = True
+    
+    # Initialize and start file cleanup scheduler
+    if hasattr(pdf_service, 'file_manager') and pdf_service.file_manager:
+        cleanup_scheduler = FileCleanupScheduler(pdf_service.file_manager, app_config)
+        cleanup_scheduler.start()
+        print("File cleanup scheduler started")
+    else:
+        print("File management not available - cleanup scheduler not started")
+    
 except Exception as e:
     print(f"CRITICAL: PDF Service initialization failed: {e}")
     pdf_service = None
@@ -164,6 +181,19 @@ def upload_file():
         except:
             pass
         
+        # Add file management stats to debug info
+        if result.success and result.debug_info:
+            if hasattr(pdf_service, 'file_manager') and pdf_service.file_manager:
+                try:
+                    file_stats = pdf_service.file_manager.get_stats()
+                    result.debug_info['file_stats'] = {
+                        'total_files': file_stats['total_files'],
+                        'total_size_mb': file_stats['total_size_mb'],
+                        'cleanup_enabled': app_config.enable_file_cleanup
+                    }
+                except:
+                    pass  # Don't fail upload if file stats fail
+        
         # Handle result with structured errors
         if result.success:
             display_filename = original_filename
@@ -190,6 +220,88 @@ def upload_file():
     except Exception as e:
         print(f"Upload processing error: {e}")
         return f"An unexpected error occurred: {str(e)}"
+
+# Admin endpoints for file management
+@app.route('/admin/file_stats')
+def get_file_stats():
+    """Get file management statistics (admin endpoint)"""
+    if not processor_available or not pdf_service:
+        return jsonify({'error': 'Service not available'}), 500
+    
+    try:
+        if hasattr(pdf_service, 'get_file_management_stats'):
+            stats = pdf_service.get_file_management_stats()
+            if stats:
+                return jsonify(stats)
+            else:
+                return jsonify({'error': 'File management not enabled'}), 404
+        else:
+            return jsonify({'error': 'File management not implemented'}), 404
+    except Exception as e:
+        print(f"Admin file_stats error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/admin/cleanup', methods=['POST'])
+def manual_cleanup():
+    """Trigger manual file cleanup (admin endpoint)"""
+    if not processor_available or not pdf_service:
+        return jsonify({'error': 'Service not available'}), 500
+    
+    try:
+        # Get max_age from request or use default
+        max_age_hours = float(request.form.get('max_age_hours', 24.0))
+        
+        if hasattr(pdf_service, 'cleanup_old_files'):
+            result = pdf_service.cleanup_old_files(max_age_hours)
+            if result:
+                return jsonify(result)
+            else:
+                return jsonify({'error': 'File management not enabled'}), 404
+        else:
+            return jsonify({'error': 'Cleanup not implemented'}), 404
+    except Exception as e:
+        print(f"Admin cleanup error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/admin/cleanup_scheduler', methods=['POST'])
+def trigger_scheduler_cleanup():
+    """Trigger scheduler's manual cleanup"""
+    if not cleanup_scheduler:
+        return jsonify({'error': 'Cleanup scheduler not available'}), 500
+    
+    try:
+        result = cleanup_scheduler.run_manual_cleanup()
+        return jsonify(result)
+    except Exception as e:
+        print(f"Scheduler cleanup error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/admin/test')
+def test_admin():
+    """Test endpoint to check what's available"""
+    try:
+        info = {
+            'processor_available': processor_available,
+            'pdf_service_exists': pdf_service is not None,
+            'has_file_manager_attr': hasattr(pdf_service, 'file_manager') if pdf_service else False,
+            'file_manager_exists': pdf_service.file_manager is not None if (pdf_service and hasattr(pdf_service, 'file_manager')) else False,
+            'pdf_service_type': pdf_service.__class__.__name__ if pdf_service else 'None',
+            'cleanup_scheduler_exists': cleanup_scheduler is not None,
+            'file_cleanup_enabled': app_config.enable_file_cleanup
+        }
+        
+        if pdf_service and hasattr(pdf_service, 'file_manager') and pdf_service.file_manager:
+            info['file_manager_type'] = pdf_service.file_manager.__class__.__name__
+            try:
+                stats = pdf_service.file_manager.get_stats()
+                info['file_stats'] = stats
+            except Exception as e:
+                info['file_stats_error'] = str(e)
+        
+        return jsonify(info)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 def _get_user_friendly_error_message(error: 'ApplicationError') -> str:
     """Convert technical error to user-friendly message"""
@@ -235,6 +347,24 @@ def _get_retry_suggestion(error: 'ApplicationError') -> str:
     
     return ""
 
+# Graceful shutdown handlers
+def shutdown_cleanup():
+    """Clean shutdown with proper cleanup scheduler stop"""
+    global cleanup_scheduler
+    if cleanup_scheduler:
+        print("Shutting down file cleanup scheduler...")
+        cleanup_scheduler.stop()
+
+def signal_handler(sig, frame):
+    print(f"\nReceived signal {sig}, shutting down gracefully...")
+    shutdown_cleanup()
+    sys.exit(0)
+
+# Register shutdown handlers
+atexit.register(shutdown_cleanup)
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
+
 @app.errorhandler(413)
 def too_large(e):
     return f"File is too large. Maximum file size is {app_config.max_file_size_mb}MB.", 413
@@ -248,4 +378,9 @@ if __name__ == '__main__':
     print("Starting Flask development server...")
     print(f"TTS Engine: {app_config.tts_engine.value}")
     print(f"Text Cleaning: {'Enabled' if app_config.enable_text_cleaning else 'Disabled'}")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    print(f"File Cleanup: {'Enabled' if app_config.enable_file_cleanup else 'Disabled'}")
+    
+    try:
+        app.run(debug=True, host='0.0.0.0', port=5000)
+    finally:
+        shutdown_cleanup()

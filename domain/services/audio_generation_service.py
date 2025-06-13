@@ -2,25 +2,31 @@
 import os
 import subprocess
 from typing import Optional, List, Tuple
-from domain.interfaces import AudioGenerator, ITTSEngine
+from domain.interfaces import AudioGenerator, ITTSEngine, FileManager
 
 class AudioGenerationService(AudioGenerator):
-    """Simplified audio generation service with clear sync/async rules."""
+    """Domain service for audio generation with file lifecycle management."""
     
-    def __init__(self, tts_engine: ITTSEngine):
+    def __init__(self, tts_engine: ITTSEngine, file_manager: Optional[FileManager] = None):
         self.tts_engine = tts_engine
+        self.file_manager = file_manager  # Domain interface dependency ✅
         self.ffmpeg_available = self._check_ffmpeg()
         
-        # Simple configuration
+        # Simple configuration from environment
         self.use_async = os.getenv('ENABLE_ASYNC_AUDIO', 'True').lower() == 'true'
         self.max_concurrent = int(os.getenv('MAX_CONCURRENT_TTS_REQUESTS', '4'))
         
-        print(f"AudioGenerationService: Async enabled: {self.use_async}")
-        print(f"AudioGenerationService: FFmpeg available: {self.ffmpeg_available}")
+        # File management settings (domain concerns)
+        self.auto_schedule_cleanup = os.getenv('AUTO_SCHEDULE_FILE_CLEANUP', 'True').lower() == 'true'
+        self.file_cleanup_delay_hours = float(os.getenv('FILE_CLEANUP_DELAY_HOURS', '2.0'))
+        
+        print(f"AudioGenerationService: File management: {'Enabled' if file_manager else 'Disabled'}")
+        if file_manager and self.auto_schedule_cleanup:
+            print(f"AudioGenerationService: Auto-scheduling files for cleanup in {self.file_cleanup_delay_hours}h")
     
     def generate_audio(self, text_chunks: List[str], output_name: str, output_dir: str, 
                       tts_engine: Optional[ITTSEngine] = None) -> Tuple[List[str], Optional[str]]:
-        """Generate audio with simplified processing strategy."""
+        """Generate audio with integrated file lifecycle management"""
         
         engine = tts_engine or self.tts_engine
         if not engine:
@@ -36,14 +42,56 @@ class AudioGenerationService(AudioGenerator):
         
         print(f"AudioGenerationService: Processing {len(valid_chunks)} chunks")
         
-        # SIMPLIFIED DECISION: Just check engine preference
+        # Generate audio files
         if self._should_use_async(engine, len(valid_chunks)):
-            return self._generate_async(valid_chunks, output_name, output_dir, engine)
+            generated_files, combined_mp3 = self._generate_async(valid_chunks, output_name, output_dir, engine)
         else:
-            return self._generate_sync(valid_chunks, output_name, output_dir, engine)
+            generated_files, combined_mp3 = self._generate_sync(valid_chunks, output_name, output_dir, engine)
+        
+        # Register files with file manager (Domain service → Domain interface)
+        if self.file_manager and generated_files:
+            self._register_generated_files(generated_files, combined_mp3)
+        
+        return generated_files, combined_mp3
+    
+    def _register_generated_files(self, audio_files: List[str], combined_mp3: Optional[str]):
+        """Register generated files with file manager for lifecycle tracking"""
+        if not self.file_manager:
+            return
+        
+        files_to_register = audio_files.copy()
+        if combined_mp3:
+            files_to_register.append(combined_mp3)
+        
+        for filename in files_to_register:
+            try:
+                # Verify file exists and get info
+                file_info = self.file_manager.get_file_info(filename)
+                if file_info:
+                    print(f"AudioGenerationService: Registered {filename} ({file_info.size_mb:.1f} MB)")
+                    
+                    # Schedule cleanup if enabled
+                    if self.auto_schedule_cleanup:
+                        success = self.file_manager.schedule_cleanup(filename, self.file_cleanup_delay_hours)
+                        if success:
+                            print(f"AudioGenerationService: Scheduled {filename} for cleanup in {self.file_cleanup_delay_hours}h")
+                        
+            except Exception as e:
+                print(f"AudioGenerationService: Failed to register {filename}: {e}")
+    
+    def get_file_stats(self) -> Optional[dict]:
+        """Get file management statistics"""
+        if not self.file_manager:
+            return None
+        
+        try:
+            return self.file_manager.get_stats()
+        except Exception as e:
+            print(f"AudioGenerationService: Failed to get file stats: {e}")
+            return None
     
     def _should_use_async(self, engine: ITTSEngine, chunk_count: int) -> bool:
-        """SIMPLIFIED: Only two rules."""
+        """SIMPLIFIED: Only basic rules for async decision"""
         
         # Rule 1: User disabled async
         if not self.use_async:
@@ -58,7 +106,7 @@ class AudioGenerationService(AudioGenerator):
     
     def _generate_sync(self, text_chunks: List[str], output_name: str, output_dir: str, 
                       engine: ITTSEngine) -> Tuple[List[str], Optional[str]]:
-        """Synchronous generation - simple and reliable."""
+        """Synchronous generation - simple and reliable"""
         
         os.makedirs(output_dir, exist_ok=True)
         generated_files = []
@@ -88,7 +136,7 @@ class AudioGenerationService(AudioGenerator):
     
     def _generate_async(self, text_chunks: List[str], output_name: str, output_dir: str, 
                        engine: ITTSEngine) -> Tuple[List[str], Optional[str]]:
-        """Async generation with fallback to sync."""
+        """Async generation with fallback to sync"""
         
         print(f"AudioGenerationService: Attempting async processing")
         
@@ -106,7 +154,7 @@ class AudioGenerationService(AudioGenerator):
     
     def _finalize_files(self, generated_files: List[str], output_name: str, 
                        output_dir: str) -> Tuple[List[str], Optional[str]]:
-        """Create combined MP3 if possible."""
+        """Create combined MP3 if possible"""
         
         if not generated_files:
             return [], None
@@ -123,7 +171,7 @@ class AudioGenerationService(AudioGenerator):
         return generated_files, combined_mp3
     
     def _convert_single_to_mp3(self, audio_file: str, base_name: str, output_dir: str) -> Optional[str]:
-        """Convert single file to MP3."""
+        """Convert single file to MP3"""
         
         if not self.ffmpeg_available:
             return None
@@ -154,7 +202,7 @@ class AudioGenerationService(AudioGenerator):
         return None
     
     def _create_combined_mp3(self, audio_files: List[str], base_name: str, output_dir: str) -> Optional[str]:
-        """Combine multiple files into MP3."""
+        """Combine multiple files into MP3"""
         
         if not self.ffmpeg_available or len(audio_files) < 2:
             return None
@@ -200,7 +248,7 @@ class AudioGenerationService(AudioGenerator):
         return None
     
     def _check_ffmpeg(self) -> bool:
-        """Check if FFmpeg is available."""
+        """Check if FFmpeg is available"""
         try:
             result = subprocess.run(['ffmpeg', '-version'], 
                                   capture_output=True, timeout=5)
