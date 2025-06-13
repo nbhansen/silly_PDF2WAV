@@ -3,262 +3,382 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF to Audio - Result</title>
+    <title>CONVERSION COMPLETE - NICOLAIS PDF2WAV</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
+        @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
+        
+        * {
             margin: 0;
-            padding: 20px;
-            background-color: #222222;
-            color: #FFFF00;
-            line-height: 1.6;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier Prime', monospace;
+            background-color: #40318D;
+            color: #50C8FC;
+            line-height: 1.4;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
-            min-height: 90vh;
+            padding: 20px;
         }
-        .container {
-            background-color: #333333;
-            border: 1px solid #FFD700;
-            color: #FFFF00;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 0 15px rgba(255, 255, 0, 0.1);
-            width: 90%;
-            max-width: 800px;
-            text-align: center;
-        }
-        h1 {
-            color: #FFFF00;
-            border-bottom: 2px solid #FFD700;
-            padding-bottom: 10px;
+        
+        .rainbow-header {
+            background: linear-gradient(90deg, 
+                #A31ACB 0%, #A31ACB 16.66%, 
+                #50C8FC 16.66%, #50C8FC 33.33%, 
+                #9BF04C 33.33%, #9BF04C 50%, 
+                #FBFE65 50%, #FBFE65 66.66%, 
+                #A31ACB 66.66%, #A31ACB 83.33%, 
+                #50C8FC 83.33%, #50C8FC 100%);
+            height: 8px;
+            width: 100%;
+            max-width: 1000px;
             margin-bottom: 30px;
         }
+        
+        .container {
+            background-color: #000000;
+            border: 3px solid #50C8FC;
+            color: #50C8FC;
+            padding: 40px;
+            width: 100%;
+            max-width: 1000px;
+            position: relative;
+        }
+        
+        .container::before {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: -3px;
+            right: -3px;
+            bottom: -3px;
+            background-color: #A31ACB;
+            z-index: -1;
+        }
+        
+        h1 {
+            color: #9BF04C;
+            font-size: 2.5em;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 2px 2px 0px #000000;
+        }
+        
         .success-message {
-            background-color: #2a4a2a;
-            border: 1px solid #4a8a4a;
-            color: #88ff88;
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 25px;
-            font-weight: bold;
-        }
-        .file-info {
-            background-color: #2a2a2a;
-            border: 1px solid #555;
-            border-left: 4px solid #FFD700;
+            background-color: #9BF04C;
+            color: #000000;
             padding: 20px;
-            margin-bottom: 25px;
-            border-radius: 0 5px 5px 0;
-            text-align: left;
+            margin-bottom: 30px;
+            font-weight: 700;
+            text-transform: uppercase;
+            text-align: center;
+            border: 2px solid #FFFFFF;
+            font-size: 1.2em;
         }
+        
+        .file-info {
+            background-color: #40318D;
+            border: 2px solid #9BF04C;
+            border-left: 8px solid #FBFE65;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+        
         .file-info h3 {
             margin-top: 0;
-            color: #FFD700;
-            margin-bottom: 15px;
-        }
-        .file-info p {
-            margin: 8px 0;
-            color: #FFFFE0;
-        }
-        .file-info strong {
-            color: #FFD700;
-        }
-        .audio-player-section {
-            background-color: #2a2a2a;
-            border: 1px solid #555;
-            border-radius: 8px;
-            padding: 25px;
-            margin: 25px 0;
-        }
-        .audio-player-section h3 {
-            color: #FFD700;
-            margin-top: 0;
+            color: #FBFE65;
             margin-bottom: 20px;
+            font-size: 1.4em;
+            text-transform: uppercase;
+            font-weight: 700;
         }
+        
+        .file-info p {
+            margin: 12px 0;
+            color: #FFFFFF;
+            font-size: 1.1em;
+        }
+        
+        .file-info strong {
+            color: #50C8FC;
+            text-transform: uppercase;
+        }
+        
+        .audio-player-section {
+            background-color: #000000;
+            border: 3px solid #A31ACB;
+            padding: 30px;
+            margin: 30px 0;
+        }
+        
+        .audio-player-section h3 {
+            color: #A31ACB;
+            margin-top: 0;
+            margin-bottom: 25px;
+            font-size: 1.5em;
+            text-transform: uppercase;
+            font-weight: 700;
+            text-align: center;
+        }
+        
         .main-audio-player {
-            margin: 20px 0;
+            margin: 25px 0;
+            text-align: center;
         }
+        
         .main-audio-player audio {
             width: 100%;
             max-width: 600px;
-            background-color: #444;
-            border-radius: 5px;
+            height: 60px;
+            background-color: #40318D;
+            border: 2px solid #50C8FC;
         }
+        
         .download-section {
             margin: 30px 0;
+            text-align: center;
         }
+        
         .download-btn {
             display: inline-block;
-            background-color: #4a8a4a;
-            color: #ffffff;
-            padding: 15px 30px;
+            background-color: #A31ACB;
+            color: #FFFFFF;
+            padding: 20px 30px;
             text-decoration: none;
-            border-radius: 5px;
-            font-weight: bold;
-            margin: 10px;
-            transition: all 0.3s ease;
-            border: 1px solid #6aba6a;
-            font-size: 1.1em;
+            font-weight: 700;
+            margin: 15px;
+            transition: all 0.1s ease;
+            border: 3px solid #FFFFFF;
+            font-family: 'Courier Prime', monospace;
+            font-size: 1.2em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
+        
         .download-btn:hover {
-            background-color: #5aba5a;
-            color: #ffffff;
+            background-color: #9BF04C;
+            color: #000000;
+            border-color: #000000;
             text-decoration: none;
-            transform: translateY(-1px);
         }
+        
         .download-btn .size-info {
             display: block;
-            font-size: 0.9em;
-            opacity: 0.8;
-            margin-top: 5px;
+            font-size: 0.8em;
+            margin-top: 8px;
+            font-weight: normal;
         }
+        
         .back-btn {
             display: inline-block;
-            background-color: #555555;
-            color: #FFFFE0;
-            padding: 12px 24px;
+            background-color: #8B8B8B;
+            color: #000000;
+            padding: 15px 25px;
             text-decoration: none;
-            border-radius: 5px;
-            margin: 15px;
-            transition: all 0.3s ease;
-            border: 1px solid #777;
+            margin: 20px;
+            transition: all 0.1s ease;
+            border: 2px solid #FFFFFF;
+            font-family: 'Courier Prime', monospace;
+            font-weight: 700;
+            text-transform: uppercase;
         }
+        
         .back-btn:hover {
-            background-color: #666666;
-            color: #FFFFFF;
+            background-color: #50C8FC;
+            color: #000000;
             text-decoration: none;
-            transform: translateY(-1px);
         }
+        
         .instructions {
-            background-color: #4a4a2a;
-            border: 1px solid #8a8a4a;
-            color: #ffff88;
-            padding: 20px;
-            border-radius: 5px;
-            margin: 25px 0;
-            text-align: left;
+            background-color: #40318D;
+            border: 2px solid #FBFE65;
+            color: #FFFFFF;
+            padding: 25px;
+            margin: 30px 0;
         }
+        
         .instructions h4 {
             margin-top: 0;
-            color: #FFD700;
+            color: #FBFE65;
+            text-transform: uppercase;
+            font-weight: 700;
+            margin-bottom: 15px;
         }
+        
         .instructions ul {
-            margin: 10px 0;
-            padding-left: 20px;
+            margin: 15px 0;
+            padding-left: 25px;
         }
+        
         .instructions li {
-            margin: 8px 0;
+            margin: 10px 0;
+            color: #50C8FC;
         }
+        
         .processing-info {
-            background-color: #1a1a1a;
-            border: 1px solid #444;
-            border-radius: 5px;
-            padding: 15px;
-            margin: 20px 0;
-            text-align: left;
+            background-color: #000000;
+            border: 2px solid #8B8B8B;
+            padding: 20px;
+            margin: 25px 0;
             font-size: 0.9em;
         }
+        
         .processing-info h4 {
-            color: #FFD700;
+            color: #8B8B8B;
             margin-top: 0;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            font-weight: 700;
         }
+        
         .processing-info .info-item {
-            margin: 5px 0;
-            color: #CCCCCC;
+            margin: 8px 0;
+            color: #50C8FC;
         }
+        
         .processing-info .info-label {
-            color: #FFD700;
-            font-weight: bold;
+            color: #FBFE65;
+            font-weight: 700;
+            text-transform: uppercase;
         }
+        
         .icon {
-            font-size: 1.2em;
-            margin-right: 8px;
+            font-size: 1.3em;
+            margin-right: 10px;
+            color: #9BF04C;
         }
+        
         .fallback-info {
-            background-color: #4a3a2a;
-            border: 1px solid #8a6a4a;
-            color: #ffcc88;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 20px 0;
-            font-size: 0.9em;
+            background-color: #FBFE65;
+            border: 2px solid #000000;
+            color: #000000;
+            padding: 20px;
+            margin: 25px 0;
+            font-weight: 700;
+            text-transform: uppercase;
         }
+        
+        .fallback-info strong {
+            color: #A31ACB;
+        }
+        
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(80, 200, 252, 0.03) 2px,
+                rgba(80, 200, 252, 0.03) 4px
+            );
+            pointer-events: none;
+            z-index: 1000;
+        }
+        
+        .rainbow-divider {
+            height: 4px;
+            background: linear-gradient(90deg, 
+                #A31ACB, #50C8FC, #9BF04C, #FBFE65, #A31ACB, #50C8FC);
+            margin: 30px 0;
+        }
+        
         @media (max-width: 600px) {
             .container {
-                width: 95%;
-                padding: 20px;
+                padding: 25px;
+                margin: 10px;
             }
+            
+            h1 {
+                font-size: 2em;
+            }
+            
             .download-btn {
                 display: block;
-                margin: 10px 0;
+                margin: 15px 0;
                 text-align: center;
+            }
+            
+            .audio-player-section {
+                padding: 20px;
             }
         }
     </style>
 </head>
 <body>
+    <div class="scanlines"></div>
+    <div class="rainbow-header"></div>
+    
     <div class="container">
-        <h1><span class="icon">🎉</span>Audio Generated Successfully!</h1>
+        <h1>◆ CONVERSION COMPLETE ◆</h1>
         
-
+        <div class="success-message">
+            *** AUDIO FILE GENERATION SUCCESSFUL ***
+        </div>
 
         <div class="file-info">
-            <h3><span class="icon">📄</span>File Information</h3>
-            <p><strong>Original PDF:</strong> {{ original_filename }}</p>
-            <p><strong>TTS Engine:</strong> {{ tts_engine }}</p>
-            <p><strong>Audio Format:</strong> MP3 (compressed for easy listening)</p>
+            <h3>■ FILE INFORMATION</h3>
+            <p><strong>ORIGINAL PDF:</strong> {{ original_filename }}</p>
+            <p><strong>TTS ENGINE:</strong> {{ tts_engine }}</p>
+            <p><strong>AUDIO FORMAT:</strong> MP3 (COMPRESSED FOR PLAYBACK)</p>
             {% if debug_info and debug_info.text_chunks_count %}
-                <p><strong>Content Sections:</strong> {{ debug_info.text_chunks_count }} parts combined</p>
+                <p><strong>CONTENT SECTIONS:</strong> {{ debug_info.text_chunks_count }} PARTS COMBINED</p>
             {% endif %}
         </div>
 
         {% if combined_mp3_file %}
             <div class="audio-player-section">
-                <h3><span class="icon">🎵</span>Your Complete Audio File</h3>
+                <h3>♫ YOUR COMPLETE AUDIO FILE ♫</h3>
                 
                 <div class="main-audio-player">
                     <audio controls preload="metadata">
                         <source src="{{ url_for('serve_audio', filename=combined_mp3_file) }}" type="audio/mpeg">
-                        Your browser does not support the audio element.
+                        YOUR BROWSER DOES NOT SUPPORT AUDIO PLAYBACK.
                     </audio>
                 </div>
 
                 <div class="download-section">
                     <a href="{{ url_for('serve_audio', filename=combined_mp3_file) }}" download="{{ combined_mp3_file }}" class="download-btn">
-                        <span class="icon">🎧</span>Download Complete MP3
-                        <span class="size-info">Optimized for car audio systems</span>
+                        >> DOWNLOAD COMPLETE MP3 <<
+                        <span class="size-info">OPTIMIZED FOR CAR AUDIO SYSTEMS</span>
                     </a>
                 </div>
             </div>
         {% elif audio_files and audio_files|length == 1 %}
-            <!-- Single file fallback -->
             <div class="audio-player-section">
-                <h3><span class="icon">🎵</span>Your Audio File</h3>
+                <h3>♫ YOUR AUDIO FILE ♫</h3>
                 
                 <div class="main-audio-player">
                     <audio controls preload="metadata">
                         <source src="{{ url_for('serve_audio', filename=audio_files[0]) }}" type="audio/{{ 'mpeg' if audio_files[0].endswith('.mp3') else 'wav' }}">
-                        Your browser does not support the audio element.
+                        YOUR BROWSER DOES NOT SUPPORT AUDIO PLAYBACK.
                     </audio>
                 </div>
 
                 <div class="download-section">
                     <a href="{{ url_for('serve_audio', filename=audio_files[0]) }}" download="{{ audio_files[0] }}" class="download-btn">
-                        <span class="icon">📥</span>Download Audio File
+                        >> DOWNLOAD AUDIO FILE <<
                     </a>
                 </div>
             </div>
         {% else %}
-            <!-- Fallback if no combined file -->
             <div class="fallback-info">
-                <strong>Note:</strong> MP3 compression was not available, but your audio files were generated successfully.
+                <strong>NOTICE:</strong> MP3 COMPRESSION WAS NOT AVAILABLE, BUT YOUR AUDIO FILES WERE GENERATED SUCCESSFULLY.
                 {% if audio_files %}
-                    <div style="margin-top: 15px;">
+                    <div style="margin-top: 20px;">
                         {% for audio_file in audio_files %}
-                            <a href="{{ url_for('serve_audio', filename=audio_file) }}" download="{{ audio_file }}" class="download-btn" style="font-size: 0.9em; padding: 8px 16px; margin: 5px;">
-                                <span class="icon">📥</span>Download Part {{ loop.index }}
+                            <a href="{{ url_for('serve_audio', filename=audio_file) }}" download="{{ audio_file }}" class="download-btn" style="font-size: 0.9em; padding: 10px 20px; margin: 8px;">
+                                >> DOWNLOAD PART {{ loop.index }} <<
                             </a>
                         {% endfor %}
                     </div>
@@ -266,54 +386,61 @@
             </div>
         {% endif %}
 
+        <div class="rainbow-divider"></div>
+
         <div class="instructions">
-            <h4><span class="icon">💡</span>Usage Tips</h4>
+            <h4><span class="icon">►</span>SYSTEM USAGE INSTRUCTIONS</h4>
             <ul>
-                <li>Use the audio controls above to play, pause, and adjust volume</li>
-                <li>Click "Download Complete MP3" to save the file to your device</li>
-                <li>Right-click the download button to save directly to your preferred location</li>
-                <li>Audio files are automatically cleaned up from the server after some time</li>
+                <li>USE AUDIO CONTROLS ABOVE TO PLAY, PAUSE, AND ADJUST VOLUME</li>
+                <li>CLICK "DOWNLOAD COMPLETE MP3" TO SAVE FILE TO YOUR DEVICE</li>
+                <li>RIGHT-CLICK DOWNLOAD BUTTON TO SAVE TO PREFERRED LOCATION</li>
+                <li>AUDIO FILES ARE AUTOMATICALLY CLEANED FROM SERVER AFTER TIME</li>
             </ul>
         </div>
 
         {% if debug_info %}
             <div class="processing-info">
-                <h4><span class="icon">🔧</span>Processing Summary</h4>
+                <h4><span class="icon">●</span>PROCESSING SUMMARY</h4>
                 {% if debug_info.raw_text_length %}
                     <div class="info-item">
-                        <span class="info-label">Text Extracted:</span> {{ "{:,}".format(debug_info.raw_text_length) }} characters
+                        <span class="info-label">TEXT EXTRACTED:</span> {{ "{:,}".format(debug_info.raw_text_length) }} CHARACTERS
                     </div>
                 {% endif %}
                 {% if debug_info.page_range and debug_info.page_range != "full_document" %}
                     <div class="info-item">
-                        <span class="info-label">Page Range:</span> {{ debug_info.page_range.range_description if debug_info.page_range.range_description else debug_info.page_range }}
+                        <span class="info-label">PAGE RANGE:</span> {{ debug_info.page_range.range_description if debug_info.page_range.range_description else debug_info.page_range }}
                     </div>
                 {% endif %}
                 {% if debug_info.tts_engine %}
                     <div class="info-item">
-                        <span class="info-label">TTS Engine:</span> {{ debug_info.tts_engine }}
+                        <span class="info-label">TTS ENGINE:</span> {{ debug_info.tts_engine }}
                     </div>
                 {% endif %}
                 {% if debug_info.ffmpeg_available is defined %}
                     <div class="info-item">
-                        <span class="info-label">MP3 Compression:</span> {{ "✅ Available" if debug_info.ffmpeg_available else "❌ Not Available" }}
+                        <span class="info-label">MP3 COMPRESSION:</span> {{ "✓ AVAILABLE" if debug_info.ffmpeg_available else "✗ NOT AVAILABLE" }}
+                    </div>
+                {% endif %}
+                {% if debug_info.ssml_enhancement %}
+                    <div class="info-item">
+                        <span class="info-label">SSML ENHANCEMENT:</span> {{ debug_info.ssml_enhancement.upper() }}
                     </div>
                 {% endif %}
             </div>
         {% endif %}
 
-        <div style="margin-top: 40px;">
+        <div class="rainbow-divider"></div>
+
+        <div style="text-align: center; margin-top: 40px;">
             <a href="{{ url_for('index') }}" class="back-btn">
-                <span class="icon">←</span>Convert Another PDF
+                << CONVERT ANOTHER PDF
             </a>
         </div>
     </div>
 
     <script>
-        // Add some basic analytics/tracking if needed
-        console.log('Audio conversion completed for:', '{{ original_filename }}');
+        console.log('AUDIO CONVERSION COMPLETED FOR:', '{{ original_filename }}');
         
-        // Optional: Auto-scroll to audio player
         document.addEventListener('DOMContentLoaded', function() {
             const audioSection = document.querySelector('.audio-player-section');
             if (audioSection) {
@@ -323,18 +450,17 @@
             }
         });
 
-        // Enhanced audio player feedback
         document.querySelectorAll('audio').forEach(audio => {
             audio.addEventListener('loadstart', function() {
-                console.log('Loading audio:', this.src);
+                console.log('LOADING AUDIO:', this.src);
             });
             
             audio.addEventListener('canplay', function() {
-                console.log('Audio ready to play:', this.src);
+                console.log('AUDIO READY TO PLAY:', this.src);
             });
             
             audio.addEventListener('error', function() {
-                console.error('Audio loading error:', this.src);
+                console.error('AUDIO LOADING ERROR:', this.src);
             });
         });
     </script>

@@ -14,7 +14,7 @@ load_dotenv()
 # Import new configuration system and errors
 from application.config.system_config import SystemConfig
 from domain.models import ProcessingRequest, PageRange
-from domain.errors import ErrorCode, invalid_page_range_error, file_size_error, unsupported_file_type_error
+from domain.errors import ErrorCode, ApplicationError, invalid_page_range_error, file_size_error, unsupported_file_type_error
 from application.composition_root import create_pdf_service_from_env
 from infrastructure.file.cleanup_scheduler import FileCleanupScheduler
 

@@ -3,193 +3,314 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nicolais PDF to Audio Converter</title>
+    <title>NICOLAIS PDF2WAV CONVERTER</title>
     <style>
-        body { 
-            font-family: Arial, sans-serif; 
-            margin: 0; 
-            padding: 20px;
-            background-color: #222222;
-            color: #FFFF00;
-            line-height: 1.6;
+        @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier Prime', monospace;
+            background-color: #40318D;
+            color: #50C8FC;
+            line-height: 1.4;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
-            min-height: 90vh;
+            padding: 20px;
         }
+        
+        .rainbow-header {
+            background: linear-gradient(90deg, 
+                #A31ACB 0%, #A31ACB 16.66%, 
+                #50C8FC 16.66%, #50C8FC 33.33%, 
+                #9BF04C 33.33%, #9BF04C 50%, 
+                #FBFE65 50%, #FBFE65 66.66%, 
+                #A31ACB 66.66%, #A31ACB 83.33%, 
+                #50C8FC 83.33%, #50C8FC 100%);
+            height: 8px;
+            width: 100%;
+            max-width: 800px;
+            margin-bottom: 30px;
+        }
+        
         .container {
-            background-color: #333333;
-            border: 1px solid #FFD700;
-            color: #FFFF00; 
-            padding: 30px; 
-            border-radius: 8px; 
-            box-shadow: 0 0 15px rgba(255, 255, 0, 0.1);
-            width: 90%; 
-            max-width: 700px;
+            background-color: #000000;
+            border: 3px solid #50C8FC;
+            color: #50C8FC;
+            padding: 40px;
+            width: 100%;
+            max-width: 800px;
+            position: relative;
+        }
+        
+        .container::before {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: -3px;
+            right: -3px;
+            bottom: -3px;
+            background-color: #A31ACB;
+            z-index: -1;
+        }
+        
+        h1 {
+            color: #FFFFFF;
+            font-size: 2.5em;
+            font-weight: 700;
             text-align: center;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 2px 2px 0px #A31ACB;
         }
-        h1 { 
-            color: #FFFF00;
-            border-bottom: 2px solid #FFD700;
-            padding-bottom: 10px; 
-            margin-bottom: 20px;
+        
+        .c64-logo {
+            text-align: center;
+            margin-bottom: 40px;
+            font-size: 1.2em;
+            font-weight: 700;
         }
+        
+        .c64-logo .rainbow-text {
+            background: linear-gradient(90deg, 
+                #A31ACB, #50C8FC, #9BF04C, #FBFE65, #A31ACB, #50C8FC);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            display: inline-block;
+        }
+        
         .form-group {
-            margin-bottom: 20px;
-            text-align: left;
+            margin-bottom: 30px;
         }
+        
         label {
             display: block;
-            margin-bottom: 8px;
-            font-weight: bold;
-            color: #FFD700;
-        }
-        input[type="file"] {
-            display: block;
-            margin: 0 auto 10px auto;
-            padding: 8px;
-            border-radius: 4px;
-            border: 1px solid #FFD700;
-            background-color: #444444;
-            color: #FFFFE0;
-            width: 90%;
-        }
-        input[type="file"]::file-selector-button {
-            background-color: #FFD700;
-            color: #222222;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-        input[type="file"]::file-selector-button:hover {
-            background-color: #FFFF00;
-        }
-        .page-range-container {
-            background-color: #2a2a2a;
-            border: 1px solid #555;
-            border-radius: 6px;
-            padding: 20px;
-            margin: 20px 0;
-            text-align: left;
-        }
-        .page-range-header {
+            margin-bottom: 10px;
+            font-weight: 700;
+            color: #9BF04C;
+            text-transform: uppercase;
             font-size: 1.1em;
-            color: #FFD700;
-            margin-bottom: 15px;
+        }
+        
+        input[type="file"] {
+            width: 100%;
+            padding: 15px;
+            background-color: #40318D;
+            border: 2px solid #50C8FC;
+            color: #FFFFFF;
+            font-family: 'Courier Prime', monospace;
+            font-size: 1em;
+        }
+        
+        input[type="file"]:focus {
+            outline: none;
+            border-color: #A31ACB;
+            background-color: #000000;
+        }
+        
+        input[type="file"]::file-selector-button {
+            background-color: #A31ACB;
+            color: #FFFFFF;
+            border: none;
+            padding: 10px 20px;
+            font-family: 'Courier Prime', monospace;
+            font-weight: 700;
+            text-transform: uppercase;
+            cursor: pointer;
+            margin-right: 15px;
+        }
+        
+        input[type="file"]::file-selector-button:hover {
+            background-color: #9BF04C;
+            color: #000000;
+        }
+        
+        .page-range-container {
+            background-color: #40318D;
+            border: 2px solid #9BF04C;
+            padding: 25px;
+            margin: 30px 0;
+        }
+        
+        .page-range-header {
+            font-size: 1.2em;
+            color: #FBFE65;
+            margin-bottom: 20px;
+            font-weight: 700;
+            text-transform: uppercase;
             display: flex;
             align-items: center;
             gap: 10px;
         }
+        
         .checkbox-group {
-            margin: 15px 0;
+            margin: 20px 0;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 15px;
         }
+        
         input[type="checkbox"] {
-            transform: scale(1.3);
-            accent-color: #FFD700;
+            width: 20px;
+            height: 20px;
+            accent-color: #A31ACB;
+            transform: scale(1.5);
         }
+        
         .checkbox-label {
             font-weight: normal;
-            color: #FFFFE0;
+            color: #50C8FC;
             margin: 0;
+            text-transform: none;
         }
+        
         .page-range-inputs {
             display: none;
-            gap: 15px;
+            gap: 20px;
             align-items: center;
-            justify-content: flex-start;
-            margin: 20px 0;
+            margin: 25px 0;
             flex-wrap: wrap;
         }
+        
         .page-range-inputs.active {
             display: flex;
         }
-        input[type="number"] {
-            width: 80px;
-            padding: 8px;
-            border-radius: 4px;
-            border: 1px solid #FFD700;
-            background-color: #444444;
-            color: #FFFFE0;
-            text-align: center;
-            font-size: 14px;
-        }
-        input[type="number"]:focus {
-            outline: none;
-            border-color: #FFFF00;
-            box-shadow: 0 0 5px rgba(255, 255, 0, 0.3);
-        }
+        
         .page-input-group {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
+            color: #FFFFFF;
+            font-weight: 700;
         }
+        
+        input[type="number"] {
+            width: 80px;
+            padding: 10px;
+            background-color: #000000;
+            border: 2px solid #50C8FC;
+            color: #FFFFFF;
+            text-align: center;
+            font-family: 'Courier Prime', monospace;
+            font-size: 1.1em;
+            font-weight: 700;
+        }
+        
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #FBFE65;
+            background-color: #40318D;
+        }
+        
         .help-text {
-            font-size: 0.85em;
-            color: #AAAAAA;
-            margin-top: 15px;
-            line-height: 1.4;
-        }
-        .help-text strong {
-            color: #FFD700;
-        }
-        .tip-icon {
-            font-size: 1.2em;
-        }
-        input[type="submit"] {
-            display: inline-block; 
-            padding: 15px 30px; 
-            background-color: #FFD700;
-            color: #222222;
-            text-decoration: none; 
-            border-radius: 5px; 
-            transition: all 0.3s ease; 
-            font-size: 1.1em; 
-            font-weight: bold;
-            border: 1px solid #FFFF00;
-            cursor: pointer;
+            font-size: 0.9em;
+            color: #8B8B8B;
             margin-top: 20px;
+            line-height: 1.6;
         }
+        
+        .help-text strong {
+            color: #FBFE65;
+        }
+        
+        .submit-container {
+            text-align: center;
+            margin-top: 40px;
+        }
+        
+        input[type="submit"] {
+            background-color: #A31ACB;
+            color: #FFFFFF;
+            padding: 20px 40px;
+            border: 3px solid #FFFFFF;
+            font-family: 'Courier Prime', monospace;
+            font-size: 1.3em;
+            font-weight: 700;
+            text-transform: uppercase;
+            cursor: pointer;
+            letter-spacing: 1px;
+            transition: all 0.1s ease;
+        }
+        
         input[type="submit"]:hover {
-            background-color: #FFFF00;
-            color: #111111;
-            transform: translateY(-1px);
+            background-color: #9BF04C;
+            color: #000000;
+            border-color: #000000;
         }
+        
         input[type="submit"]:disabled {
-            background-color: #666;
-            color: #999;
+            background-color: #8B8B8B;
+            color: #40318D;
+            border-color: #8B8B8B;
             cursor: not-allowed;
-            transform: none;
         }
+        
         .processing-indicator {
             display: none;
-            margin-top: 20px;
-            color: #FFD700;
-            font-style: italic;
+            margin-top: 25px;
+            color: #FBFE65;
+            font-weight: 700;
+            text-transform: uppercase;
+            animation: blink 1s infinite;
         }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+        
         .error-message {
-            background-color: #552222;
-            border: 1px solid #aa4444;
-            color: #ffcccc;
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
+            background-color: #000000;
+            border: 2px solid #FBFE65;
+            color: #FBFE65;
+            padding: 15px;
+            margin: 15px 0;
             display: none;
+            font-weight: 700;
+            text-transform: uppercase;
         }
+        
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(80, 200, 252, 0.03) 2px,
+                rgba(80, 200, 252, 0.03) 4px
+            );
+            pointer-events: none;
+            z-index: 1000;
+        }
+        
         @media (max-width: 600px) {
             .container {
-                width: 95%;
-                padding: 20px;
+                padding: 25px;
+                margin: 10px;
             }
+            
+            h1 {
+                font-size: 2em;
+            }
+            
             .page-range-inputs {
                 flex-direction: column;
                 align-items: flex-start;
-                gap: 10px;
+                gap: 15px;
             }
+            
             .page-input-group {
                 width: 100%;
                 justify-content: space-between;
@@ -198,20 +319,27 @@
     </style>
 </head>
 <body>
+    <div class="scanlines"></div>
+    <div class="rainbow-header"></div>
+    
     <div class="container">
-        <h1>Nicolais silly PDF to WAV Converter</h1>
+        <div class="c64-logo">
+            <div class="rainbow-text">◆◇◆◇◆ HANSEN SYSTEMS PRESENTS ◆◇◆◇◆</div>
+        </div>
+        
+        <h1>PDF TO MP3 CONVERTER</h1>
         
         <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data">
             
             <div class="form-group">
-                <label for="pdf_file">Choose a PDF file:</label>
+                <label for="pdf_file">>>> SELECT PDF FILE:</label>
                 <input type="file" id="pdf_file" name="pdf_file" accept=".pdf" required onchange="handleFileSelection()">
             </div>
 
             <div class="page-range-container">
                 <div class="page-range-header">
-                    <span class="tip-icon">📄</span>
-                    <span>Page Range Selection</span>
+                    <span>■</span>
+                    <span>PAGE RANGE SELECTION</span>
                 </div>
                 
                 <div class="checkbox-group">
@@ -221,30 +349,32 @@
                 
                 <div class="page-range-inputs" id="page_range_inputs">
                     <div class="page-input-group">
-                        <span>From page:</span>
+                        <span>FROM PAGE:</span>
                         <input type="number" id="start_page" name="start_page" min="1" placeholder="1" onchange="validatePageRange()">
                     </div>
                     <div class="page-input-group">
-                        <span>to page:</span>
-                        <input type="number" id="end_page" name="end_page" min="1" placeholder="last" onchange="validatePageRange()">
+                        <span>TO PAGE:</span>
+                        <input type="number" id="end_page" name="end_page" min="1" placeholder="END" onchange="validatePageRange()">
                     </div>
                 </div>
                 
                 <div class="error-message" id="page_error"></div>
                 
                 <div class="help-text">
-                    <span class="tip-icon">💡</span> <strong>Tips:</strong><br>
-                    • Leave unchecked to process the entire PDF<br>
-                    • For academic papers: typically skip title pages (start at page 2-3) and references (end before last 10-20% of pages)<br>
-                    • You can preview the PDF first to identify the right page range<br>
-                    • Both fields are optional - leave "to page" empty to process until the end
+                    <strong>SYSTEM TIPS:</strong><br>
+                    • Leave unchecked to process entire PDF<br>
+                    • Academic papers: Skip title pages (start page 2-3)<br>
+                    • Skip references (end before last 10-20% pages)<br>
+                    • Both fields optional - leave "to page" empty for end
                 </div>
             </div>
 
-            <input type="submit" id="submitBtn" value="Upload and Process">
-            
-            <div class="processing-indicator" id="processingIndicator">
-                🔄 Processing your PDF... This may take a few minutes.
+            <div class="submit-container">
+                <input type="submit" id="submitBtn" value=">> PROCESS FILE <<">
+                
+                <div class="processing-indicator" id="processingIndicator">
+                    PROCESSING... PLEASE WAIT...
+                </div>
             </div>
         </form>
     </div>
@@ -259,7 +389,6 @@
                 inputs.classList.add('active');
             } else {
                 inputs.classList.remove('active');
-                // Clear values and errors when disabled
                 document.getElementById('start_page').value = '';
                 document.getElementById('end_page').value = '';
                 hideError();
@@ -270,22 +399,20 @@
             const startPage = parseInt(document.getElementById('start_page').value);
             const endPage = parseInt(document.getElementById('end_page').value);
             
-            // Clear previous errors
             hideError();
             
-            // Basic validation
             if (startPage && startPage < 1) {
-                showError('Start page must be 1 or greater');
+                showError('START PAGE MUST BE 1 OR GREATER');
                 return false;
             }
             
             if (endPage && endPage < 1) {
-                showError('End page must be 1 or greater');
+                showError('END PAGE MUST BE 1 OR GREATER');
                 return false;
             }
             
             if (startPage && endPage && startPage > endPage) {
-                showError('Start page cannot be greater than end page');
+                showError('START PAGE CANNOT BE GREATER THAN END PAGE');
                 return false;
             }
             
@@ -308,23 +435,19 @@
             const file = fileInput.files[0];
             
             if (file) {
-                console.log('Selected file:', file.name, 'Size:', (file.size / 1024 / 1024).toFixed(1) + ' MB');
+                console.log('SELECTED FILE:', file.name, 'SIZE:', (file.size / 1024 / 1024).toFixed(1) + ' MB');
                 
-                // Could potentially get PDF info here via AJAX in the future
-                // For now, just validate file size
                 const maxSize = 100 * 1024 * 1024; // 100MB
                 if (file.size > maxSize) {
-                    alert('File is too large. Maximum file size is 100MB.');
+                    alert('FILE TOO LARGE. MAXIMUM SIZE IS 100MB.');
                     fileInput.value = '';
                 }
             }
         }
 
-        // Form submission handling
         document.getElementById('uploadForm').addEventListener('submit', function(e) {
             const checkbox = document.getElementById('use_page_range');
             
-            // If page range is enabled, validate it
             if (checkbox.checked) {
                 if (!validatePageRange()) {
                     e.preventDefault();
@@ -332,23 +455,20 @@
                 }
             }
             
-            // Show processing indicator
             const submitBtn = document.getElementById('submitBtn');
             const processingIndicator = document.getElementById('processingIndicator');
             
             submitBtn.disabled = true;
-            submitBtn.value = 'Processing...';
+            submitBtn.value = 'PROCESSING...';
             processingIndicator.style.display = 'block';
             
-            // Re-enable form if user navigates back
             window.addEventListener('beforeunload', function() {
                 submitBtn.disabled = false;
-                submitBtn.value = 'Upload and Process';
+                submitBtn.value = '>> PROCESS FILE <<';
                 processingIndicator.style.display = 'none';
             });
         });
 
-        // Prevent double submission
         let formSubmitted = false;
         document.getElementById('uploadForm').addEventListener('submit', function(e) {
             if (formSubmitted) {
