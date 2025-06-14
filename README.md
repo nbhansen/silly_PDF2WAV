@@ -1,133 +1,196 @@
 # PDF to Audio App
 
-This project is a "PDF to Audio App" designed to convert PDF documents into audio, making academic papers and other long-form texts accessible for listening. It handles both text-based and image-based PDFs, cleans the extracted content, and synthesizes high-quality audio using various Text-to-Speech (TTS) providers.
+A PDF to audio conversion application that extracts text from PDFs and converts it to speech using multiple TTS engines. Supports both text-based and image-based PDFs with intelligent text cleaning and SSML enhancement for academic content.
 
-## Features
+## Current Features
 
-*   **PDF Processing**: Extracts text from PDFs, supporting both direct text extraction and Optical Character Recognition (OCR) for image-based documents.
-*   **Intelligent Text Cleaning**: Utilizes a Large Language Model (LLM) to clean extracted text, removing common artifacts found in academic papers (e.g., headers, footers, citations).
-*   **SSML Generation**: Generates Speech Synthesis Markup Language (SSML) to enhance audio quality with natural pauses and speech-friendly formatting.
-*   **Audio Synthesis**: Supports multiple Text-to-Speech (TTS) providers, including local (e.g., PiperTTS) and cloud-based (e.g., Gemini TTS) options.
-*   **Asynchronous Processing**: Leverages asynchronous and concurrent processing for faster audio generation, especially for large documents.
-*   **Page Range Selection**: Allows users to specify a range of pages to process, focusing on relevant content.
-*   **MP3 Compression**: Automatically combines and compresses generated audio files into MP3 format.
+### Core Functionality
+- **PDF Text Extraction**: Direct text extraction via pdfplumber with OCR fallback using Tesseract
+- **Text Processing**: LLM-based text cleaning removes headers, footers, citations, and adds natural pauses
+- **Audio Generation**: Support for multiple TTS engines with async processing
+- **Page Range Selection**: Convert specific page ranges instead of entire documents
+- **Format Support**: Outputs individual WAV files with combined MP3 creation via FFmpeg
+
+### TTS Engine Support
+- **Piper TTS**: Local engine with basic SSML support, no API costs
+- **Gemini TTS**: Cloud-based engine with full SSML support, requires Google AI API key
+
+### Advanced Features
+- **SSML Enhancement**: Academic-focused speech markup for better pronunciation of numbers, statistics, and technical terms
+- **Async Processing**: Concurrent audio generation with intelligent rate limiting
+- **File Management**: Automatic cleanup of generated files based on age and disk usage
+- **Error Handling**: Structured error system with retryable failures and user-friendly messages
+
+### Web Interface
+- Flask-based web application with C64-themed design
+- File upload with validation (100MB limit)
+- Real-time PDF info display
+- Audio playback and download
+- Admin endpoints for file management statistics
 
 ## Architecture
 
-The project follows a layered or hexagonal architecture, promoting separation of concerns, testability, and modularity.
-
-*   **`domain/`**: This layer contains the core business logic, domain models, interfaces, and pure business services. It is independent of external frameworks and infrastructure details. Examples include `domain/models.py` for data structures and `domain/services/audio_generation_service.py` for core audio logic.
-*   **`application/`**: This layer orchestrates the domain services to implement specific use cases and application workflows. It acts as an intermediary between the domain and infrastructure layers, handling dependency injection and application-specific configurations. Key files include `application/composition_root.py` for setting up dependencies and `application/services/pdf_processing.py` for the main PDF processing flow.
-*   **`infrastructure/`**: This layer provides implementations for external concerns and integrations. It contains adapters for interacting with external systems such as LLM providers, OCR engines, and TTS services. Examples include `infrastructure/llm/gemini_llm_provider.py` for LLM integration and `infrastructure/tts/gemini_tts_provider.py` for TTS services.
-
-## Project structure /main folders only)
 ```
 pdf_to_audio_app/
-├── application/
-│   ├── __init__.py
-│   ├── composition_root.py
-│   ├── config/
-│   │   ├── __init__.py
-│   │   ├── config_builders.py
-│   │   └── tts_factory.py
-│   ├── services/
-│   │   ├── __init__.py
-│   │   └── pdf_processing.py
-├── domain/
-│   ├── __init__.py
-│   ├── interfaces.py
-│   ├── models.py
-│   ├── config/
-│   │   ├── __init__.py
-│   │   └── tts_config.py
-│   ├── services/
-│   │   ├── async_audio_generation_service.py
-│   │   ├── audio_generation_service.py
-│   │   ├── ssml_generation_service.py
-│   │   ├── ssml_pipeline.py
-│   │   └── text_cleaning_service.py
-├── infrastructure/
-│   ├── __init__.py
-│   ├── llm/
-│   │   └── gemini_llm_provider.py
-│   ├── ocr/
-│   │   ├── __init__.py
-│   │   └── tesseract_ocr_provider.py
-│   ├── tts/
-│   │   ├── __init__.py
-│   │   ├── audio_generator_adapter.py
-│   │   ├── gemini_tts_provider.py
-│   │   └── piper_tts_provider.py
-│   └── web/
-│       └── __init__.py
-├── templates/
-│   ├── index.html
-│   └── result.html
-└── tests/
+├── application/           # Application orchestration and configuration
+│   ├── config/           # SystemConfig and TTS factory
+│   └── services/         # PDF processing service
+├── domain/               # Core business logic and interfaces
+│   ├── services/         # Text cleaning, audio generation, SSML
+│   ├── interfaces.py     # Core abstractions
+│   ├── models.py         # Domain models
+│   └── errors.py         # Structured error handling
+├── infrastructure/       # External integrations
+│   ├── tts/             # Piper and Gemini TTS providers
+│   ├── llm/             # Gemini LLM provider
+│   ├── ocr/             # Tesseract OCR provider
+│   └── file/            # File lifecycle management
+└── templates/           # Web interface templates
 ```
 
-## Setup and Installation
+The project follows clean architecture principles with clear separation between domain logic, application orchestration, and infrastructure concerns.
 
-### Prerequisites
+## Requirements
 
-*   **Python 3.9 - 3.11**
-*   **Tesseract OCR Engine**: For image-based PDF processing. Refer to [Tesseract Installation Guide](https://tesseract-ocr.github.io/tessdoc/Installation.html).
-*   **Poppler**: PDF rendering utilities, required by `pdf2image`.
-    *   Linux (Debian/Ubuntu): `sudo apt-get install poppler-utils`
-    *   macOS (Homebrew): `brew install poppler`
-    *   Windows: Download binaries from [Poppler for Windows](https://github.com/oschwartz10612/poppler-windows/releases/) and add to PATH.
-*   **espeak (or espeak-ng)**: Required by some TTS models for phonemization.
-    *   Linux (Debian/Ubuntu): `sudo apt-get install espeak-ng`
-    *   macOS (Homebrew): `brew install espeak`
-*   **FFmpeg**: Recommended for MP3 compression and metadata fixing.
+### System Dependencies
+- **Python 3.9-3.11**
+- **Tesseract OCR**: Required for image-based PDF processing
+- **Poppler**: PDF rendering utilities for pdf2image
+- **FFmpeg**: Audio processing and MP3 compression (optional but recommended)
+- **espeak/espeak-ng**: Required by some TTS models
 
-### Installation Steps
+### Python Dependencies
+See `requirements.txt` for complete list. Key dependencies:
+- `Flask` - Web interface
+- `google-genai` - Gemini LLM and TTS integration
+- `pdfplumber` - PDF text extraction
+- `pytesseract` - OCR processing
+- `pdf2image` - PDF to image conversion
+- `aiofiles` - Async file operations
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/nbhansen/silly_PDF2WAV
-    cd silly_PDF2WAV
-    ```
-2.  **Create and activate a Python virtual environment:**
-    ```bash
-    python3 -m venv venv
-    source venv/bin/activate # On Windows: venv\Scripts\activate
-    ```
-3.  **Install dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    ```
-4.  **Configure Environment Variables**: Create a `.env` file in the project root and populate it with necessary API keys and settings (e.g., `GOOGLE_AI_API_KEY`, `TTS_ENGINE`). A template is usually provided or can be inferred from `application/config/config_builders.py` and `domain/config/tts_config.py`.
+## Installation
 
-## Usage
+1. **Clone repository**:
+   ```bash
+   git clone https://github.com/nbhansen/silly_PDF2WAV
+   cd silly_PDF2WAV
+   ```
 
-1.  Ensure your Python virtual environment is activated and all prerequisites are installed.
-2.  Start the Flask application:
-    ```bash
-    python app.py
-    ```
-3.  Open your web browser and navigate to `http://127.0.0.1:5000/`.
-4.  Upload a PDF, select desired options (e.g., page range, TTS engine), and generate audio.
+2. **Install system dependencies**:
+   ```bash
+   # Ubuntu/Debian
+   sudo apt-get install tesseract-ocr poppler-utils espeak-ng ffmpeg
+   
+   # macOS (Homebrew)
+   brew install tesseract poppler espeak ffmpeg
+   ```
 
-## Testing
+3. **Create virtual environment**:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # Windows: venv\Scripts\activate
+   ```
 
-The project includes a comprehensive test suite. To run all tests:
+4. **Install Python dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-```bash
-./run_tests.sh
-```
-
-Alternatively, you can run tests manually with `pytest`:
-
-```bash
-pytest tests/ -v --cov=. --cov-report=term-missing --cov-report=html
-```
+5. **Configure environment**:
+   Create `.env` file with configuration:
+   ```bash
+   TTS_ENGINE=piper                    # or 'gemini'
+   GOOGLE_AI_API_KEY=your_api_key     # required for Gemini TTS/LLM
+   ENABLE_TEXT_CLEANING=True
+   ENABLE_SSML=True
+   DOCUMENT_TYPE=research_paper
+   ```
 
 ## Configuration
 
-The application's behavior can be configured through environment variables, typically loaded from a `.env` file. Key configuration files include:
+The application uses environment variables for configuration. Key settings:
 
-*   [`domain/config/tts_config.py`](domain/config/tts_config.py): Defines the structure and default values for Text-to-Speech engine configurations, including specific settings for different TTS providers (e.g., PiperTTS, Gemini TTS).
-*   [`application/config/config_builders.py`](application/config/config_builders.py): Responsible for building and providing configuration objects to the application, often reading values from environment variables and ensuring proper type conversion and validation.
+### Core Settings
+- `TTS_ENGINE`: `piper` (local) or `gemini` (cloud)
+- `ENABLE_TEXT_CLEANING`: Use LLM for text enhancement (default: True)
+- `ENABLE_SSML`: Apply SSML markup for better speech (default: True)
+- `DOCUMENT_TYPE`: `research_paper`, `literature_review`, or `general`
 
-These files work together to allow flexible configuration of TTS engines, API keys, concurrency settings, and other application parameters.
+### File Management
+- `ENABLE_FILE_CLEANUP`: Automatic file cleanup (default: True)
+- `MAX_FILE_AGE_HOURS`: File retention period (default: 24)
+- `MAX_DISK_USAGE_MB`: Disk usage limit before forced cleanup (default: 1000)
+
+### TTS Engine Specific
+- `GOOGLE_AI_API_KEY`: Required for Gemini TTS and LLM features
+- `PIPER_MODEL_NAME`: Piper voice model (default: en_US-lessac-medium)
+- `MAX_CONCURRENT_TTS_REQUESTS`: Async processing limit (default: 4)
+
+See `application/config/system_config.py` for complete configuration options.
+
+## Usage
+
+1. **Start application**:
+   ```bash
+   python app.py
+   ```
+
+2. **Access web interface**: http://127.0.0.1:5000
+
+3. **Convert PDF**:
+   - Upload PDF file (max 100MB)
+   - Optionally specify page range
+   - Download generated audio files
+
+### Admin Endpoints
+- `/admin/file_stats` - File management statistics
+- `/admin/cleanup` - Manual cleanup trigger
+- `/admin/test` - System status information
+
+## Performance Characteristics
+
+### Processing Speed
+- **Local TTS (Piper)**: Fast, no network dependencies
+- **Cloud TTS (Gemini)**: Slower due to API calls, rate limited
+- **Text Cleaning**: Depends on LLM response time when enabled
+- **Large Documents**: Automatically chunked and processed concurrently
+
+### Resource Usage
+- **CPU**: Moderate for local TTS, minimal for cloud TTS
+- **Memory**: Scales with document size and concurrent chunks
+- **Disk**: Temporary files auto-cleaned based on configuration
+- **Network**: Only required for Gemini TTS/LLM features
+
+## Testing
+
+Run test suite:
+```bash
+./run_tests.py              # All tests
+./run_tests.py integration  # Integration tests only
+./run_tests.py unit         # Unit tests only
+./run_tests.py quick        # Single fast test
+```
+
+Or directly with pytest:
+```bash
+pytest tests/ -v --cov=. --cov-report=html
+```
+
+## Limitations
+
+- **File Size**: 100MB PDF limit (configurable)
+- **TTS Quality**: Varies between engines and models
+- **Processing Time**: Large documents can take several minutes
+- **API Costs**: Gemini TTS usage incurs charges
+- **Language Support**: Currently optimized for English content
+- **SSML Support**: Limited by TTS engine capabilities
+
+## Error Handling
+
+The application includes structured error handling with:
+- Retryable vs permanent error classification
+- User-friendly error messages
+- Automatic fallbacks (OCR when direct extraction fails)
+- Rate limit handling for cloud APIs
+
+Common error scenarios are handled gracefully with informative feedback to users.
