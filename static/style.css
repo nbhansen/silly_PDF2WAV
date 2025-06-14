@@ -8,7 +8,7 @@
 
 body {
     font-family: 'Courier Prime', monospace;
-    background-color: #40318D;
+    background-color: #8B4513;
     color: #50C8FC;
     line-height: 1.4;
     min-height: 100vh;
@@ -73,7 +73,7 @@ h1 {
 
 .c64-logo .rainbow-text {
     background: linear-gradient(90deg, 
-        #A31ACB, #50C8FC, #9BF04C, #FBFE65, #A31ACB, #50C8FC);
+        #FF0000, #FF8000, #FFFF00, #00FF00, #0080FF);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
