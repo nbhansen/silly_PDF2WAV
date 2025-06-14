@@ -1,0 +1,127 @@
+# tests/test_minimal_working.py
+"""
+Minimal working test to validate pytest setup.
+This doesn't depend on the complex application structure.
+"""
+
+import sys
+import os
+from pathlib import Path
+
+# Add project root to path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+def test_python_basics():
+    """Test that Python basics work"""
+    assert 1 + 1 == 2
+    assert "hello" + " world" == "hello world"
+
+def test_project_directory_structure():
+    """Test that we're in the right project directory"""
+    project_root = Path(__file__).parent.parent
+    
+    # Check for key project files
+    assert (project_root / "app.py").exists(), "app.py should exist in project root"
+    assert (project_root / "application").exists(), "application/ directory should exist"
+    assert (project_root / "domain").exists(), "domain/ directory should exist"
+
+def test_basic_imports():
+    """Test basic Python imports work"""
+    import json
+    import pathlib
+    import tempfile
+    
+    # Test we can create temp files
+    with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
+        f.write("test")
+        temp_path = f.name
+    
+    assert Path(temp_path).exists()
+    os.unlink(temp_path)
+
+def test_project_imports():
+    """Test that we can import project modules"""
+    try:
+        # Try to import core modules
+        from application.config.system_config import SystemConfig
+        print("✅ Successfully imported SystemConfig")
+        
+        from domain.models import PageRange, ProcessingRequest
+        print("✅ Successfully imported domain models")
+        
+        from domain.interfaces import ITTSEngine, ILLMProvider
+        print("✅ Successfully imported domain interfaces")
+        
+    except ImportError as e:
+        print(f"❌ Import failed: {e}")
+        # Don't fail the test, just report
+        assert False, f"Could not import project modules: {e}"
+
+def test_create_basic_objects():
+    """Test that we can create basic project objects"""
+    try:
+        from domain.models import PageRange, ProcessingRequest
+        
+        # Create a page range
+        page_range = PageRange()
+        assert page_range.is_full_document() == True
+        
+        page_range_partial = PageRange(start_page=1, end_page=5)
+        assert page_range_partial.is_full_document() == False
+        
+        # Create a processing request
+        request = ProcessingRequest(
+            pdf_path="test.pdf",
+            output_name="test_output", 
+            page_range=page_range
+        )
+        assert request.pdf_path == "test.pdf"
+        assert request.output_name == "test_output"
+        
+        print("✅ Successfully created domain objects")
+        
+    except Exception as e:
+        assert False, f"Could not create basic objects: {e}"
+
+def test_environment_variables():
+    """Test environment handling"""
+    # Test that we can read environment variables
+    test_var = os.getenv('PATH')
+    assert test_var is not None, "Should be able to read PATH environment variable"
+    
+    # Test setting a variable
+    os.environ['TEST_VAR'] = 'test_value'
+    assert os.getenv('TEST_VAR') == 'test_value'
+
+if __name__ == "__main__":
+    print("Running minimal tests manually...")
+    
+    tests = [
+        test_python_basics,
+        test_project_directory_structure, 
+        test_basic_imports,
+        test_project_imports,
+        test_create_basic_objects,
+        test_environment_variables
+    ]
+    
+    passed = 0
+    failed = 0
+    
+    for test_func in tests:
+        try:
+            print(f"\n🧪 Running {test_func.__name__}...")
+            test_func()
+            print(f"✅ {test_func.__name__} passed")
+            passed += 1
+        except Exception as e:
+            print(f"❌ {test_func.__name__} failed: {e}")
+            failed += 1
+    
+    print(f"\n📊 Results: {passed} passed, {failed} failed")
+    
+    if failed == 0:
+        print("🎉 All tests passed! Your environment is working.")
+    else:
+        print("💥 Some tests failed. Check the errors above.")
