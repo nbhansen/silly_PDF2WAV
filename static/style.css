@@ -509,4 +509,89 @@ input[type="submit"]:disabled {
     .audio-player-section {
         padding: 20px;
     }
+.read-along-section {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.read-along-btn {
+    display: inline-block;
+    background-color: #9BF04C;
+    color: #000000;
+    padding: 20px 30px;
+    text-decoration: none;
+    font-weight: 700;
+    margin: 15px;
+    transition: all 0.1s ease;
+    border: 3px solid #000000;
+    font-family: 'Courier Prime', monospace;
+    font-size: 1.2em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    position: relative;
+}
+
+.read-along-btn:hover {
+    background-color: #50C8FC;
+    color: #000000;
+    border-color: #FFFFFF;
+    text-decoration: none;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(155, 240, 76, 0.3);
+}
+
+.read-along-btn .size-info {
+    display: block;
+    font-size: 0.8em;
+    margin-top: 8px;
+    font-weight: normal;
+    opacity: 0.8;
+}
+
+.read-along-btn::before {
+    content: "✨";
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    font-size: 1.2em;
+    animation: sparkle 2s infinite;
+}
+
+@keyframes sparkle {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.2); }
+}
+
+@media (max-width: 600px) {
+    .read-along-btn {
+        display: block;
+        margin: 15px 0;
+        text-align: center;
+        font-size: 1.1em;
+        padding: 18px 25px;
+    }
+}
+.checkbox-group input[type="checkbox"]:checked + .checkbox-label {
+    color: #9BF04C;
+    font-weight: 700;
+}
+
+.checkbox-group .checkbox-label {
+    transition: all 0.2s ease;
+}
+
+.checkbox-group .checkbox-label:hover {
+    color: #50C8FC;
+}
+
+/* Special styling for read-along checkbox */
+input[type="checkbox"]#enable_read_along:checked {
+    accent-color: #9BF04C;
+    transform: scale(1.5);
+}
+
+input[type="checkbox"]#enable_read_along:checked + label {
+    color: #9BF04C;
+    text-shadow: 0 0 5px rgba(155, 240, 76, 0.5);
+}
 }

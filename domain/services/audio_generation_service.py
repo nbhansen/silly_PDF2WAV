@@ -1,8 +1,12 @@
 # domain/services/audio_generation_service.py 
 import os
 import subprocess
+import time
+import wave
+import re
 from typing import Optional, List, Tuple
 from domain.interfaces import AudioGenerator, ITTSEngine, FileManager
+
 
 class AudioGenerationService(AudioGenerator):
     """Domain service for audio generation with file lifecycle management."""
@@ -53,6 +57,59 @@ class AudioGenerationService(AudioGenerator):
             self._register_generated_files(generated_files, combined_mp3)
         
         return generated_files, combined_mp3
+    
+    def generate_audio_with_timing(self, text_chunks: List[str], output_name: str, output_dir: str, 
+                                  tts_engine: Optional[ITTSEngine] = None) -> 'TimedAudioResult':
+        """Generate audio with timing metadata capture"""
+        from domain.models import TimedAudioResult, TimingMetadata, TextSegment
+        
+        engine = tts_engine or self.tts_engine
+        if not engine:
+            print("AudioGenerationService: No TTS engine available for timing capture")
+            return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
+        
+        # Filter valid chunks
+        valid_chunks = [c for c in text_chunks if c.strip() and not c.startswith("Error")]
+        
+        if not valid_chunks:
+            print("AudioGenerationService: No valid chunks for timing capture")
+            return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
+        
+        print(f"AudioGenerationService: Generating audio with timing for {len(valid_chunks)} chunks")
+        
+        # Generate audio with timing capture (sync only for now)
+        generated_files, text_segments = self._generate_sync_with_timing(
+            valid_chunks, output_name, output_dir, engine
+        )
+        
+        # Create combined MP3 
+        combined_mp3 = None
+        if len(generated_files) == 1:
+            combined_mp3 = self._convert_single_to_mp3(generated_files[0], output_name, output_dir)
+        elif len(generated_files) > 1:
+            combined_mp3 = self._create_combined_mp3(generated_files, output_name, output_dir)
+        
+        # Build timing metadata
+        timing_data = None
+        if text_segments:
+            total_duration = max((seg.end_time for seg in text_segments), default=0.0)
+            timing_data = TimingMetadata(
+                total_duration=total_duration,
+                text_segments=text_segments,
+                audio_files=generated_files
+            )
+            
+            print(f"AudioGenerationService: Created timing data - {len(text_segments)} segments, {total_duration:.1f}s total")
+        
+        # Register files with file manager if available
+        if self.file_manager and generated_files:
+            self._register_generated_files(generated_files, combined_mp3)
+        
+        return TimedAudioResult(
+            audio_files=generated_files,
+            combined_mp3=combined_mp3,
+            timing_data=timing_data
+        )
     
     def _register_generated_files(self, audio_files: List[str], combined_mp3: Optional[str]):
         """Register generated files with file manager for lifecycle tracking"""
@@ -133,6 +190,68 @@ class AudioGenerationService(AudioGenerator):
                 print(f"AudioGenerationService: Error generating chunk {i+1}: {e}")
         
         return self._finalize_files(generated_files, output_name, output_dir)
+    
+    def _generate_sync_with_timing(self, text_chunks: List[str], output_name: str, output_dir: str, 
+                                  engine: ITTSEngine) -> Tuple[List[str], List['TextSegment']]:
+        """Synchronous generation with timing capture"""
+        from domain.models import TextSegment
+        
+        os.makedirs(output_dir, exist_ok=True)
+        generated_files = []
+        text_segments = []
+        cumulative_time = 0.0
+        
+        print(f"AudioGenerationService: Using sync processing with timing capture")
+        
+        for i, text_chunk in enumerate(text_chunks):
+            chunk_name = f"{output_name}_part{i+1:02d}"
+            
+            try:
+                # Generate audio and measure
+                start_time = time.time()
+                audio_data = engine.generate_audio_data(text_chunk)
+                generation_time = time.time() - start_time
+                
+                if audio_data:
+                    ext = engine.get_output_format()
+                    filename = f"{chunk_name}.{ext}"
+                    filepath = os.path.join(output_dir, filename)
+                    
+                    with open(filepath, "wb") as f:
+                        f.write(audio_data)
+                    
+                    generated_files.append(filename)
+                    
+                    # Get actual audio duration (more accurate than generation time)
+                    audio_duration = self._get_audio_duration(filepath)
+                    if audio_duration is None:
+                        # Fallback: estimate based on text length (rough: 150 words/minute)
+                        word_count = len(text_chunk.split())
+                        audio_duration = max(word_count / 2.5, 1.0)  # 150 words/min = 2.5 words/sec
+                    
+                    # Split chunk into sentences for better granularity
+                    sentences = self._split_into_sentences(text_chunk)
+                    sentence_duration = audio_duration / len(sentences) if sentences else audio_duration
+                    
+                    for j, sentence in enumerate(sentences):
+                        if sentence.strip():
+                            segment = TextSegment(
+                                text=sentence.strip(),
+                                start_time=cumulative_time + (j * sentence_duration),
+                                duration=sentence_duration,
+                                segment_type="sentence",
+                                chunk_index=i,
+                                sentence_index=j
+                            )
+                            text_segments.append(segment)
+                    
+                    cumulative_time += audio_duration
+                    print(f"AudioGenerationService: Generated {filename} - {audio_duration:.1f}s")
+                
+            except Exception as e:
+                print(f"AudioGenerationService: Error generating chunk {i+1}: {e}")
+        
+        return generated_files, text_segments
     
     def _generate_async(self, text_chunks: List[str], output_name: str, output_dir: str, 
                        engine: ITTSEngine) -> Tuple[List[str], Optional[str]]:
@@ -246,6 +365,36 @@ class AudioGenerationService(AudioGenerator):
             print(f"AudioGenerationService: Combined MP3 creation failed: {e}")
         
         return None
+    
+    def _get_audio_duration(self, audio_filepath: str) -> Optional[float]:
+        """Get actual audio duration from file"""
+        try:
+            with wave.open(audio_filepath, 'rb') as wav_file:
+                frames = wav_file.getnframes()
+                sample_rate = wav_file.getframerate()
+                duration = frames / float(sample_rate)
+                return duration
+        except Exception as e:
+            print(f"AudioGenerationService: Could not read audio duration: {e}")
+            return None
+
+    def _split_into_sentences(self, text: str) -> List[str]:
+        """Simple sentence splitting for timing granularity"""
+        # Split on sentence endings, but keep the punctuation
+        sentences = re.split(r'([.!?]+)', text)
+        
+        # Recombine punctuation with sentences
+        result = []
+        for i in range(0, len(sentences) - 1, 2):
+            sentence = sentences[i].strip()
+            if i + 1 < len(sentences):
+                punct = sentences[i + 1].strip()
+                sentence = sentence + punct
+            
+            if sentence:
+                result.append(sentence)
+        
+        return result if result else [text]
     
     def _check_ffmpeg(self) -> bool:
         """Check if FFmpeg is available"""

@@ -1,0 +1,413 @@
+{% extends "base.html" %}
+{% block title %}READ-ALONG MODE - NICOLAIS PDF2WAV{% endblock %}
+{% block content %}
+    <h1>◆ READ-ALONG MODE ◆</h1>
+    
+    <div class="read-along-container">
+        <div class="audio-controls-section">
+            <h3>♫ AUDIO PLAYBACK CONTROLS ♫</h3>
+            <div class="main-audio-player">
+                <audio id="mainAudio" controls preload="metadata">
+                    <source src="{{ url_for('serve_audio', filename=audio_filename) }}" type="audio/{{ 'mpeg' if audio_filename.endswith('.mp3') else 'wav' }}">
+                    YOUR BROWSER DOES NOT SUPPORT AUDIO PLAYBACK.
+                </audio>
+            </div>
+            
+            <div class="playback-info">
+                <div class="time-display">
+                    <span id="currentTime">00:00</span> / <span id="totalTime">00:00</span>
+                </div>
+                <div class="sync-controls">
+                    <button id="toggleAutoScroll" class="control-btn">AUTO-SCROLL: ON</button>
+                    <button id="resumeTracking" class="control-btn" style="display: none;">RESUME TRACKING</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-display-section">
+            <h3>📄 DOCUMENT TEXT</h3>
+            <div id="textContainer" class="text-container">
+                <p class="loading-text">LOADING TEXT SYNCHRONIZATION...</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="rainbow-divider"></div>
+    
+    <div class="instructions">
+        <h4><span class="icon">►</span>READ-ALONG INSTRUCTIONS</h4>
+        <ul>
+            <li>TEXT WILL HIGHLIGHT AUTOMATICALLY AS AUDIO PLAYS</li>
+            <li>CLICK ANY SENTENCE TO JUMP AUDIO TO THAT POSITION</li>
+            <li>SCROLL MANUALLY TO DISABLE AUTO-SCROLL</li>
+            <li>CLICK "RESUME TRACKING" TO RE-SYNC TEXT WITH AUDIO</li>
+            <li>USE AUDIO CONTROLS FOR PLAY/PAUSE/VOLUME/SPEED</li>
+        </ul>
+    </div>
+
+    <div style="text-align: center; margin-top: 40px;">
+        <a href="{{ url_for('index') }}" class="back-btn">
+            << BACK TO CONVERTER
+        </a>
+    </div>
+
+    <style>
+        .read-along-container {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .audio-controls-section {
+            background-color: #40318D;
+            border: 2px solid #A31ACB;
+            padding: 25px;
+        }
+
+        .audio-controls-section h3 {
+            color: #A31ACB;
+            margin-top: 0;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 1.4em;
+        }
+
+        .main-audio-player {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .main-audio-player audio {
+            width: 100%;
+            max-width: 600px;
+            height: 60px;
+            background-color: #000000;
+            border: 2px solid #50C8FC;
+        }
+
+        .playback-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .time-display {
+            color: #FBFE65;
+            font-weight: 700;
+            font-size: 1.2em;
+        }
+
+        .sync-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .control-btn {
+            background-color: #9BF04C;
+            color: #000000;
+            border: 2px solid #FFFFFF;
+            padding: 8px 15px;
+            font-family: 'Courier Prime', monospace;
+            font-weight: 700;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.1s ease;
+        }
+
+        .control-btn:hover {
+            background-color: #50C8FC;
+            border-color: #000000;
+        }
+
+        .control-btn:disabled {
+            background-color: #8B8B8B;
+            color: #40318D;
+            cursor: not-allowed;
+        }
+
+        .text-display-section {
+            background-color: #000000;
+            border: 2px solid #9BF04C;
+            border-left: 8px solid #FBFE65;
+            padding: 25px;
+            min-height: 400px;
+        }
+
+        .text-display-section h3 {
+            color: #9BF04C;
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 1.4em;
+        }
+
+        .text-container {
+            color: #50C8FC;
+            line-height: 1.8;
+            font-size: 1.1em;
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid #40318D;
+            padding: 20px;
+            background-color: #40318D;
+        }
+
+        .text-segment {
+            cursor: pointer;
+            padding: 2px 4px;
+            margin: 2px 0;
+            border-radius: 2px;
+            transition: all 0.2s ease;
+        }
+
+        .text-segment:hover {
+            background-color: #A31ACB;
+            color: #FFFFFF;
+        }
+
+        .text-segment.active {
+            background-color: #9BF04C;
+            color: #000000;
+            font-weight: 700;
+        }
+
+        .text-segment.completed {
+            background-color: #8B8B8B;
+            color: #FFFFFF;
+        }
+
+        .loading-text {
+            color: #FBFE65;
+            text-align: center;
+            font-style: italic;
+            animation: blink 1s infinite;
+        }
+
+        @media (max-width: 768px) {
+            .playback-info {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .sync-controls {
+                justify-content: center;
+            }
+            
+            .control-btn {
+                font-size: 0.8em;
+                padding: 6px 12px;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    class ReadAlongPlayer {
+        constructor(timingApiUrl, audioElement) {
+            this.timingApiUrl = timingApiUrl;
+            this.audio = audioElement;
+            this.segments = [];
+            this.currentSegmentIndex = -1;
+            this.autoScroll = true;
+            this.isUserSeeking = false;
+            
+            this.initializeElements();
+            this.loadTimingData();
+            this.setupEventListeners();
+        }
+        
+        initializeElements() {
+            this.textContainer = document.getElementById('textContainer');
+            this.currentTimeDisplay = document.getElementById('currentTime');
+            this.totalTimeDisplay = document.getElementById('totalTime');
+            this.toggleAutoScrollBtn = document.getElementById('toggleAutoScroll');
+            this.resumeTrackingBtn = document.getElementById('resumeTracking');
+        }
+        
+        async loadTimingData() {
+            try {
+                const response = await fetch(this.timingApiUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const timingData = await response.json();
+                this.segments = timingData.text_segments || [];
+                this.renderText();
+                
+                console.log(`Loaded ${this.segments.length} text segments`);
+            } catch (error) {
+                console.error('Failed to load timing data:', error);
+                this.textContainer.innerHTML = `
+                    <p style="color: #FBFE65; text-align: center;">
+                        ❌ FAILED TO LOAD TIMING DATA<br>
+                        Error: ${error.message}
+                    </p>
+                `;
+            }
+        }
+        
+        renderText() {
+            if (this.segments.length === 0) {
+                this.textContainer.innerHTML = '<p style="color: #FBFE65;">No text segments available.</p>';
+                return;
+            }
+            
+            const textHtml = this.segments.map((segment, index) => 
+                `<span class="text-segment" data-index="${index}" data-start="${segment.start_time}">
+                    ${this.escapeHtml(segment.text)}
+                </span>`
+            ).join(' ');
+            
+            this.textContainer.innerHTML = textHtml;
+            
+            // Add click listeners to segments
+            this.textContainer.querySelectorAll('.text-segment').forEach(segment => {
+                segment.addEventListener('click', (e) => {
+                    const startTime = parseFloat(e.target.dataset.start);
+                    this.seekToTime(startTime);
+                });
+            });
+        }
+        
+        setupEventListeners() {
+            // Audio time updates
+            this.audio.addEventListener('timeupdate', () => {
+                if (!this.isUserSeeking) {
+                    this.updateHighlight();
+                    this.updateTimeDisplay();
+                }
+            });
+            
+            // Audio loaded
+            this.audio.addEventListener('loadedmetadata', () => {
+                this.updateTimeDisplay();
+            });
+            
+            // User seeking
+            this.audio.addEventListener('seeking', () => {
+                this.isUserSeeking = true;
+            });
+            
+            this.audio.addEventListener('seeked', () => {
+                this.isUserSeeking = false;
+                this.updateHighlight();
+            });
+            
+            // Control buttons
+            this.toggleAutoScrollBtn.addEventListener('click', () => {
+                this.toggleAutoScroll();
+            });
+            
+            this.resumeTrackingBtn.addEventListener('click', () => {
+                this.resumeTracking();
+            });
+            
+            // Scroll detection
+            this.textContainer.addEventListener('scroll', () => {
+                if (this.autoScroll) {
+                    this.autoScroll = false;
+                    this.updateAutoScrollButton();
+                    this.resumeTrackingBtn.style.display = 'inline-block';
+                }
+            });
+        }
+        
+        updateHighlight() {
+            const currentTime = this.audio.currentTime;
+            let activeIndex = -1;
+            
+            // Find current segment
+            for (let i = 0; i < this.segments.length; i++) {
+                const segment = this.segments[i];
+                if (currentTime >= segment.start_time && 
+                    currentTime < segment.start_time + segment.duration) {
+                    activeIndex = i;
+                    break;
+                }
+            }
+            
+            // Update segment highlighting
+            this.textContainer.querySelectorAll('.text-segment').forEach((element, index) => {
+                element.classList.remove('active', 'completed');
+                
+                if (index === activeIndex) {
+                    element.classList.add('active');
+                } else if (index < activeIndex) {
+                    element.classList.add('completed');
+                }
+            });
+            
+            // Auto-scroll to active segment
+            if (activeIndex !== -1 && this.autoScroll && activeIndex !== this.currentSegmentIndex) {
+                const activeElement = this.textContainer.querySelector(`[data-index="${activeIndex}"]`);
+                if (activeElement) {
+                    activeElement.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+                }
+            }
+            
+            this.currentSegmentIndex = activeIndex;
+        }
+        
+        updateTimeDisplay() {
+            this.currentTimeDisplay.textContent = this.formatTime(this.audio.currentTime);
+            this.totalTimeDisplay.textContent = this.formatTime(this.audio.duration || 0);
+        }
+        
+        formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        seekToTime(time) {
+            this.audio.currentTime = time;
+            this.updateHighlight();
+        }
+        
+        toggleAutoScroll() {
+            this.autoScroll = !this.autoScroll;
+            this.updateAutoScrollButton();
+            
+            if (this.autoScroll) {
+                this.resumeTrackingBtn.style.display = 'none';
+                this.updateHighlight(); // Re-scroll to current position
+            }
+        }
+        
+        updateAutoScrollButton() {
+            this.toggleAutoScrollBtn.textContent = `AUTO-SCROLL: ${this.autoScroll ? 'ON' : 'OFF'}`;
+        }
+        
+        resumeTracking() {
+            this.autoScroll = true;
+            this.updateAutoScrollButton();
+            this.resumeTrackingBtn.style.display = 'none';
+            this.updateHighlight();
+        }
+        
+        escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    }
+    
+    // Initialize read-along player
+    document.addEventListener('DOMContentLoaded', function() {
+        const audioElement = document.getElementById('mainAudio');
+        const timingApiUrl = '{{ timing_api_url }}';
+        
+        const player = new ReadAlongPlayer(timingApiUrl, audioElement);
+        
+        console.log('Read-along player initialized');
+        console.log('Timing API URL:', timingApiUrl);
+        console.log('Audio file:', '{{ audio_filename }}');
+    });
+</script>
+{% endblock %}

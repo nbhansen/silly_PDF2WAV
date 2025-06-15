@@ -13,7 +13,11 @@
         {% if debug_info and debug_info.text_chunks_count %}
             <p><strong>CONTENT SECTIONS:</strong> {{ debug_info.text_chunks_count }} PARTS COMBINED</p>
         {% endif %}
+        {% if debug_info and debug_info.timing_segments %}
+            <p><strong>READ-ALONG SEGMENTS:</strong> {{ debug_info.timing_segments }} SYNCHRONIZED TEXT SECTIONS</p>
+        {% endif %}
     </div>
+    
     {% if combined_mp3_file %}
         <div class="audio-player-section">
             <h3>♫ YOUR COMPLETE AUDIO FILE ♫</h3>
@@ -28,6 +32,15 @@
                     >> DOWNLOAD COMPLETE MP3 <<
                     <span class="size-info">OPTIMIZED FOR CAR AUDIO SYSTEMS</span>
                 </a>
+                
+                {% if has_timing_data and base_filename %}
+                <div class="read-along-section">
+                    <a href="{{ url_for('read_along_view', filename=combined_mp3_file) }}" class="read-along-btn">
+                        📖 READ ALONG MODE
+                        <span class="size-info">SYNCHRONIZED TEXT HIGHLIGHTING</span>
+                    </a>
+                </div>
+                {% endif %}
             </div>
         </div>
     {% elif audio_files and audio_files|length == 1 %}
@@ -43,6 +56,15 @@
                 <a href="{{ url_for('serve_audio', filename=audio_files[0]) }}" download="{{ audio_files[0] }}" class="download-btn">
                     >> DOWNLOAD AUDIO FILE <<
                 </a>
+                
+                {% if has_timing_data and base_filename %}
+                <div class="read-along-section">
+                    <a href="{{ url_for('read_along_view', filename=audio_files[0]) }}" class="read-along-btn">
+                        📖 READ ALONG MODE
+                        <span class="size-info">SYNCHRONIZED TEXT HIGHLIGHTING</span>
+                    </a>
+                </div>
+                {% endif %}
             </div>
         </div>
     {% else %}
@@ -59,6 +81,7 @@
             {% endif %}
         </div>
     {% endif %}
+    
     <div class="rainbow-divider"></div>
     <div class="instructions">
         <h4><span class="icon">►</span>SYSTEM USAGE INSTRUCTIONS</h4>
@@ -66,6 +89,9 @@
             <li>USE AUDIO CONTROLS ABOVE TO PLAY, PAUSE, AND ADJUST VOLUME</li>
             <li>CLICK "DOWNLOAD COMPLETE MP3" TO SAVE FILE TO YOUR DEVICE</li>
             <li>RIGHT-CLICK DOWNLOAD BUTTON TO SAVE TO PREFERRED LOCATION</li>
+            {% if has_timing_data %}
+            <li>CLICK "📖 READ ALONG MODE" FOR SYNCHRONIZED TEXT HIGHLIGHTING</li>
+            {% endif %}
             <li>AUDIO FILES ARE AUTOMATICALLY CLEANED FROM SERVER AFTER TIME</li>
         </ul>
     </div>
@@ -97,6 +123,16 @@
                     <span class="info-label">SSML ENHANCEMENT:</span> {{ debug_info.ssml_enhancement.upper() }}
                 </div>
             {% endif %}
+            {% if debug_info.timing_data_created %}
+                <div class="info-item">
+                    <span class="info-label">READ-ALONG DATA:</span> {{ "✓ GENERATED" if debug_info.timing_data_created else "✗ NOT GENERATED" }}
+                </div>
+            {% endif %}
+            {% if debug_info.timing_segments %}
+                <div class="info-item">
+                    <span class="info-label">TIMING SEGMENTS:</span> {{ debug_info.timing_segments }} SYNCHRONIZED SECTIONS
+                </div>
+            {% endif %}
         </div>
     {% endif %}
     <div class="rainbow-divider"></div>
@@ -107,25 +143,47 @@
     </div>
 {% endblock %}
 {% block scripts %}
+<!-- Configuration data as JSON in a script tag -->
+<script type="application/json" id="page-config">
+{
+    "originalFilename": "{{ original_filename }}",
+    "hasTimingData": {{ 'true' if has_timing_data else 'false' }},
+    "debugMode": {{ 'true' if debug_info else 'false' }}
+}
+</script>
+
+<!-- Pure JavaScript with no Jinja syntax -->
 <script>
-    console.log('AUDIO CONVERSION COMPLETED FOR:', '{{ original_filename }}');
     document.addEventListener('DOMContentLoaded', function() {
+        // Read configuration from JSON script tag
+        const configElement = document.getElementById('page-config');
+        const pageConfig = JSON.parse(configElement.textContent);
+        
+        console.log('AUDIO CONVERSION COMPLETED FOR:', pageConfig.originalFilename);
+        
+        if (pageConfig.hasTimingData) {
+            console.log('READ-ALONG MODE AVAILABLE');
+        }
+        
+        // Auto-scroll to audio section
         const audioSection = document.querySelector('.audio-player-section');
         if (audioSection) {
             setTimeout(() => {
                 audioSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }, 500);
         }
-    });
-    document.querySelectorAll('audio').forEach(audio => {
-        audio.addEventListener('loadstart', function() {
-            console.log('LOADING AUDIO:', this.src);
-        });
-        audio.addEventListener('canplay', function() {
-            console.log('AUDIO READY TO PLAY:', this.src);
-        });
-        audio.addEventListener('error', function() {
-            console.error('AUDIO LOADING ERROR:', this.src);
+        
+        // Set up audio event listeners
+        document.querySelectorAll('audio').forEach(audio => {
+            audio.addEventListener('loadstart', function() {
+                console.log('LOADING AUDIO:', this.src);
+            });
+            audio.addEventListener('canplay', function() {
+                console.log('AUDIO READY TO PLAY:', this.src);
+            });
+            audio.addEventListener('error', function() {
+                console.error('AUDIO LOADING ERROR:', this.src);
+            });
         });
     });
 </script>

@@ -2,8 +2,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Tuple, Optional
 from enum import Enum
-from .models import PDFInfo, PageRange, ProcessingRequest, ProcessingResult, FileInfo, CleanupResult
-
+from .models import PDFInfo, PageRange, ProcessingRequest, ProcessingResult, FileInfo, CleanupResult, TimedAudioResult
 # === SSML Support Enums ===
 
 class SSMLCapability(Enum):
@@ -133,7 +132,7 @@ class AudioGenerator(ABC):
     def generate_audio(self, text_chunks: List[str], output_name: str, output_dir: str, 
                       tts_engine: Optional[ITTSEngine] = None) -> Tuple[List[str], Optional[str]]:
         """
-        Generate audio files from text chunks
+        Generate audio files from text chunks (existing method)
         
         Args:
             text_chunks: List of text chunks to convert
@@ -145,7 +144,30 @@ class AudioGenerator(ABC):
             Tuple of (individual_files, combined_mp3_file_or_None)
         """
         pass
-
+    
+    def generate_audio_with_timing(self, text_chunks: List[str], output_name: str, output_dir: str, 
+                                  tts_engine: Optional[ITTSEngine] = None) -> 'TimedAudioResult':
+        """
+        Generate audio with timing metadata (optional implementation)
+        
+        Args:
+            text_chunks: List of text chunks to convert
+            output_name: Base name for output files  
+            output_dir: Directory to save audio files
+            tts_engine: Optional TTS engine to use
+            
+        Returns:
+            TimedAudioResult with audio files and timing data
+        """
+        # Default implementation: call existing method and wrap result
+        audio_files, combined_mp3 = self.generate_audio(text_chunks, output_name, output_dir, tts_engine)
+        
+        from .models import TimedAudioResult
+        return TimedAudioResult(
+            audio_files=audio_files,
+            combined_mp3=combined_mp3,
+            timing_data=None
+        )
 class PageRangeValidator(ABC):
     """Interface for validating page ranges"""
     

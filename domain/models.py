@@ -1,4 +1,4 @@
-# domain/models.py - Updated with structured error handling
+# domain/models.py
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -106,3 +106,42 @@ class CleanupResult:
     @property
     def mb_freed(self) -> float:
         return self.bytes_freed / (1024 * 1024)
+    
+@dataclass
+class TextSegment:
+    """Represents a segment of text with timing information"""
+    text: str
+    start_time: float  # seconds from beginning
+    duration: float    # segment duration in seconds
+    segment_type: str  # "sentence", "paragraph", "heading"
+    chunk_index: int   # which audio chunk this belongs to
+    sentence_index: int # position within the chunk
+    
+    @property
+    def end_time(self) -> float:
+        return self.start_time + self.duration
+
+@dataclass
+class TimingMetadata:
+    """Complete timing information for a document"""
+    total_duration: float
+    text_segments: List[TextSegment]
+    audio_files: List[str]  # just filenames for now
+    
+    def get_segment_at_time(self, time_seconds: float) -> Optional[TextSegment]:
+        """Find which text segment is active at given time"""
+        for segment in self.text_segments:
+            if segment.start_time <= time_seconds <= segment.end_time:
+                return segment
+        return None
+
+@dataclass
+class TimedAudioResult:
+    """Audio generation result with optional timing data"""
+    audio_files: List[str]
+    combined_mp3: Optional[str]
+    timing_data: Optional[TimingMetadata] = None
+    
+    @property
+    def has_timing_data(self) -> bool:
+        return self.timing_data is not None

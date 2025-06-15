@@ -1,8 +1,9 @@
-# app.py - Updated to use SystemConfig with File Management
+# app.py - Updated to use SystemConfig with File Management and Read-Along Support
 import os
 import signal
 import sys
 import atexit
+import json
 from typing import Optional
 from flask import Flask, render_template, request, redirect, url_for, send_from_directory, jsonify
 from werkzeug.utils import secure_filename
@@ -13,8 +14,8 @@ load_dotenv()
 
 # Import new configuration system and errors
 from application.config.system_config import SystemConfig
-from domain.models import ProcessingRequest, PageRange
-from domain.errors import ErrorCode, ApplicationError, invalid_page_range_error, file_size_error, unsupported_file_type_error
+from domain.models import ProcessingRequest, PageRange, ProcessingResult
+from domain.errors import ErrorCode, ApplicationError, invalid_page_range_error, file_size_error, unsupported_file_type_error, text_extraction_error, text_cleaning_error, audio_generation_error
 from application.composition_root import create_pdf_service_from_env
 from infrastructure.file.cleanup_scheduler import FileCleanupScheduler
 
@@ -95,6 +96,47 @@ def index():
 @app.route('/audio_outputs/<filename>')
 def serve_audio(filename):
     return send_from_directory(app.config['AUDIO_FOLDER'], filename)
+
+@app.route('/read-along/<filename>')
+def read_along_view(filename):
+    """Serve read-along interface for audio file"""
+    # Extract base filename (remove extension and _combined suffix)
+    base_filename = filename.replace('_combined.mp3', '').replace('.mp3', '').replace('.wav', '')
+    
+    # Check if timing data exists
+    timing_filename = f"{base_filename}_timing.json"
+    timing_path = os.path.join(app.config['AUDIO_FOLDER'], timing_filename)
+    
+    if not os.path.exists(timing_path):
+        return f"Timing data not found for {filename}. This file was not processed with read-along support.", 404
+    
+    # Check if audio file exists
+    audio_path = os.path.join(app.config['AUDIO_FOLDER'], filename)
+    if not os.path.exists(audio_path):
+        return f"Audio file {filename} not found.", 404
+    
+    return render_template('read_along.html', 
+                         audio_filename=filename,
+                         base_filename=base_filename,
+                         timing_api_url=url_for('get_timing_data', filename=base_filename))
+
+@app.route('/api/timing/<filename>')
+def get_timing_data(filename):
+    """Serve timing metadata as JSON"""
+    timing_filename = f"{filename}_timing.json"
+    timing_path = os.path.join(app.config['AUDIO_FOLDER'], timing_filename)
+    
+    if not os.path.exists(timing_path):
+        return jsonify({'error': 'Timing data not found'}), 404
+    
+    try:
+        with open(timing_path, 'r', encoding='utf-8') as f:
+            timing_data = json.load(f)
+        
+        return jsonify(timing_data)
+    except Exception as e:
+        print(f"Error serving timing data: {e}")
+        return jsonify({'error': 'Failed to load timing data'}), 500
 
 @app.route('/get_pdf_info', methods=['POST'])
 def get_pdf_info():
@@ -220,6 +262,173 @@ def upload_file():
     except Exception as e:
         print(f"Upload processing error: {e}")
         return f"An unexpected error occurred: {str(e)}"
+
+@app.route('/upload-with-timing', methods=['POST'])
+def upload_file_with_timing():
+    """Upload and process PDF with timing data generation"""
+    if not processor_available or pdf_service is None:
+        return "Error: PDF Service is not available."
+
+    if 'pdf_file' not in request.files:
+        return "No file part in the request."
+    
+    file = request.files['pdf_file']
+    if file.filename == '' or not allowed_file(file.filename):
+        return "No file selected or invalid file type."
+    
+    try:
+        # Process upload (same as regular upload)
+        original_filename = secure_filename(file.filename)
+        base_filename_no_ext = os.path.splitext(original_filename)[0]
+        pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], original_filename)
+        file.save(pdf_path)
+        
+        # Parse page range
+        page_range = parse_page_range_from_form(request.form)
+        
+        # Validate page range if specified
+        if not page_range.is_full_document():
+            validation = pdf_service.validate_page_range(pdf_path, page_range)
+            if not validation.get('valid', False):
+                try:
+                    os.remove(pdf_path)
+                except:
+                    pass
+                return f"Error: {validation.get('error', 'Invalid page range')}"
+        
+        # Create processing request
+        request_model = ProcessingRequest(
+            pdf_path=pdf_path,
+            output_name=base_filename_no_ext,
+            page_range=page_range
+        )
+        
+        # Use timing-enabled processing
+        result = process_pdf_with_timing(request_model)
+        
+        # Clean up uploaded file
+        try:
+            os.remove(pdf_path)
+        except:
+            pass
+        
+        if result.success:
+            display_filename = original_filename
+            if not page_range.is_full_document():
+                display_filename += f" (pages {page_range.start_page or 1}-{page_range.end_page or 'end'})"
+            
+            return render_template('result.html', 
+                                 audio_files=result.audio_files or [],           
+                                 combined_mp3_file=result.combined_mp3_file,
+                                 original_filename=display_filename,
+                                 tts_engine=app_config.tts_engine.value,
+                                 file_count=len(result.audio_files) if result.audio_files else 0,
+                                 debug_info=result.debug_info,
+                                 has_timing_data=True,  # Flag for read-along button
+                                 base_filename=base_filename_no_ext)
+        else:
+            error_message = _get_user_friendly_error_message(result.error)
+            retry_suggestion = _get_retry_suggestion(result.error)
+            
+            if retry_suggestion:
+                return f"Error: {error_message}<br><br>💡 Suggestion: {retry_suggestion}"
+            else:
+                return f"Error: {error_message}"
+            
+    except Exception as e:
+        print(f"Upload with timing processing error: {e}")
+        return f"An unexpected error occurred: {str(e)}"
+
+def process_pdf_with_timing(request_model):
+    """Process PDF using timing-enabled service"""
+    try:
+        # Extract text
+        raw_text = pdf_service.text_extractor.extract_text(request_model.pdf_path, request_model.page_range)
+        if not raw_text or raw_text.startswith("Error"):
+            return ProcessingResult.failure_result(text_extraction_error(raw_text))
+        
+        # Clean text
+        clean_text_chunks = pdf_service.text_cleaner.clean_text(raw_text, pdf_service.llm_provider)
+        if not clean_text_chunks:
+            return ProcessingResult.failure_result(text_cleaning_error("No valid text chunks produced"))
+        
+        # Generate audio with timing
+        timed_result = pdf_service.audio_generator.generate_audio_with_timing(
+            clean_text_chunks,
+            request_model.output_name,
+            app.config['AUDIO_FOLDER'],
+            pdf_service.tts_engine
+        )
+        
+        if not timed_result.audio_files:
+            return ProcessingResult.failure_result(audio_generation_error("No audio files were generated"))
+        
+        # Save timing data as JSON file
+        if timed_result.timing_data:
+            save_timing_data(request_model.output_name, timed_result.timing_data)
+        
+        # Build debug info
+        debug_info = {
+            "raw_text_length": len(raw_text),
+            "text_chunks_count": len(clean_text_chunks),
+            "audio_files_count": len(timed_result.audio_files),
+            "combined_mp3_created": timed_result.combined_mp3 is not None,
+            "timing_data_created": timed_result.timing_data is not None,
+            "timing_segments": len(timed_result.timing_data.text_segments) if timed_result.timing_data else 0
+        }
+        
+        return ProcessingResult.success_result(
+            audio_files=timed_result.audio_files,
+            combined_mp3=timed_result.combined_mp3,
+            debug_info=debug_info
+        )
+        
+    except Exception as e:
+        print(f"Timing processing error: {e}")
+        return ProcessingResult.failure_result(ApplicationError(
+            code=ErrorCode.UNKNOWN_ERROR,
+            message=f"Processing with timing failed: {str(e)}",
+            details=e.__class__.__name__,
+            retryable=False
+        ))
+
+def save_timing_data(base_filename, timing_metadata):
+    """Save timing metadata as JSON file"""
+    # Convert to JSON-serializable format
+    timing_json = {
+        "total_duration": timing_metadata.total_duration,
+        "audio_files": timing_metadata.audio_files,
+        "text_segments": [
+            {
+                "text": segment.text,
+                "start_time": segment.start_time,
+                "duration": segment.duration,
+                "segment_type": segment.segment_type,
+                "chunk_index": segment.chunk_index,
+                "sentence_index": segment.sentence_index
+            }
+            for segment in timing_metadata.text_segments
+        ]
+    }
+    
+    timing_filename = f"{base_filename}_timing.json"
+    timing_path = os.path.join(app.config['AUDIO_FOLDER'], timing_filename)
+    
+    try:
+        with open(timing_path, 'w', encoding='utf-8') as f:
+            json.dump(timing_json, f, indent=2, ensure_ascii=False)
+        
+        print(f"Saved timing data: {timing_filename}")
+        
+        # Register timing file with file manager if available
+        if hasattr(pdf_service, 'file_manager') and pdf_service.file_manager:
+            try:
+                pdf_service.file_manager.schedule_cleanup(timing_filename, 2.0)  # Same cleanup as audio
+            except:
+                pass
+                
+    except Exception as e:
+        print(f"Failed to save timing data: {e}")
 
 # Admin endpoints for file management
 @app.route('/admin/file_stats')

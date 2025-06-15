@@ -169,6 +169,27 @@
             color: #50C8FC;
             margin: 0;
             text-transform: none;
+            transition: all 0.2s ease;
+        }
+        
+        .checkbox-label:hover {
+            color: #50C8FC;
+        }
+        
+        /* Special styling for read-along checkbox */
+        input[type="checkbox"]:checked + .checkbox-label {
+            color: #9BF04C;
+            font-weight: 700;
+        }
+        
+        input[type="checkbox"]#enable_read_along:checked {
+            accent-color: #9BF04C;
+            transform: scale(1.5);
+        }
+        
+        input[type="checkbox"]#enable_read_along:checked + label {
+            color: #9BF04C;
+            text-shadow: 0 0 5px rgba(155, 240, 76, 0.5);
         }
         
         .page-range-inputs {
@@ -294,6 +315,12 @@
             z-index: 1000;
         }
         
+        .read-along-highlight {
+            border-top: 1px solid #9BF04C;
+            padding-top: 15px;
+            margin-top: 20px;
+        }
+        
         @media (max-width: 600px) {
             .container {
                 padding: 25px;
@@ -338,7 +365,7 @@
             <div class="page-range-container">
                 <div class="page-range-header">
                     <span>■</span>
-                    <span>PAGE RANGE SELECTION</span>
+                    <span>ADVANCED OPTIONS</span>
                 </div>
                 
                 <div class="checkbox-group">
@@ -359,12 +386,19 @@
                 
                 <div class="error-message" id="page_error"></div>
                 
+                <!-- READ-ALONG OPTION -->
+                <div class="checkbox-group read-along-highlight">
+                    <input type="checkbox" id="enable_read_along" name="enable_read_along" onchange="updateFormAction()">
+                    <label for="enable_read_along" class="checkbox-label">📖 Enable Read-Along Mode (synchronized text highlighting)</label>
+                </div>
+                
                 <div class="help-text">
                     <strong>SYSTEM TIPS:</strong><br>
-                    • Leave unchecked to process entire PDF<br>
+                    • Leave page range unchecked to process entire PDF<br>
                     • Academic papers: Skip title pages (start page 2-3)<br>
                     • Skip references (end before last 10-20% pages)<br>
-                    • Both fields optional - leave "to page" empty for end
+                    • Both page fields optional - leave "to page" empty for end<br>
+                    • <strong>📖 Read-Along Mode:</strong> Generates timing data for synchronized text highlighting with audio playback
                 </div>
             </div>
 
@@ -391,6 +425,19 @@
                 document.getElementById('start_page').value = '';
                 document.getElementById('end_page').value = '';
                 hideError();
+            }
+        }
+
+        function updateFormAction() {
+            const form = document.getElementById('uploadForm');
+            const readAlongCheckbox = document.getElementById('enable_read_along');
+            
+            if (readAlongCheckbox.checked) {
+                form.action = '/upload-with-timing';
+                document.getElementById('submitBtn').value = '>> PROCESS WITH READ-ALONG <<';
+            } else {
+                form.action = '/upload';
+                document.getElementById('submitBtn').value = '>> PROCESS FILE <<';
             }
         }
 
@@ -458,12 +505,11 @@
             const processingIndicator = document.getElementById('processingIndicator');
             
             submitBtn.disabled = true;
-            submitBtn.value = 'PROCESSING...';
             processingIndicator.style.display = 'block';
             
             window.addEventListener('beforeunload', function() {
                 submitBtn.disabled = false;
-                submitBtn.value = '>> PROCESS FILE <<';
+                updateFormAction(); // Reset button text properly
                 processingIndicator.style.display = 'none';
             });
         });
@@ -475,6 +521,11 @@
                 return false;
             }
             formSubmitted = true;
+        });
+
+        // Initialize form action on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            updateFormAction();
         });
     </script>
 </body>
