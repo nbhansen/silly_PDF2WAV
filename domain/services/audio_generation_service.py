@@ -4,8 +4,11 @@ import subprocess
 import time
 import wave
 import re
+import asyncio
+import tempfile
 from typing import Optional, List, Tuple
 from domain.interfaces import AudioGenerator, ITTSEngine, FileManager
+from domain.models import TimedAudioResult, TextSegment, TimingMetadata
 
 
 class AudioGenerationService(AudioGenerator):
@@ -59,9 +62,8 @@ class AudioGenerationService(AudioGenerator):
         return generated_files, combined_mp3
     
     def generate_audio_with_timing(self, text_chunks: List[str], output_name: str, output_dir: str, 
-                                  tts_engine: Optional[ITTSEngine] = None) -> 'TimedAudioResult':
+                                  tts_engine: Optional[ITTSEngine] = None) -> TimedAudioResult:
         """Generate audio with timing metadata capture"""
-        from domain.models import TimedAudioResult, TimingMetadata, TextSegment
         
         engine = tts_engine or self.tts_engine
         if not engine:
@@ -77,10 +79,15 @@ class AudioGenerationService(AudioGenerator):
         
         print(f"AudioGenerationService: Generating audio with timing for {len(valid_chunks)} chunks")
         
-        # Generate audio with timing capture (sync only for now)
-        generated_files, text_segments = self._generate_sync_with_timing(
-            valid_chunks, output_name, output_dir, engine
-        )
+        # Generate audio with timing capture - async for speed, then measure files for accuracy
+        if self._should_use_async(engine, len(valid_chunks)):
+            generated_files, text_segments = self._generate_async_with_timing(
+                valid_chunks, output_name, output_dir, engine
+            )
+        else:
+            generated_files, text_segments = self._generate_sync_with_timing(
+                valid_chunks, output_name, output_dir, engine
+            )
         
         # Create combined MP3 
         combined_mp3 = None
@@ -192,9 +199,8 @@ class AudioGenerationService(AudioGenerator):
         return self._finalize_files(generated_files, output_name, output_dir)
     
     def _generate_sync_with_timing(self, text_chunks: List[str], output_name: str, output_dir: str, 
-                                  engine: ITTSEngine) -> Tuple[List[str], List['TextSegment']]:
+                                  engine: ITTSEngine) -> Tuple[List[str], List[TextSegment]]:
         """Synchronous generation with timing capture"""
-        from domain.models import TextSegment
         
         os.makedirs(output_dir, exist_ok=True)
         generated_files = []
@@ -270,6 +276,65 @@ class AudioGenerationService(AudioGenerator):
         except Exception as e:
             print(f"AudioGenerationService: Async failed ({e}), falling back to sync")
             return self._generate_sync(text_chunks, output_name, output_dir, engine)
+    
+    def _generate_async_with_timing(self, text_chunks: List[str], output_name: str, output_dir: str, 
+                                   engine: ITTSEngine) -> Tuple[List[str], List[TextSegment]]:
+        """Async generation, then measure timing from actual files"""
+        
+        print(f"AudioGenerationService: Using async generation with post-processing timing")
+        
+        try:
+            # Generate files async (fast)
+            generated_files, _ = self._generate_async(text_chunks, output_name, output_dir, engine)
+            
+            # Measure timing from actual audio files (accurate)
+            text_segments = self._extract_timing_from_files(generated_files, text_chunks, output_dir)
+            
+            return generated_files, text_segments
+            
+        except Exception as e:
+            print(f"AudioGenerationService: Async timing failed ({e}), falling back to sync")
+            return self._generate_sync_with_timing(text_chunks, output_name, output_dir, engine)
+    
+    def _extract_timing_from_files(self, audio_files: List[str], text_chunks: List[str], 
+                                  output_dir: str) -> List[TextSegment]:
+        """Extract accurate timing from generated audio files"""
+        
+        segments = []
+        cumulative_time = 0.0
+        
+        print(f"AudioGenerationService: Extracting timing from {len(audio_files)} audio files")
+        
+        for i, (filename, text_chunk) in enumerate(zip(audio_files, text_chunks)):
+            filepath = os.path.join(output_dir, filename)
+            duration = self._get_audio_duration(filepath)
+            
+            if duration is None:
+                # Fallback estimation
+                word_count = len(text_chunk.split())
+                duration = max(word_count / 2.5, 1.0)
+                print(f"AudioGenerationService: Could not read duration for {filename}, estimated {duration:.1f}s")
+            else:
+                print(f"AudioGenerationService: {filename} duration: {duration:.1f}s")
+            
+            sentences = self._split_into_sentences(text_chunk)
+            sentence_duration = duration / len(sentences) if sentences else duration
+            
+            for j, sentence in enumerate(sentences):
+                if sentence.strip():
+                    segments.append(TextSegment(
+                        text=sentence.strip(),
+                        start_time=cumulative_time + (j * sentence_duration),
+                        duration=sentence_duration,
+                        segment_type="sentence",
+                        chunk_index=i,
+                        sentence_index=j
+                    ))
+            
+            cumulative_time += duration
+        
+        print(f"AudioGenerationService: Created {len(segments)} timing segments, total duration: {cumulative_time:.1f}s")
+        return segments
     
     def _finalize_files(self, generated_files: List[str], output_name: str, 
                        output_dir: str) -> Tuple[List[str], Optional[str]]:

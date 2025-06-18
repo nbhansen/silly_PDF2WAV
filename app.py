@@ -4,6 +4,7 @@ import signal
 import sys
 import atexit
 import json
+import re
 from typing import Optional
 from flask import Flask, render_template, request, redirect, url_for, send_from_directory, jsonify
 from werkzeug.utils import secure_filename
@@ -87,6 +88,18 @@ def parse_page_range_from_form(form) -> PageRange:
         end_page = int(end_page_str)
     
     return PageRange(start_page=start_page, end_page=end_page)
+
+def clean_text_for_display(text: str) -> str:
+    """Remove SSML markup and pause markers from text for display"""
+    # Remove SSML tags
+    text = re.sub(r'<[^>]+>', '', text)
+    
+    # Remove pause markers
+    text = re.sub(r'\.{3,}', '', text)  # Remove ... sequences
+    text = re.sub(r'\(\s*\)', '', text)  # Remove ( ) sequences
+    text = re.sub(r'\s+', ' ', text)    # Clean up multiple spaces
+    
+    return text.strip()
 
 # Routes
 @app.route('/')
@@ -400,7 +413,7 @@ def save_timing_data(base_filename, timing_metadata):
         "audio_files": timing_metadata.audio_files,
         "text_segments": [
             {
-                "text": segment.text,
+                "text": clean_text_for_display(segment.text),  # Clean SSML markup
                 "start_time": segment.start_time,
                 "duration": segment.duration,
                 "segment_type": segment.segment_type,
