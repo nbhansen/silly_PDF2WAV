@@ -8,7 +8,7 @@
 
 body {
     font-family: 'Courier Prime', monospace;
-    background-color: #8B4513;
+    background-color: #40318D;
     color: #50C8FC;
     line-height: 1.4;
     min-height: 100vh;
@@ -19,16 +19,16 @@ body {
 }
 
 .rainbow-header {
-    background: linear-gradient(90deg, 
-        #A31ACB 0%, #A31ACB 16.66%, 
-        #50C8FC 16.66%, #50C8FC 33.33%, 
-        #9BF04C 33.33%, #9BF04C 50%, 
-        #FBFE65 50%, #FBFE65 66.66%, 
-        #A31ACB 66.66%, #A31ACB 83.33%, 
+    background: linear-gradient(90deg,
+        #A31ACB 0%, #A31ACB 16.66%,
+        #50C8FC 16.66%, #50C8FC 33.33%,
+        #9BF04C 33.33%, #9BF04C 50%,
+        #FBFE65 50%, #FBFE65 66.66%,
+        #A31ACB 66.66%, #A31ACB 83.33%,
         #50C8FC 83.33%, #50C8FC 100%);
     height: 8px;
     width: 100%;
-    max-width: 1000px;
+    max-width: 800px;
     margin-bottom: 30px;
 }
 
@@ -38,7 +38,7 @@ body {
     color: #50C8FC;
     padding: 40px;
     width: 100%;
-    max-width: 1000px;
+    max-width: 800px;
     position: relative;
 }
 
@@ -72,8 +72,8 @@ h1 {
 }
 
 .c64-logo .rainbow-text {
-    background: linear-gradient(90deg, 
-        #FF0000, #FF8000, #FFFF00, #00FF00, #0080FF);
+    background: linear-gradient(90deg,
+        #A31ACB, #50C8FC, #9BF04C, #FBFE65, #A31ACB, #50C8FC);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -163,6 +163,27 @@ input[type="checkbox"] {
     color: #50C8FC;
     margin: 0;
     text-transform: none;
+    transition: all 0.2s ease;
+}
+
+.checkbox-label:hover {
+    color: #50C8FC;
+}
+
+/* Special styling for read-along checkbox */
+input[type="checkbox"]:checked + .checkbox-label {
+    color: #9BF04C;
+    font-weight: 700;
+}
+
+input[type="checkbox"]#enable_read_along:checked {
+    accent-color: #9BF04C;
+    transform: scale(1.5);
+}
+
+input[type="checkbox"]#enable_read_along:checked + label {
+    color: #9BF04C;
+    text-shadow: 0 0 5px rgba(155, 240, 76, 0.5);
 }
 
 .page-range-inputs {
@@ -288,9 +309,15 @@ input[type="submit"]:disabled {
     z-index: 1000;
 }
 
+.read-along-highlight {
+    border-top: 1px solid #9BF04C;
+    padding-top: 15px;
+    margin-top: 20px;
+}
+
 .rainbow-divider {
     height: 4px;
-    background: linear-gradient(90deg, 
+    background: linear-gradient(90deg,
         #A31ACB, #50C8FC, #9BF04C, #FBFE65, #A31ACB, #50C8FC);
     margin: 30px 0;
 }
@@ -493,22 +520,126 @@ input[type="submit"]:disabled {
     color: #A31ACB;
 }
 
-@media (max-width: 600px) {
-    .container {
-        padding: 25px;
-        margin: 10px;
-    }
-    h1 {
-        font-size: 2em;
-    }
-    .download-btn {
-        display: block;
-        margin: 15px 0;
-        text-align: center;
-    }
-    .audio-player-section {
-        padding: 20px;
-    }
+/* Read-along specific styles */
+.read-along-container {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+}
+
+.audio-controls-section {
+    background-color: #40318D;
+    border: 2px solid #A31ACB;
+    padding: 25px;
+}
+
+.audio-controls-section h3 {
+    color: #A31ACB;
+    margin-top: 0;
+    margin-bottom: 20px;
+    text-align: center;
+    font-size: 1.4em;
+}
+
+.playback-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.time-display {
+    color: #FBFE65;
+    font-weight: 700;
+    font-size: 1.2em;
+}
+
+.sync-controls {
+    display: flex;
+    gap: 10px;
+}
+
+.control-btn {
+    background-color: #9BF04C;
+    color: #000000;
+    border: 2px solid #FFFFFF;
+    padding: 8px 15px;
+    font-family: 'Courier Prime', monospace;
+    font-weight: 700;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: all 0.1s ease;
+}
+
+.control-btn:hover {
+    background-color: #50C8FC;
+    border-color: #000000;
+}
+
+.control-btn:disabled {
+    background-color: #8B8B8B;
+    color: #40318D;
+    cursor: not-allowed;
+}
+
+.text-display-section {
+    background-color: #000000;
+    border: 2px solid #9BF04C;
+    border-left: 8px solid #FBFE65;
+    padding: 25px;
+    min-height: 400px;
+}
+
+.text-display-section h3 {
+    color: #9BF04C;
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 1.4em;
+}
+
+.text-container {
+    color: #50C8FC;
+    line-height: 1.8;
+    font-size: 1.1em;
+    max-height: 500px;
+    overflow-y: auto;
+    border: 1px solid #40318D;
+    padding: 20px;
+    background-color: #40318D;
+}
+
+.text-segment {
+    cursor: pointer;
+    padding: 2px 4px;
+    margin: 2px 0;
+    border-radius: 2px;
+    transition: all 0.2s ease;
+}
+
+.text-segment:hover {
+    background-color: #A31ACB;
+    color: #FFFFFF;
+}
+
+.text-segment.active {
+    background-color: #9BF04C;
+    color: #000000;
+    font-weight: 700;
+}
+
+.text-segment.completed {
+    background-color: #8B8B8B;
+    color: #FFFFFF;
+}
+
+.loading-text {
+    color: #FBFE65;
+    text-align: center;
+    font-style: italic;
+    animation: blink 1s infinite;
+}
+
 .read-along-section {
     margin-top: 20px;
     text-align: center;
@@ -562,7 +693,54 @@ input[type="submit"]:disabled {
     50% { opacity: 0.5; transform: scale(1.2); }
 }
 
+/* Media Queries */
+@media (max-width: 768px) {
+    .playback-info {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .sync-controls {
+        justify-content: center;
+    }
+
+    .control-btn {
+        font-size: 0.8em;
+        padding: 6px 12px;
+    }
+}
+
 @media (max-width: 600px) {
+    .container {
+        padding: 25px;
+        margin: 10px;
+    }
+
+    h1 {
+        font-size: 2em;
+    }
+
+    .page-range-inputs {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+
+    .page-input-group {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .download-btn {
+        display: block;
+        margin: 15px 0;
+        text-align: center;
+    }
+
+    .audio-player-section {
+        padding: 20px;
+    }
+
     .read-along-btn {
         display: block;
         margin: 15px 0;
@@ -570,28 +748,4 @@ input[type="submit"]:disabled {
         font-size: 1.1em;
         padding: 18px 25px;
     }
-}
-.checkbox-group input[type="checkbox"]:checked + .checkbox-label {
-    color: #9BF04C;
-    font-weight: 700;
-}
-
-.checkbox-group .checkbox-label {
-    transition: all 0.2s ease;
-}
-
-.checkbox-group .checkbox-label:hover {
-    color: #50C8FC;
-}
-
-/* Special styling for read-along checkbox */
-input[type="checkbox"]#enable_read_along:checked {
-    accent-color: #9BF04C;
-    transform: scale(1.5);
-}
-
-input[type="checkbox"]#enable_read_along:checked + label {
-    color: #9BF04C;
-    text-shadow: 0 0 5px rgba(155, 240, 76, 0.5);
-}
 }
