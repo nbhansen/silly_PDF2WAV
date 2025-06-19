@@ -8,16 +8,17 @@ TTS engine.
 """
 
 import os
-import re
 import wave
 import subprocess
 from typing import List, Optional
 
-from ..interfaces import ITimingStrategy, ITTSEngine
-from ..models import TimedAudioResult, TextSegment
-from .academic_ssml_service import AcademicSSMLService
-from .text_cleaning_service import TextCleaningService
-from infrastructure.file.file_manager import FileManager
+from domain.interfaces import ITimingStrategy, ITTSEngine
+from domain.models import TimedAudioResult, TextSegment
+from domain.services.academic_ssml_service import AcademicSSMLService
+from domain.services.text_cleaning_service import TextCleaningService
+
+# --- Fix: Import the module, not the class, to avoid circular dependency ---
+from infrastructure.file import file_manager
 
 
 class SentenceMeasurementStrategy(ITimingStrategy):
@@ -29,7 +30,7 @@ class SentenceMeasurementStrategy(ITimingStrategy):
         self,
         tts_engine: ITTSEngine,
         ssml_service: AcademicSSMLService,
-        file_manager: FileManager,
+        file_manager, # Type hint removed to simplify import resolution
         text_cleaning_service: TextCleaningService,
     ):
         self.tts_engine = tts_engine
@@ -42,10 +43,7 @@ class SentenceMeasurementStrategy(ITimingStrategy):
         """
         Executes the sentence-by-sentence audio generation and measurement process.
         """
-        # Prepare SSML-enhanced text from chunks
         full_ssml_text = " ".join(self.ssml_service.add_ssml(chunk) for chunk in text_chunks)
-        
-        # Split the full text into speakable sentences
         sentences = self.text_cleaning_service.split_into_sentences(full_ssml_text)
         
         if not sentences:
@@ -57,25 +55,19 @@ class SentenceMeasurementStrategy(ITimingStrategy):
         text_segments = []
         cumulative_time = 0.0
 
-        # --- Step 1: Generate audio for each sentence ---
         for i, sentence_ssml in enumerate(sentences):
             try:
-                # The TTS engine expects SSML, so we provide it directly
                 audio_data = self.tts_engine.generate_audio_data(sentence_ssml)
                 
                 if audio_data:
-                    # Save to a temporary WAV file for measurement
                     temp_wav_path = self.file_manager.save_temp_file(audio_data, suffix=".wav")
                     temp_audio_files.append(temp_wav_path)
                     
-                    # Measure duration
                     duration = self._get_audio_duration(temp_wav_path)
                     if duration is None:
-                        # Fallback if measurement fails
                         word_count = len(self.text_cleaning_service.strip_ssml(sentence_ssml).split())
-                        duration = max(word_count / 2.5, 0.5) # Estimate
+                        duration = max(word_count / 2.5, 0.5)
 
-                    # Create TextSegment with accurate timing
                     segment = TextSegment(
                         text=self.text_cleaning_service.strip_ssml(sentence_ssml),
                         start_time=cumulative_time,
@@ -88,20 +80,17 @@ class SentenceMeasurementStrategy(ITimingStrategy):
             except Exception as e:
                 print(f"SentenceMeasurementStrategy: Error processing sentence {i}: {e}")
 
-        # --- Step 2: Combine all temporary WAV files into a single MP3 ---
         final_audio_path = None
         if temp_audio_files and self.ffmpeg_available:
             final_audio_path = self._create_combined_mp3(temp_audio_files, output_filename)
         
-        # --- Step 3: Clean up temporary files ---
         for temp_file in temp_audio_files:
-            self.file_manager.delete_file(temp_file)
+            self.file_manager.delete_file(os.path.basename(temp_file))
 
         print(f"SentenceMeasurementStrategy: Finished. Total duration: {cumulative_time:.2f}s")
         return TimedAudioResult(audio_path=final_audio_path, segments=text_segments)
 
     def _get_audio_duration(self, audio_filepath: str) -> Optional[float]:
-        """Get actual audio duration from a WAV file."""
         try:
             with wave.open(audio_filepath, 'rb') as wav_file:
                 frames = wav_file.getnframes()
@@ -112,14 +101,12 @@ class SentenceMeasurementStrategy(ITimingStrategy):
             return None
 
     def _create_combined_mp3(self, audio_files: List[str], base_name: str) -> Optional[str]:
-        """Combine multiple WAV files into a single MP3 using FFmpeg."""
         output_path = os.path.join(self.file_manager.get_output_dir(), f"{base_name}.mp3")
         concat_list_path = os.path.join(self.file_manager.get_output_dir(), "concat_list.txt")
 
         try:
             with open(concat_list_path, 'w') as f:
                 for path in audio_files:
-                    # FFmpeg concat requires a specific format
                     f.write(f"file '{os.path.abspath(path)}'\n")
 
             cmd = [
@@ -140,11 +127,9 @@ class SentenceMeasurementStrategy(ITimingStrategy):
                 os.remove(concat_list_path)
 
     def _check_ffmpeg(self) -> bool:
-        """Check if FFmpeg is available in the system path."""
         try:
             subprocess.run(['ffmpeg', '-version'], capture_output=True, check=True)
             return True
         except (FileNotFoundError, subprocess.CalledProcessError):
             print("Warning: FFmpeg is not installed or not in PATH. Combined MP3 generation will be disabled.")
             return False
-

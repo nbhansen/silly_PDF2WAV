@@ -3,10 +3,10 @@ import time
 import re
 from typing import Optional, List
 
-from domain.interfaces import TextCleaner, ILLMProvider
+from domain.interfaces import ITextCleaner, ILLMProvider
 from domain.errors import llm_provider_error
 
-class TextCleaningService(TextCleaner):
+class TextCleaningService(ITextCleaner):
     """Simplified text cleaning service focusing on core text processing"""
     
     def __init__(self, llm_provider: Optional[ILLMProvider] = None, max_chunk_size: int = 100000):

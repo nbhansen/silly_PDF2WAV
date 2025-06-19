@@ -4,9 +4,10 @@ import pdfplumber
 from typing import Optional, List, Dict, Any
 
 from domain.models import PDFInfo, PageRange
-from domain.interfaces import TextExtractor, PageRangeValidator
+from domain.interfaces import IOCRProvider
 
-class TesseractOCRProvider(TextExtractor, PageRangeValidator):
+
+class TesseractOCRProvider(IOCRProvider):
     """Direct implementation of TextExtractor and PageRangeValidator using Tesseract OCR and pdfplumber."""
     
     def __init__(self, tesseract_cmd=None, poppler_path_custom=None):
