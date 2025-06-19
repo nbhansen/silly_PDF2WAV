@@ -1,4 +1,4 @@
-# app.py - Updated to use SystemConfig with File Management and Read-Along Support
+# app.py - Fixed interface issues
 import os
 import signal
 import sys
@@ -187,8 +187,8 @@ def get_pdf_info():
         temp_path = os.path.join(app.config['UPLOAD_FOLDER'], f"temp_{original_filename}")
         file.save(temp_path)
         
-        # Use service
-        pdf_info = service.get_pdf_info(temp_path)
+        # Use OCR provider to get PDF info
+        pdf_info = service.ocr_provider.get_pdf_info(temp_path)
         
         # Clean up
         try:
@@ -230,7 +230,7 @@ def process_upload_request(request_form, uploaded_file, enable_timing=False):
         # Validate page range if specified
         service = get_pdf_service()
         if not page_range.is_full_document():
-            validation = service.validate_page_range(pdf_path, page_range)
+            validation = service.ocr_provider.validate_range(pdf_path, page_range)
             if not validation.get('valid', False):
                 # Clean up file before returning error
                 try:
@@ -239,20 +239,26 @@ def process_upload_request(request_form, uploaded_file, enable_timing=False):
                     pass
                 return None, original_filename, base_filename_no_ext, f"Error: {validation.get('error', 'Invalid page range')}"
         
-        # Create processing request
-        request_model = ProcessingRequest(
-            pdf_path=pdf_path,
-            output_name=base_filename_no_ext,
-            page_range=page_range
-        )
+        # Convert PageRange to page list for the service
+        pages_list = None
+        if not page_range.is_full_document():
+            start = page_range.start_page or 1
+            end = page_range.end_page
+            if end is None:
+                # Get total pages to determine end
+                pdf_info = service.ocr_provider.get_pdf_info(pdf_path)
+                end = pdf_info.total_pages
+            pages_list = list(range(start - 1, end))  # Convert to 0-based indexing
         
-        # CRITICAL: Different processing based on timing requirement
-        if enable_timing:
-            print(f"Processing with timing data for read-along: {original_filename}")
-            result = process_pdf_with_timing(request_model)
-        else:
-            print(f"Processing without timing data: {original_filename}")
-            result = service.process_pdf(request_model)
+        # CRITICAL: Process using the correct service method
+        print(f"Processing {'with timing data' if enable_timing else 'without timing'} for: {original_filename}")
+        
+        # Use the existing method that returns TimedAudioResult
+        timed_result = service.process_pdf_and_generate_audio(
+            filepath=pdf_path,
+            output_name=base_filename_no_ext,
+            pages=pages_list
+        )
         
         # Clean up uploaded file
         try:
@@ -260,23 +266,42 @@ def process_upload_request(request_form, uploaded_file, enable_timing=False):
         except:
             pass
         
-        # Add file management stats to debug info (common for both)
-        if result.success and result.debug_info:
-            if hasattr(service, 'file_manager') and service.file_manager:
-                try:
-                    file_stats = service.file_manager.get_stats()
-                    result.debug_info['file_stats'] = {
-                        'total_files': file_stats['total_files'],
-                        'total_size_mb': file_stats['total_size_mb'],
-                        'cleanup_enabled': app_config.enable_file_cleanup
-                    }
-                except:
-                    pass  # Don't fail upload if file stats fail
+        if not timed_result or not timed_result.audio_files:
+            return ProcessingResult.failure_result(
+                audio_generation_error("No audio files were generated")
+            ), original_filename, base_filename_no_ext, None
+        
+        # Save timing data if available and requested
+        if enable_timing and timed_result.timing_data:
+            save_timing_data(base_filename_no_ext, timed_result.timing_data)
+        
+        # Convert TimedAudioResult to ProcessingResult
+        result = ProcessingResult.success_result(
+            audio_files=[os.path.basename(f) for f in timed_result.audio_files],
+            combined_mp3=os.path.basename(timed_result.combined_mp3) if timed_result.combined_mp3 else None,
+            debug_info={
+                "audio_files_count": len(timed_result.audio_files),
+                "combined_mp3_created": timed_result.combined_mp3 is not None,
+                "timing_data_created": enable_timing and timed_result.timing_data is not None,
+                "timing_segments": len(timed_result.timing_data.text_segments) if (enable_timing and timed_result.timing_data) else 0
+            }
+        )
+        
+        # Add file management stats to debug info
+        if hasattr(service, 'file_manager') and service.file_manager:
+            try:
+                if hasattr(service.file_manager, 'get_file_info'):
+                    result.debug_info['file_management'] = 'available'
+                result.debug_info['cleanup_enabled'] = app_config.enable_file_cleanup
+            except:
+                pass  # Don't fail upload if file stats fail
         
         return result, original_filename, base_filename_no_ext, None
         
     except Exception as e:
         print(f"Upload processing error: {e}")
+        import traceback
+        traceback.print_exc()
         return None, original_filename if 'original_filename' in locals() else 'unknown', '', f"An unexpected error occurred: {str(e)}"
 
 def render_upload_result(result, original_filename, base_filename_no_ext, page_range, enable_timing=False):
@@ -332,7 +357,7 @@ def render_upload_result(result, original_filename, base_filename_no_ext, page_r
         else:
             return f"Error: {error_message}"
 
-# Upload routes - THE MISSING ROUTES!
+# Upload routes - THE CORRECT ROUTES!
 @app.route('/upload', methods=['POST'])
 def upload_file():
     """Regular upload WITHOUT timing data"""
@@ -389,60 +414,6 @@ def upload_file_with_timing():
     # Render result WITH timing data (enables read-along button)
     return render_upload_result(result, original_filename, base_filename, page_range, enable_timing=True)
 
-def process_pdf_with_timing(request_model):
-    """Process PDF using timing-enabled service"""
-    service = get_pdf_service()
-    try:
-        # Extract text
-        raw_text = service.text_extractor.extract_text(request_model.pdf_path, request_model.page_range)
-        if not raw_text or raw_text.startswith("Error"):
-            return ProcessingResult.failure_result(text_extraction_error(raw_text))
-        
-        # Clean text
-        clean_text_chunks = service.text_cleaner.clean_text(raw_text, service.llm_provider)
-        if not clean_text_chunks:
-            return ProcessingResult.failure_result(text_cleaning_error("No valid text chunks produced"))
-        
-        # Generate audio with timing
-        timed_result = service.audio_generator.generate_audio_with_timing(
-            clean_text_chunks,
-            request_model.output_name,
-            app.config['AUDIO_FOLDER'],
-            service.tts_engine
-        )
-        
-        if not timed_result.audio_files:
-            return ProcessingResult.failure_result(audio_generation_error("No audio files were generated"))
-        
-        # Save timing data as JSON file
-        if timed_result.timing_data:
-            save_timing_data(request_model.output_name, timed_result.timing_data)
-        
-        # Build debug info
-        debug_info = {
-            "raw_text_length": len(raw_text),
-            "text_chunks_count": len(clean_text_chunks),
-            "audio_files_count": len(timed_result.audio_files),
-            "combined_mp3_created": timed_result.combined_mp3 is not None,
-            "timing_data_created": timed_result.timing_data is not None,
-            "timing_segments": len(timed_result.timing_data.text_segments) if timed_result.timing_data else 0
-        }
-        
-        return ProcessingResult.success_result(
-            audio_files=timed_result.audio_files,
-            combined_mp3=timed_result.combined_mp3,
-            debug_info=debug_info
-        )
-        
-    except Exception as e:
-        print(f"Timing processing error: {e}")
-        return ProcessingResult.failure_result(ApplicationError(
-            code=ErrorCode.UNKNOWN_ERROR,
-            message=f"Processing with timing failed: {str(e)}",
-            details=e.__class__.__name__,
-            retryable=False
-        ))
-
 def save_timing_data(base_filename, timing_metadata):
     """Save timing metadata as JSON file"""
     # Convert to JSON-serializable format
@@ -475,7 +446,8 @@ def save_timing_data(base_filename, timing_metadata):
         service = get_pdf_service()
         if hasattr(service, 'file_manager') and service.file_manager:
             try:
-                service.file_manager.schedule_cleanup(timing_filename, 2.0)  # Same cleanup as audio
+                if hasattr(service.file_manager, 'schedule_cleanup'):
+                    service.file_manager.schedule_cleanup(timing_filename, 2.0)  # Same cleanup as audio
             except:
                 pass
                 

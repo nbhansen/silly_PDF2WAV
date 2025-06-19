@@ -1,0 +1,7 @@
+Requirement already satisfied: gtts in ./venv/lib64/python3.13/site-packages (2.5.4)
+Requirement already satisfied: requests<3,>=2.27 in ./venv/lib64/python3.13/site-packages (from gtts) (2.32.4)
+Requirement already satisfied: click<8.2,>=7.1 in ./venv/lib64/python3.13/site-packages (from gtts) (8.1.8)
+Requirement already satisfied: charset_normalizer<4,>=2 in ./venv/lib64/python3.13/site-packages (from requests<3,>=2.27->gtts) (3.4.2)
+Requirement already satisfied: idna<4,>=2.5 in ./venv/lib64/python3.13/site-packages (from requests<3,>=2.27->gtts) (3.10)
+Requirement already satisfied: urllib3<3,>=1.21.1 in ./venv/lib64/python3.13/site-packages (from requests<3,>=2.27->gtts) (2.4.0)
+Requirement already satisfied: certifi>=2017.4.17 in ./venv/lib64/python3.13/site-packages (from requests<3,>=2.27->gtts) (2025.4.26)

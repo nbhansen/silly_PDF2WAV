@@ -7,7 +7,7 @@ fast and accurate, making it the preferred approach.
 """
 
 from domain.interfaces import ITimingStrategy, ITimestampedTTSEngine
-from domain.models import TimedAudioResult, TextSegment
+from domain.models import TimedAudioResult, TextSegment, TimingMetadata
 from domain.services.academic_ssml_service import AcademicSSMLService
 
 # --- Fix: Import the module, not the class, to avoid circular dependency ---
@@ -38,26 +38,64 @@ class GeminiTimestampStrategy(ITimingStrategy):
         """
         print("GeminiTimestampStrategy: Using ideal path with direct engine timestamping.")
         
-        full_ssml_text = " ".join(self.ssml_service.add_ssml(chunk) for chunk in text_chunks)
+        # FIXED: Use the correct method name
+        print(f"GeminiTimestampStrategy: Enhancing {len(text_chunks)} text chunks with SSML...")
+        enhanced_chunks = self.ssml_service.enhance_text_chunks(text_chunks)
+        
+        # Combine enhanced chunks into full SSML text
+        full_ssml_text = " ".join(enhanced_chunks)
 
         if not full_ssml_text.strip():
-            return TimedAudioResult(audio_path=None, segments=[])
+            print("GeminiTimestampStrategy: No text to process after SSML enhancement")
+            return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
 
         try:
+            print("GeminiTimestampStrategy: Generating audio with timestamps...")
             audio_data, text_segments = self.tts_engine.generate_audio_with_timestamps(full_ssml_text)
             
-            if not audio_data or not text_segments:
-                print("GeminiTimestampStrategy: Engine returned no audio or timing data.")
-                return TimedAudioResult(audio_path=None, segments=[])
-
+            if not audio_data:
+                print("GeminiTimestampStrategy: Engine returned no audio data.")
+                return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
+            
+            if not text_segments:
+                print("GeminiTimestampStrategy: Engine returned no timing data.")
+                # Still save the audio even without timing
+                
+            # Save the audio file
+            final_audio_filename = f"{output_filename}_combined.mp3"
             final_audio_path = self.file_manager.save_output_file(
                 audio_data,
-                f"{output_filename}.mp3"
+                final_audio_filename
             )
+            
+            if not final_audio_path:
+                print("GeminiTimestampStrategy: Failed to save audio file")
+                return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
 
-            print(f"GeminiTimestampStrategy: Finished. Generated {len(text_segments)} segments.")
-            return TimedAudioResult(audio_path=final_audio_path, segments=text_segments)
+            # Create timing metadata if we have segments
+            timing_metadata = None
+            if text_segments:
+                # Calculate total duration from segments
+                total_duration = max(seg.start_time + seg.duration for seg in text_segments) if text_segments else 0.0
+                
+                timing_metadata = TimingMetadata(
+                    total_duration=total_duration,
+                    text_segments=text_segments,
+                    audio_files=[final_audio_filename]
+                )
+                
+                print(f"GeminiTimestampStrategy: Generated {len(text_segments)} timed segments, total duration: {total_duration:.2f}s")
+            else:
+                print("GeminiTimestampStrategy: No timing segments available")
+
+            return TimedAudioResult(
+                audio_files=[final_audio_filename],
+                combined_mp3=final_audio_filename,
+                timing_data=timing_metadata
+            )
 
         except Exception as e:
             print(f"GeminiTimestampStrategy: An error occurred during audio generation: {e}")
-            return TimedAudioResult(audio_path=None, segments=[])
+            import traceback
+            traceback.print_exc()
+            return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
