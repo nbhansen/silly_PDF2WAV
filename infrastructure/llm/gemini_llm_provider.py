@@ -25,6 +25,9 @@ class GeminiLLMProvider(ILLMProvider):
         except Exception as e:
             print(f"GeminiLLMProvider: Failed to initialize Gemini: {e}")
             return None
+    def process_text(self, text: str) -> str:
+        """Processes and enhances text - required by ILLMProvider interface"""
+        return self.generate_content(text)
 
     def generate_content(self, prompt: str) -> str:
         """Generates content based on a prompt using Gemini"""

@@ -11,13 +11,12 @@ from typing import List, Tuple
 from .models import TimedAudioResult, TextSegment
 
 
-# --- New SSML Capability Enum ---
 class SSMLCapability(Enum):
-    """Defines the SSML features an engine might support."""
-    BREAK = auto()
-    PROSODY = auto()
-    SAY_AS = auto()
-    MARK = auto()
+    """Defines the SSML capability levels an engine might support."""
+    NONE = auto()       # No SSML support - plain text only
+    BASIC = auto()      # Basic SSML tags (break, emphasis)
+    ADVANCED = auto()   # Advanced SSML (prosody, say-as, marks)
+    FULL = auto()       # Full SSML support including all features
 
 
 # --- Core Service Interfaces ---

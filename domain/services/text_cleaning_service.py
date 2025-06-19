@@ -14,6 +14,38 @@ class TextCleaningService(ITextCleaner):
         self.max_chunk_size = max_chunk_size
         print(f"TextCleaningService: Initialized with LLM provider: {llm_provider is not None}")
 
+    def strip_ssml(self, ssml_text: str) -> str:
+        """Removes all SSML tags from a string."""
+        import re
+        # Remove SSML tags like <speak>, <break>, <prosody>, etc.
+        text = re.sub(r'<[^>]+>', '', ssml_text)
+        # Clean up multiple spaces
+        text = re.sub(r'\s+', ' ', text)
+        return text.strip()
+
+    def split_into_sentences(self, text: str) -> List[str]:
+        """Splits a block of text into a list of sentences."""
+        import re
+        
+        # First strip any SSML tags
+        clean_text = self.strip_ssml(text)
+        
+        # Simple sentence splitting on common sentence endings
+        # This handles most academic text reasonably well
+        sentences = re.split(r'[.!?]+\s+', clean_text)
+        
+        # Clean up and filter out empty sentences
+        cleaned_sentences = []
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if sentence and len(sentence) > 3:  # Skip very short fragments
+                # Ensure sentence ends with punctuation
+                if not sentence[-1] in '.!?':
+                    sentence += '.'
+                cleaned_sentences.append(sentence)
+        
+        return cleaned_sentences
+
     def clean_text(self, raw_text: str, llm_provider: Optional[ILLMProvider] = None) -> List[str]:
         """Clean text for TTS - core responsibility only"""
         provider_to_use = llm_provider or self.llm_provider

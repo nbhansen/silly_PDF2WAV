@@ -15,6 +15,26 @@ class TesseractOCRProvider(IOCRProvider):
             pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
         self.poppler_path_custom = poppler_path_custom
 
+    def perform_ocr(self, image_path: str) -> str:
+        """Performs OCR on a single image file and returns the extracted text."""
+        try:
+            # Simple OCR on single image - this is what the interface expects
+            text = pytesseract.image_to_string(image_path, lang='eng')
+            return text if text.strip() else "OCR process yielded no text."
+        except Exception as e:
+            print(f"TesseractOCRProvider: OCR failed on {image_path}: {e}")
+            return f"Error during OCR: {str(e)}"
+
+    def perform_ocr(self, image_path: str) -> str:
+        """Performs OCR on a single image file and returns the extracted text."""
+        try:
+            # Simple OCR on single image - this is what the interface expects
+            text = pytesseract.image_to_string(image_path, lang='eng')
+            return text if text.strip() else "OCR process yielded no text."
+        except Exception as e:
+            print(f"TesseractOCRProvider: OCR failed on {image_path}: {e}")
+            return f"Error during OCR: {str(e)}"
+
     def extract_text(self, pdf_path: str, page_range: PageRange) -> str:
         """Extract text from PDF with optional page range"""
         print(f"TesseractOCRProvider: Starting extraction for {pdf_path}")

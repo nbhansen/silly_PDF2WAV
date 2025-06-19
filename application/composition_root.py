@@ -40,9 +40,14 @@ class CompositionRoot:
         self.llm_provider = self._create_llm_provider()
         self.tts_engine = self._create_tts_engine()
 
-        # --- 2. Instantiate Core Domain Services ---
-        self.text_cleaning_service = TextCleaningService()
-        self.academic_ssml_service = AcademicSSMLService()
+        # --- 2. Instantiate Core Domain Services (now that TTS engine exists) ---
+        self.text_cleaning_service = TextCleaningService(
+            llm_provider=self.llm_provider
+        )
+        self.academic_ssml_service = AcademicSSMLService(
+            tts_engine=self.tts_engine,
+            document_type=self.config.document_type
+        )
 
         # --- 3. Instantiate Timing Strategy & Dependent Service ---
         self.timing_strategy = self._create_timing_strategy()
@@ -74,8 +79,7 @@ class CompositionRoot:
                 api_key=self.config.gemini_api_key
             )
         elif self.config.tts_engine == self.config.tts_engine.PIPER:
-            # Note: Your PiperTTSProvider may need adjustment to accept these params
-            return PiperTTSProvider(model_path=self.config.piper_model_name)
+            return PiperTTSProvider(self.config.get_piper_config())
         raise ValueError(f"Unsupported TTS provider: {self.config.tts_engine}")
 
     def _create_timing_strategy(self) -> ITimingStrategy:
@@ -99,14 +103,15 @@ class CompositionRoot:
         if not self.config.enable_file_cleanup:
             print("INFO: File cleanup is disabled by configuration.")
             return None
-            
-        max_age_seconds = int(self.config.max_file_age_hours * 3600)
-        interval_seconds = int(self.config.auto_cleanup_interval_hours * 3600)
         
+        max_file_age_seconds = int(self.config.max_file_age_hours * 3600)
+        check_interval_seconds = int(self.config.auto_cleanup_interval_hours * 3600)
+    
+        # Use explicit keyword arguments to avoid any parameter mismatch
         scheduler = FileCleanupScheduler(
             file_manager=self.file_manager,
-            max_file_age_seconds=max_age_seconds,
-            check_interval_seconds=interval_seconds
+            max_file_age_seconds=max_file_age_seconds,
+            check_interval_seconds=check_interval_seconds
         )
         scheduler.start()
         return scheduler
