@@ -8,17 +8,12 @@ TTS engine.
 """
 
 import os
-import wave
-import subprocess
 from typing import List, Optional
 
-from domain.interfaces import ITimingStrategy, ITTSEngine
+from domain.interfaces import ITimingStrategy, ITTSEngine, IFileManager, IAudioProcessor
 from domain.models import TimedAudioResult, TextSegment, TimingMetadata
 from domain.services.academic_ssml_service import AcademicSSMLService
 from domain.services.text_cleaning_service import TextCleaningService
-
-# --- Fix: Import the module, not the class, to avoid circular dependency ---
-from infrastructure.file import file_manager
 
 
 class SentenceMeasurementStrategy(ITimingStrategy):
@@ -30,14 +25,15 @@ class SentenceMeasurementStrategy(ITimingStrategy):
         self,
         tts_engine: ITTSEngine,
         ssml_service: AcademicSSMLService,
-        file_manager, # Type hint removed to simplify import resolution
+        file_manager: IFileManager,
         text_cleaning_service: TextCleaningService,
+        audio_processor: IAudioProcessor,
     ):
         self.tts_engine = tts_engine
         self.ssml_service = ssml_service
         self.file_manager = file_manager
         self.text_cleaning_service = text_cleaning_service
-        self.ffmpeg_available = self._check_ffmpeg()
+        self.audio_processor = audio_processor
 
     def generate_with_timing(self, text_chunks: list[str], output_filename: str) -> TimedAudioResult:
         """
@@ -64,20 +60,23 @@ class SentenceMeasurementStrategy(ITimingStrategy):
         for i, sentence_text in enumerate(sentences):
             try:
                 # Generate audio for this sentence
-                audio_data = self.tts_engine.generate_audio_data(sentence_text)
+                result = self.tts_engine.generate_audio_data(sentence_text)
                 
-                if audio_data:
+                if result.is_success:
+                    audio_data = result.value
                     # Save temporary audio file
                     temp_wav_path = self.file_manager.save_temp_file(audio_data, suffix=".wav")
                     temp_audio_files.append(temp_wav_path)
                     
-                    # Measure actual duration from audio file
-                    duration = self._get_audio_duration(temp_wav_path)
-                    if duration is None:
+                    # Measure actual duration from audio file using AudioProcessor
+                    duration_result = self.audio_processor.get_audio_duration(temp_wav_path)
+                    if duration_result.is_failure:
                         # Fall back to estimation based on word count
                         clean_text = self.text_cleaning_service.strip_ssml(sentence_text)
                         word_count = len(clean_text.split())
                         duration = max(word_count / 2.5, 0.5)  # ~2.5 words per second
+                    else:
+                        duration = duration_result.value
 
                     # Create text segment with timing info
                     clean_display_text = self.text_cleaning_service.strip_ssml(sentence_text)
@@ -93,7 +92,7 @@ class SentenceMeasurementStrategy(ITimingStrategy):
                     cumulative_time += duration
                     print(f"  - Generated segment {i+1}: '{segment.text[:50]}...' ({duration:.2f}s)")
                 else:
-                    print(f"  - Failed to generate audio for sentence {i+1}")
+                    print(f"  - Failed to generate audio for sentence {i+1}: {result.error}")
 
             except Exception as e:
                 print(f"SentenceMeasurementStrategy: Error processing sentence {i+1}: {e}")
@@ -103,11 +102,12 @@ class SentenceMeasurementStrategy(ITimingStrategy):
         final_audio_files = []
         
         if temp_audio_files:
-            if self.ffmpeg_available and len(temp_audio_files) > 1:
-                # Create combined MP3
-                final_audio_path = self._create_combined_mp3(temp_audio_files, output_filename)
-                if final_audio_path:
-                    final_audio_files = [os.path.basename(final_audio_path)]
+            if self.audio_processor.check_ffmpeg_availability() and len(temp_audio_files) > 1:
+                # Create combined MP3 using AudioProcessor
+                output_path = os.path.join(self.file_manager.get_output_dir(), f"{output_filename}_combined.mp3")
+                combine_result = self.audio_processor.combine_audio_files(temp_audio_files, output_path)
+                if combine_result.is_success:
+                    final_audio_files = [os.path.basename(combine_result.value)]
             elif len(temp_audio_files) == 1:
                 # Single file - convert to output directory
                 try:
@@ -153,75 +153,4 @@ class SentenceMeasurementStrategy(ITimingStrategy):
             timing_data=timing_metadata
         )
 
-    def _get_audio_duration(self, audio_filepath: str) -> Optional[float]:
-        """Get duration of audio file in seconds"""
-        try:
-            with wave.open(audio_filepath, 'rb') as wav_file:
-                frames = wav_file.getnframes()
-                rate = wav_file.getframerate()
-                return frames / float(rate) if rate > 0 else 0.0
-        except Exception as e:
-            print(f"Warning: Could not read audio duration for {audio_filepath}: {e}")
-            return None
 
-    def _create_combined_mp3(self, audio_files: List[str], base_name: str) -> Optional[str]:
-        """Create combined MP3 from individual audio files"""
-        output_path = os.path.join(self.file_manager.get_output_dir(), f"{base_name}_combined.mp3")
-        concat_list_path = os.path.join(self.file_manager.get_output_dir(), "concat_list.txt")
-
-        try:
-            # Create FFmpeg concat file list
-            with open(concat_list_path, 'w') as f:
-                for path in audio_files:
-                    # Use absolute paths and escape properly for FFmpeg
-                    abs_path = os.path.abspath(path)
-                    f.write(f"file '{abs_path}'\n")
-
-            # Run FFmpeg to combine files
-            cmd = [
-                'ffmpeg', '-y', 
-                '-f', 'concat', 
-                '-safe', '0', 
-                '-i', concat_list_path,
-                '-c:a', 'libmp3lame', 
-                '-b:a', '128k',
-                '-ar', '22050',
-                output_path
-            ]
-            
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=300)
-            
-            if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-                print(f"Successfully created combined MP3: {output_path}")
-                return output_path
-            else:
-                print("FFmpeg completed but output file is empty or missing")
-                return None
-                
-        except subprocess.TimeoutExpired:
-            print("FFmpeg timed out during audio combination")
-            return None
-        except subprocess.CalledProcessError as e:
-            print(f"Error creating combined MP3: {e}")
-            if e.stderr:
-                print(f"FFmpeg stderr: {e.stderr}")
-            return None
-        except Exception as e:
-            print(f"Unexpected error creating combined MP3: {e}")
-            return None
-        finally:
-            # Clean up concat list file
-            try:
-                if os.path.exists(concat_list_path):
-                    os.remove(concat_list_path)
-            except:
-                pass
-
-    def _check_ffmpeg(self) -> bool:
-        """Check if FFmpeg is available"""
-        try:
-            result = subprocess.run(['ffmpeg', '-version'], capture_output=True, check=True, timeout=5)
-            return result.returncode == 0
-        except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
-            print("Warning: FFmpeg is not installed or not in PATH. Combined MP3 generation will be disabled.")
-            return False

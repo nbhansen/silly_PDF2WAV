@@ -9,9 +9,19 @@ from domain.errors import llm_provider_error
 class TextCleaningService(ITextCleaner):
     """Simplified text cleaning service focusing on core text processing"""
     
-    def __init__(self, llm_provider: Optional[ILLMProvider] = None, max_chunk_size: int = 100000):
+    def __init__(self, llm_provider: Optional[ILLMProvider] = None, config=None):
         self.llm_provider = llm_provider
-        self.max_chunk_size = max_chunk_size
+        
+        # Use config values if provided, otherwise use defaults
+        if config:
+            self.max_chunk_size = config.llm_max_chunk_size
+            self.audio_target_chunk_size = config.audio_target_chunk_size
+            self.audio_max_chunk_size = config.audio_max_chunk_size
+        else:
+            # Fallback defaults for backward compatibility
+            self.max_chunk_size = 100000
+            self.audio_target_chunk_size = 3000
+            self.audio_max_chunk_size = 5000
         print(f"TextCleaningService: Initialized with LLM provider: {llm_provider is not None}")
 
     def strip_ssml(self, ssml_text: str) -> str:
@@ -101,11 +111,17 @@ TEXT TO CLEAN:
 CLEANED TEXT:"""
         
         try:
-            cleaned_text = llm_provider.generate_content(prompt)
-            if not cleaned_text or cleaned_text.strip() == "":
-                print("TextCleaningService: LLM returned empty response, using fallback")
+            result = llm_provider.generate_content(prompt)
+            if result.is_success:
+                cleaned_text = result.value
+                if not cleaned_text or cleaned_text.strip() == "":
+                    print("TextCleaningService: LLM returned empty response, using fallback")
+                    return self._basic_tts_fallback(text_chunk)[0]
+                return cleaned_text
+            else:
+                print(f"TextCleaningService: LLM cleaning failed: {result.error}")
+                # Return fallback instead of propagating error - text cleaning failure shouldn't stop processing
                 return self._basic_tts_fallback(text_chunk)[0]
-            return cleaned_text
         except Exception as e:
             print(f"TextCleaningService: LLM cleaning failed: {e}")
             # Return fallback instead of propagating error - text cleaning failure shouldn't stop processing
@@ -159,8 +175,8 @@ CLEANED TEXT:"""
     
     def _chunk_for_audio(self, text: str) -> List[str]:
         """Split cleaned text into audio-friendly chunks"""
-        target_size = 3000
-        max_chunk_size = 5000
+        target_size = self.audio_target_chunk_size
+        max_chunk_size = self.audio_max_chunk_size
         
         if len(text) <= target_size:
             return [text]

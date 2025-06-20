@@ -7,7 +7,7 @@ import json
 import re
 import time
 from typing import Optional
-from flask import Flask, render_template, request, redirect, url_for, send_from_directory, jsonify
+from flask import Flask, render_template, request, url_for, send_from_directory, jsonify
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 
@@ -16,8 +16,8 @@ load_dotenv()
 
 # Import new configuration system and errors
 from application.config.system_config import SystemConfig
-from domain.models import ProcessingRequest, PageRange, ProcessingResult
-from domain.errors import ErrorCode, ApplicationError, invalid_page_range_error, file_size_error, unsupported_file_type_error, text_extraction_error, text_cleaning_error, audio_generation_error
+from domain.models import PageRange, ProcessingResult
+from domain.errors import ErrorCode, ApplicationError, audio_generation_error
 from application.composition_root import create_pdf_service_from_env
 from infrastructure.file.cleanup_scheduler import FileCleanupScheduler
 
@@ -25,6 +25,8 @@ from infrastructure.file.cleanup_scheduler import FileCleanupScheduler
 def is_flask_reloader():
     """Check if we're in Flask debug reloader process"""
     return os.environ.get('WERKZEUG_RUN_MAIN') != 'true'
+
+
 
 # Initialize configuration and validate early
 try:
@@ -34,6 +36,8 @@ except Exception as e:
     print(f"FATAL: Configuration error - {e}")
     print("Please fix your environment variables before starting the application.")
     exit(1)
+
+
 
 # Flask App Setup using validated configuration
 app = Flask(__name__)
@@ -71,7 +75,7 @@ else:
 def get_pdf_service():
     """Get PDF service, initializing if needed (for reloader process)"""
     global pdf_service, processor_available
-    
+
     if pdf_service is None and is_flask_reloader():
         try:
             pdf_service = create_pdf_service_from_env()
@@ -79,141 +83,159 @@ def get_pdf_service():
         except Exception as e:
             print(f"Failed to initialize PDF service in reloader: {e}")
             processor_available = False
-    
+
     return pdf_service
+
+
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+
+
 def parse_page_range_from_form(form) -> PageRange:
     """Parse page range from Flask form data"""
     use_page_range = form.get('use_page_range') == 'on'
-    
+
     if not use_page_range:
         return PageRange()
-    
+
     start_page = None
     end_page = None
-    
+
     start_page_str = form.get('start_page', '').strip()
     end_page_str = form.get('end_page', '').strip()
-    
+
     if start_page_str:
         start_page = int(start_page_str)
-    
+
     if end_page_str:
         end_page = int(end_page_str)
-    
+
     return PageRange(start_page=start_page, end_page=end_page)
+
+
 
 def clean_text_for_display(text: str) -> str:
     """Remove SSML markup and pause markers from text for display"""
     # Remove SSML tags
     text = re.sub(r'<[^>]+>', '', text)
-    
+
     # Remove pause markers
     text = re.sub(r'\.{3,}', '', text)  # Remove ... sequences
     text = re.sub(r'\(\s*\)', '', text)  # Remove ( ) sequences
     text = re.sub(r'\s+', ' ', text)    # Clean up multiple spaces
-    
+
     return text.strip()
+
+
 
 # Routes
 @app.route('/')
 def index():
     return render_template('index.html')
 
+
+
 @app.route('/audio_outputs/<filename>')
 def serve_audio(filename):
     return send_from_directory(app.config['AUDIO_FOLDER'], filename)
+
+
 
 @app.route('/read-along/<filename>')
 def read_along_view(filename):
     """Serve read-along interface for audio file"""
     # Extract base filename (remove extension and _combined suffix)
     base_filename = filename.replace('_combined.mp3', '').replace('.mp3', '').replace('.wav', '')
-    
+
     # Check if timing data exists
     timing_filename = f"{base_filename}_timing.json"
     timing_path = os.path.join(app.config['AUDIO_FOLDER'], timing_filename)
-    
+
     if not os.path.exists(timing_path):
         return f"Timing data not found for {filename}. This file was not processed with read-along support.", 404
-    
+
     # Check if audio file exists
     audio_path = os.path.join(app.config['AUDIO_FOLDER'], filename)
     if not os.path.exists(audio_path):
         return f"Audio file {filename} not found.", 404
-    
-    return render_template('read_along.html', 
-                         audio_filename=filename,
-                         base_filename=base_filename,
-                         timing_api_url=url_for('get_timing_data', filename=base_filename))
+
+    return render_template('read_along.html',
+                           audio_filename=filename,
+                           base_filename=base_filename,
+                           timing_api_url=url_for('get_timing_data', filename=base_filename))
+
+
 
 @app.route('/api/timing/<filename>')
 def get_timing_data(filename):
     """Serve timing metadata as JSON"""
     timing_filename = f"{filename}_timing.json"
     timing_path = os.path.join(app.config['AUDIO_FOLDER'], timing_filename)
-    
+
     if not os.path.exists(timing_path):
         return jsonify({'error': 'Timing data not found'}), 404
-    
+
     try:
         with open(timing_path, 'r', encoding='utf-8') as f:
             timing_data = json.load(f)
-        
+
         return jsonify(timing_data)
     except Exception as e:
         print(f"Error serving timing data: {e}")
         return jsonify({'error': 'Failed to load timing data'}), 500
+
+
 
 @app.route('/get_pdf_info', methods=['POST'])
 def get_pdf_info():
     service = get_pdf_service()
     if not processor_available or service is None:
         return jsonify({'error': 'PDF Service not available'}), 500
-    
+
     if 'pdf_file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400
-    
+
     file = request.files['pdf_file']
     if file.filename == '' or not allowed_file(file.filename):
         return jsonify({'error': 'Invalid file'}), 400
-    
+
     try:
         # Save temporary file
         original_filename = secure_filename(file.filename)
         temp_path = os.path.join(app.config['UPLOAD_FOLDER'], f"temp_{original_filename}")
         file.save(temp_path)
-        
+
         # Use OCR provider to get PDF info
         pdf_info = service.ocr_provider.get_pdf_info(temp_path)
-        
+
         # Clean up
         try:
             os.remove(temp_path)
-        except:
+        except Exception:
             pass
-        
+
         return jsonify({
             'total_pages': pdf_info.total_pages,
             'title': pdf_info.title,
             'author': pdf_info.author
         })
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
 
 def process_upload_request(request_form, uploaded_file, enable_timing=False):
     """
     Unified upload processing logic that preserves timing functionality.
-    
+
     Args:
         request_form: Flask request.form
-        uploaded_file: Flask uploaded file object  
+        uploaded_file: Flask uploaded file object
         enable_timing: bool - whether to generate timing data for read-along
-        
+
     Returns:
         tuple: (result, original_filename, base_filename_no_ext, error_message)
     """
@@ -235,9 +257,10 @@ def process_upload_request(request_form, uploaded_file, enable_timing=False):
                 # Clean up file before returning error
                 try:
                     os.remove(pdf_path)
-                except:
+                except Exception:
                     pass
-                return None, original_filename, base_filename_no_ext, f"Error: {validation.get('error', 'Invalid page range')}"
+                return None, original_filename, base_filename_no_ext, \
+                    f"Error: {validation.get('error', 'Invalid page range')}"
         
         # Convert PageRange to page list for the service
         pages_list = None
@@ -263,7 +286,7 @@ def process_upload_request(request_form, uploaded_file, enable_timing=False):
         # Clean up uploaded file
         try:
             os.remove(pdf_path)
-        except:
+        except Exception:
             pass
         
         if not timed_result or not timed_result.audio_files:
@@ -283,7 +306,8 @@ def process_upload_request(request_form, uploaded_file, enable_timing=False):
                 "audio_files_count": len(timed_result.audio_files),
                 "combined_mp3_created": timed_result.combined_mp3 is not None,
                 "timing_data_created": enable_timing and timed_result.timing_data is not None,
-                "timing_segments": len(timed_result.timing_data.text_segments) if (enable_timing and timed_result.timing_data) else 0
+                "timing_segments": len(timed_result.timing_data.text_segments) \
+                if (enable_timing and timed_result.timing_data) else 0
             }
         )
         
@@ -293,28 +317,31 @@ def process_upload_request(request_form, uploaded_file, enable_timing=False):
                 if hasattr(service.file_manager, 'get_file_info'):
                     result.debug_info['file_management'] = 'available'
                 result.debug_info['cleanup_enabled'] = app_config.enable_file_cleanup
-            except:
+            except Exception:
                 pass  # Don't fail upload if file stats fail
         
         return result, original_filename, base_filename_no_ext, None
-        
+
     except Exception as e:
         print(f"Upload processing error: {e}")
         import traceback
         traceback.print_exc()
-        return None, original_filename if 'original_filename' in locals() else 'unknown', '', f"An unexpected error occurred: {str(e)}"
+        return None, original_filename if 'original_filename' in locals() else 'unknown', '', \
+            f"An unexpected error occurred: {str(e)}"
+
+
 
 def render_upload_result(result, original_filename, base_filename_no_ext, page_range, enable_timing=False):
     """
     Render the result template with appropriate parameters.
-    
+
     Args:
         result: ProcessingResult object
-        original_filename: Original PDF filename  
+        original_filename: Original PDF filename
         base_filename_no_ext: Base filename without extension
         page_range: PageRange object
         enable_timing: bool - whether timing data was generated
-        
+
     Returns:
         Rendered template response
     """
@@ -325,7 +352,7 @@ def render_upload_result(result, original_filename, base_filename_no_ext, page_r
         
         # CRITICAL: Different template parameters based on timing
         template_params = {
-            'audio_files': result.audio_files or [],           
+            'audio_files': result.audio_files or [],
             'combined_mp3_file': result.combined_mp3_file,
             'original_filename': display_filename,
             'tts_engine': app_config.tts_engine.value,
@@ -339,23 +366,25 @@ def render_upload_result(result, original_filename, base_filename_no_ext, page_r
                 'has_timing_data': True,      # Enables read-along button
                 'base_filename': base_filename_no_ext  # For read-along URL
             })
-            print(f"✅ Timing data enabled - read-along button will be available")
+            print("✅ Timing data enabled - read-along button will be available")
         else:
             template_params.update({
                 'has_timing_data': False     # No read-along button
             })
-            print(f"✅ Standard processing - no read-along functionality")
-        
+            print("✅ Standard processing - no read-along functionality")
+
         return render_template('result.html', **template_params)
     else:
         # Handle errors (common for both routes)
         error_message = _get_user_friendly_error_message(result.error)
         retry_suggestion = _get_retry_suggestion(result.error)
-        
+
         if retry_suggestion:
             return f"Error: {error_message}<br><br>💡 Suggestion: {retry_suggestion}"
         else:
             return f"Error: {error_message}"
+
+
 
 # Upload routes - THE CORRECT ROUTES!
 @app.route('/upload', methods=['POST'])
@@ -367,24 +396,26 @@ def upload_file():
 
     if 'pdf_file' not in request.files:
         return "No file part in the request."
-    
+
     file = request.files['pdf_file']
     if file.filename == '' or not allowed_file(file.filename):
         return "No file selected or invalid file type."
-    
+
     # Use unified processing logic WITHOUT timing
     result, original_filename, base_filename, error_message = process_upload_request(
         request.form, file, enable_timing=False
     )
-    
+
     if error_message:
         return error_message
-    
+
     # Parse page range for display (needed for render function)
     page_range = parse_page_range_from_form(request.form)
-    
+
     # Render result WITHOUT timing data
     return render_upload_result(result, original_filename, base_filename, page_range, enable_timing=False)
+
+
 
 @app.route('/upload-with-timing', methods=['POST'])
 def upload_file_with_timing():
@@ -395,24 +426,26 @@ def upload_file_with_timing():
 
     if 'pdf_file' not in request.files:
         return "No file part in the request."
-    
+
     file = request.files['pdf_file']
     if file.filename == '' or not allowed_file(file.filename):
         return "No file selected or invalid file type."
-    
+
     # Use unified processing logic WITH timing
     result, original_filename, base_filename, error_message = process_upload_request(
         request.form, file, enable_timing=True
     )
-    
+
     if error_message:
         return error_message
-    
+
     # Parse page range for display (needed for render function)
     page_range = parse_page_range_from_form(request.form)
-    
+
     # Render result WITH timing data (enables read-along button)
     return render_upload_result(result, original_filename, base_filename, page_range, enable_timing=True)
+
+
 
 def save_timing_data(base_filename, timing_metadata):
     """Save timing metadata as JSON file"""
@@ -432,27 +465,29 @@ def save_timing_data(base_filename, timing_metadata):
             for segment in timing_metadata.text_segments
         ]
     }
-    
+
     timing_filename = f"{base_filename}_timing.json"
     timing_path = os.path.join(app.config['AUDIO_FOLDER'], timing_filename)
-    
+
     try:
         with open(timing_path, 'w', encoding='utf-8') as f:
             json.dump(timing_json, f, indent=2, ensure_ascii=False)
-        
+
         print(f"Saved timing data: {timing_filename}")
-        
+
         # Register timing file with file manager if available
         service = get_pdf_service()
         if hasattr(service, 'file_manager') and service.file_manager:
             try:
                 if hasattr(service.file_manager, 'schedule_cleanup'):
                     service.file_manager.schedule_cleanup(timing_filename, 2.0)  # Same cleanup as audio
-            except:
+            except Exception:
                 pass
-                
+
     except Exception as e:
         print(f"Failed to save timing data: {e}")
+
+
 
 # Fixed admin endpoints
 @app.route('/admin/file_stats')
@@ -461,7 +496,7 @@ def get_file_stats():
     service = get_pdf_service()
     if not processor_available or not service:
         return jsonify({'error': 'Service not available'}), 500
-    
+
     try:
         if hasattr(service, 'file_manager') and service.file_manager:
             # Use the FileManager's get_stats method if it exists
@@ -473,9 +508,9 @@ def get_file_stats():
                 audio_dir = app.config['AUDIO_FOLDER']
                 if os.path.exists(audio_dir):
                     files = os.listdir(audio_dir)
-                    total_size = sum(os.path.getsize(os.path.join(audio_dir, f)) 
-                                   for f in files if os.path.isfile(os.path.join(audio_dir, f)))
-                    
+                    total_size = sum(os.path.getsize(os.path.join(audio_dir, f))
+                                     for f in files if os.path.isfile(os.path.join(audio_dir, f)))
+
                     stats = {
                         'total_files': len(files),
                         'total_size_mb': total_size / (1024 * 1024),
@@ -487,10 +522,12 @@ def get_file_stats():
                     return jsonify({'error': 'Audio directory not found'}), 404
         else:
             return jsonify({'error': 'File management not available'}), 404
-            
+
     except Exception as e:
         print(f"Admin file_stats error: {e}")
         return jsonify({'error': str(e)}), 500
+
+
 
 @app.route('/admin/cleanup', methods=['POST'])
 def manual_cleanup():
@@ -498,10 +535,10 @@ def manual_cleanup():
     service = get_pdf_service()
     if not processor_available or not service:
         return jsonify({'error': 'Service not available'}), 500
-    
+
     try:
         max_age_hours = float(request.form.get('max_age_hours', 24.0))
-        
+
         if hasattr(service, 'file_manager') and service.file_manager:
             # Use direct file cleanup if method exists
             if hasattr(service.file_manager, 'cleanup_old_files'):
@@ -511,11 +548,11 @@ def manual_cleanup():
                 # Fallback: manual cleanup logic
                 audio_dir = app.config['AUDIO_FOLDER']
                 cutoff_time = time.time() - (max_age_hours * 3600)
-                
+
                 removed_files = 0
                 bytes_freed = 0
                 errors = []
-                
+
                 try:
                     for filename in os.listdir(audio_dir):
                         filepath = os.path.join(audio_dir, filename)
@@ -530,7 +567,7 @@ def manual_cleanup():
                                     print(f"Cleaned up old file: {filename}")
                                 except Exception as e:
                                     errors.append(f"Failed to remove {filename}: {str(e)}")
-                
+
                     result = {
                         'files_removed': removed_files,
                         'bytes_freed': bytes_freed,
@@ -539,22 +576,24 @@ def manual_cleanup():
                         'max_age_hours': max_age_hours
                     }
                     return jsonify(result)
-                    
+
                 except Exception as e:
                     return jsonify({'error': f'Cleanup failed: {str(e)}'}), 500
         else:
             return jsonify({'error': 'File management not available'}), 404
-            
+
     except Exception as e:
         print(f"Admin cleanup error: {e}")
         return jsonify({'error': str(e)}), 500
+
+
 
 @app.route('/admin/cleanup_scheduler', methods=['POST'])
 def trigger_scheduler_cleanup():
     """Trigger scheduler's manual cleanup"""
     try:
         service = get_pdf_service()
-        
+
         # The scheduler should be available through composition root
         if hasattr(service, 'cleanup_scheduler') and service.cleanup_scheduler:
             # Trigger manual cleanup if method exists
@@ -565,10 +604,12 @@ def trigger_scheduler_cleanup():
                 return jsonify({'error': 'Manual cleanup not supported by scheduler'}), 404
         else:
             return jsonify({'error': 'Cleanup scheduler not available'}), 500
-            
+
     except Exception as e:
         print(f"Scheduler cleanup error: {e}")
         return jsonify({'error': str(e)}), 500
+
+
 
 @app.route('/admin/test')
 def test_admin():
@@ -585,7 +626,7 @@ def test_admin():
             'file_cleanup_enabled': app_config.enable_file_cleanup,
             'is_reloader_process': is_flask_reloader()
         }
-        
+
         if service and hasattr(service, 'file_manager') and service.file_manager:
             info['file_manager_type'] = service.file_manager.__class__.__name__
             try:
@@ -594,11 +635,13 @@ def test_admin():
                     info['file_stats'] = stats
             except Exception as e:
                 info['file_stats_error'] = str(e)
-        
+
         return jsonify(info)
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
 
 def _get_user_friendly_error_message(error: 'ApplicationError') -> str:
     """Convert technical error to user-friendly message"""

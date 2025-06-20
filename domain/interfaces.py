@@ -6,9 +6,10 @@ implementations, facilitating testing and modularity.
 
 from abc import ABC, abstractmethod
 from enum import Enum, auto
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 from .models import TimedAudioResult, TextSegment
+from .errors import Result
 
 
 class SSMLCapability(Enum):
@@ -79,8 +80,13 @@ class ILLMProvider(ABC):
     """Interface for a Large Language Model provider."""
 
     @abstractmethod
-    def process_text(self, text: str) -> str:
+    def process_text(self, text: str) -> Result[str]:
         """Processes and enhances text."""
+        pass
+    
+    @abstractmethod
+    def generate_content(self, prompt: str) -> Result[str]:
+        """Generates content based on a prompt."""
         pass
 
 
@@ -88,7 +94,7 @@ class IOCRProvider(ABC):
     """Interface for an Optical Character Recognition provider."""
 
     @abstractmethod
-    def perform_ocr(self, image_path: str) -> str:
+    def perform_ocr(self, image_path: str) -> Result[str]:
         """Performs OCR on an image and returns the extracted text."""
         pass
 
@@ -97,11 +103,11 @@ class ITTSEngine(ABC):
     """Interface for a Text-to-Speech engine."""
 
     @abstractmethod
-    def generate_audio_data(self, text_to_speak: str) -> bytes:
+    def generate_audio_data(self, text_to_speak: str) -> Result[bytes]:
         """
         Generates raw audio data from text.
         Returns:
-            bytes: The raw audio content.
+            Result[bytes]: Success with audio content or failure with error.
         """
         pass
 
@@ -115,16 +121,13 @@ class ITimestampedTTSEngine(ITTSEngine):
     """
 
     @abstractmethod
-    def generate_audio_with_timestamps(self, text_to_speak: str) -> Tuple[bytes, List[TextSegment]]:
+    def generate_audio_with_timestamps(self, text_to_speak: str) -> Result[Tuple[bytes, List[TextSegment]]]:
         """
         Generates audio and returns precise timing data from the engine.
         Args:
             text_to_speak (str): The SSML or plain text to synthesize.
         Returns:
-            A tuple containing:
-            - bytes: The raw audio content.
-            - List[TextSegment]: A list of text segments with precise start
-                                 and duration times provided by the engine.
+            Result[Tuple[bytes, List[TextSegment]]]: Success with audio and timing data or failure with error.
         """
         pass
 
@@ -152,4 +155,73 @@ class ITimingStrategy(ABC):
             TimedAudioResult: An object containing the path to the final audio
                               and a list of timed text segments.
         """
+        pass
+
+
+# --- Phase 2 New Abstractions ---
+
+class IAudioProcessor(ABC):
+    """Interface for audio file processing operations (FFmpeg, etc.)"""
+    
+    @abstractmethod
+    def check_ffmpeg_availability(self) -> bool:
+        """Check if FFmpeg is available on the system."""
+        pass
+    
+    @abstractmethod
+    def combine_audio_files(self, audio_files: List[str], output_path: str) -> Result[str]:
+        """Combine multiple audio files into a single file."""
+        pass
+    
+    @abstractmethod
+    def convert_audio_format(self, input_path: str, output_path: str, format: str) -> Result[str]:
+        """Convert audio file to specified format."""
+        pass
+    
+    @abstractmethod
+    def get_audio_duration(self, audio_path: str) -> Result[float]:
+        """Get duration of audio file in seconds."""
+        pass
+
+
+class ITimingCalculator(ABC):
+    """Interface for calculating audio timing and duration estimation"""
+    
+    @abstractmethod
+    def estimate_text_duration(self, text: str, engine_type: str) -> float:
+        """Estimate duration for text based on engine characteristics."""
+        pass
+    
+    @abstractmethod
+    def calculate_phoneme_duration(self, text: str) -> float:
+        """Calculate duration based on phoneme analysis."""
+        pass
+    
+    @abstractmethod
+    def add_punctuation_pauses(self, text: str) -> float:
+        """Calculate additional time for punctuation pauses."""
+        pass
+
+
+class IEngineCapabilityDetector(ABC):
+    """Interface for detecting TTS engine capabilities"""
+    
+    @abstractmethod
+    def detect_ssml_capability(self, engine: ITTSEngine) -> SSMLCapability:
+        """Detect SSML capability level of an engine."""
+        pass
+    
+    @abstractmethod
+    def supports_timestamps(self, engine: ITTSEngine) -> bool:
+        """Check if engine supports native timestamp generation."""
+        pass
+    
+    @abstractmethod
+    def get_recommended_rate_limit(self, engine: ITTSEngine) -> float:
+        """Get recommended rate limiting delay for engine."""
+        pass
+    
+    @abstractmethod
+    def requires_async_processing(self, engine: ITTSEngine) -> bool:
+        """Determine if engine should use async processing."""
         pass

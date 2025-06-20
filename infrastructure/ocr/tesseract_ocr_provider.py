@@ -5,35 +5,36 @@ from typing import Optional, List, Dict, Any
 
 from domain.models import PDFInfo, PageRange
 from domain.interfaces import IOCRProvider
+from domain.errors import Result, text_extraction_error
 
 
 class TesseractOCRProvider(IOCRProvider):
     """Direct implementation of TextExtractor and PageRangeValidator using Tesseract OCR and pdfplumber."""
     
-    def __init__(self, tesseract_cmd=None, poppler_path_custom=None):
+    def __init__(self, tesseract_cmd=None, poppler_path_custom=None, config=None):
         if tesseract_cmd:
             pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
         self.poppler_path_custom = poppler_path_custom
+        
+        # Use config values if provided, otherwise use defaults
+        if config:
+            self.ocr_dpi = config.ocr_dpi
+            self.ocr_threshold = config.ocr_threshold
+        else:
+            # Fallback defaults for backward compatibility
+            self.ocr_dpi = 300
+            self.ocr_threshold = 180
 
-    def perform_ocr(self, image_path: str) -> str:
+    def perform_ocr(self, image_path: str) -> Result[str]:
         """Performs OCR on a single image file and returns the extracted text."""
         try:
             # Simple OCR on single image - this is what the interface expects
             text = pytesseract.image_to_string(image_path, lang='eng')
-            return text if text.strip() else "OCR process yielded no text."
+            if not text.strip():
+                return Result.failure(text_extraction_error("OCR process yielded no text"))
+            return Result.success(text)
         except Exception as e:
-            print(f"TesseractOCRProvider: OCR failed on {image_path}: {e}")
-            return f"Error during OCR: {str(e)}"
-
-    def perform_ocr(self, image_path: str) -> str:
-        """Performs OCR on a single image file and returns the extracted text."""
-        try:
-            # Simple OCR on single image - this is what the interface expects
-            text = pytesseract.image_to_string(image_path, lang='eng')
-            return text if text.strip() else "OCR process yielded no text."
-        except Exception as e:
-            print(f"TesseractOCRProvider: OCR failed on {image_path}: {e}")
-            return f"Error during OCR: {str(e)}"
+            return Result.failure(text_extraction_error(f"OCR failed on {image_path}: {str(e)}"))
 
     def extract_text(self, pdf_path: str, page_range: PageRange) -> str:
         """Extract text from PDF with optional page range"""
@@ -152,7 +153,7 @@ class TesseractOCRProvider(IOCRProvider):
             # Convert specified page range
             images = convert_from_path(
                 pdf_path, 
-                dpi=300, 
+                dpi=self.ocr_dpi, 
                 grayscale=True,
                 first_page=actual_start,
                 last_page=actual_end,
@@ -163,7 +164,7 @@ class TesseractOCRProvider(IOCRProvider):
             
             for i, image in enumerate(images):
                 processed_image = image.convert('L')
-                processed_image = processed_image.point(lambda p: 0 if p < 180 else 255)
+                processed_image = processed_image.point(lambda p: 0 if p < self.ocr_threshold else 255)
                 page_text = pytesseract.image_to_string(processed_image, lang='eng')
                 actual_page_num = actual_start + i
                 full_text += page_text + f"\n\n--- Page {actual_page_num} End (OCR) ---\n\n"
@@ -177,13 +178,13 @@ class TesseractOCRProvider(IOCRProvider):
     def _extract_ocr(self, pdf_path: str) -> str:
         """Extract text using OCR (full PDF)"""
         try:
-            images = convert_from_path(pdf_path, dpi=300, grayscale=True, 
+            images = convert_from_path(pdf_path, dpi=self.ocr_dpi, grayscale=True, 
                                      poppler_path=self.poppler_path_custom)
             
             full_text = ""
             for i, image in enumerate(images):
                 processed_image = image.convert('L')
-                processed_image = processed_image.point(lambda p: 0 if p < 180 else 255)
+                processed_image = processed_image.point(lambda p: 0 if p < self.ocr_threshold else 255)
                 page_text = pytesseract.image_to_string(processed_image, lang='eng')
                 full_text += page_text + f"\n\n--- Page {i+1} End (OCR) ---\n\n"
             

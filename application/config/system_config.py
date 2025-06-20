@@ -44,6 +44,38 @@ class SystemConfig:
     piper_models_dir: str = "piper_models"
     piper_length_scale: float = 1.0
     
+    # Audio processing settings
+    audio_bitrate: str = "128k"
+    audio_sample_rate: int = 22050
+    mp3_codec: str = "libmp3lame"
+    
+    # Processing timeouts (seconds)
+    tts_timeout_seconds: int = 60
+    ocr_timeout_seconds: int = 30
+    ffmpeg_timeout_seconds: int = 300
+    
+    # File type configuration
+    allowed_extensions: set = None  # Will be set in __post_init__
+    audio_extensions: set = None    # Will be set in __post_init__
+    timing_file_suffix: str = "_timing.json"
+    combined_file_suffix: str = "_combined"
+    
+    # OCR settings
+    ocr_dpi: int = 300
+    ocr_threshold: int = 180
+    
+    # Text processing
+    llm_max_chunk_size: int = 100000
+    audio_target_chunk_size: int = 3000
+    audio_max_chunk_size: int = 5000
+    
+    def __post_init__(self):
+        """Initialize mutable default values"""
+        if self.allowed_extensions is None:
+            self.allowed_extensions = {"pdf"}
+        if self.audio_extensions is None:
+            self.audio_extensions = {"wav", "mp3"}
+    
     @classmethod
     def from_env(cls) -> 'SystemConfig':
         """Load configuration from environment variables with validation"""
@@ -80,7 +112,26 @@ class SystemConfig:
             gemini_min_request_interval=cls._parse_float('GEMINI_MIN_REQUEST_INTERVAL', 2.0, min_val=0.1, max_val=10.0),
             piper_model_name=os.getenv('PIPER_MODEL_NAME', 'en_US-lessac-medium'),
             piper_models_dir=os.getenv('PIPER_MODELS_DIR', 'piper_models'),
-            piper_length_scale=cls._parse_float('PIPER_LENGTH_SCALE', 1.0, min_val=0.5, max_val=2.0)
+            piper_length_scale=cls._parse_float('PIPER_LENGTH_SCALE', 1.0, min_val=0.5, max_val=2.0),
+            
+            # Audio processing settings
+            audio_bitrate=os.getenv('AUDIO_BITRATE', '128k'),
+            audio_sample_rate=cls._parse_int('AUDIO_SAMPLE_RATE', 22050, min_val=8000, max_val=48000),
+            mp3_codec=os.getenv('MP3_CODEC', 'libmp3lame'),
+            
+            # Processing timeouts
+            tts_timeout_seconds=cls._parse_int('TTS_TIMEOUT_SECONDS', 60, min_val=10, max_val=300),
+            ocr_timeout_seconds=cls._parse_int('OCR_TIMEOUT_SECONDS', 30, min_val=5, max_val=120),
+            ffmpeg_timeout_seconds=cls._parse_int('FFMPEG_TIMEOUT_SECONDS', 300, min_val=30, max_val=600),
+            
+            # OCR settings
+            ocr_dpi=cls._parse_int('OCR_DPI', 300, min_val=150, max_val=600),
+            ocr_threshold=cls._parse_int('OCR_THRESHOLD', 180, min_val=100, max_val=240),
+            
+            # Text processing
+            llm_max_chunk_size=cls._parse_int('LLM_MAX_CHUNK_SIZE', 100000, min_val=1000, max_val=500000),
+            audio_target_chunk_size=cls._parse_int('AUDIO_TARGET_CHUNK_SIZE', 3000, min_val=500, max_val=10000),
+            audio_max_chunk_size=cls._parse_int('AUDIO_MAX_CHUNK_SIZE', 5000, min_val=1000, max_val=20000)
         )
         
         # Validate the complete configuration

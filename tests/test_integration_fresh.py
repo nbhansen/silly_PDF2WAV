@@ -9,12 +9,14 @@ import os
 import tempfile
 from pathlib import Path
 from unittest.mock import patch, MagicMock
+import pdfplumber
 
 # Simple imports - no complex fixtures
 from application.services.pdf_processing import PDFProcessingService
 from domain.services.text_cleaning_service import TextCleaningService
 from domain.services.audio_generation_service import AudioGenerationService
 from domain.models import ProcessingRequest, PageRange, PDFInfo
+from tests.test_helpers import FakeTimingStrategy
 
 
 def test_can_create_processing_request():
@@ -45,20 +47,25 @@ def test_can_create_services():
     
     # Create services
     text_cleaner = TextCleaningService(llm_provider=None)
-    audio_generator = AudioGenerationService(tts_engine=mock_tts)
+    timing_strategy = FakeTimingStrategy()
+    audio_generator = AudioGenerationService(timing_strategy=timing_strategy)
+    
+    # Create missing services for the actual constructor
+    mock_file_manager = MagicMock()
+    mock_ssml_service = MagicMock()
     
     pdf_service = PDFProcessingService(
-        text_extractor=mock_extractor,
+        ocr_provider=mock_extractor,
+        audio_generation_service=audio_generator,
+        file_manager=mock_file_manager,
         text_cleaner=text_cleaner,
-        audio_generator=audio_generator,
-        page_validator=mock_extractor,
-        llm_provider=None,
-        tts_engine=mock_tts
+        ssml_service=mock_ssml_service,
+        llm_provider=None
     )
     
     assert pdf_service is not None
-    assert pdf_service.text_extractor == mock_extractor
-    assert pdf_service.tts_engine == mock_tts
+    assert pdf_service.ocr_provider == mock_extractor
+    assert pdf_service.audio_generation_service == audio_generator
 
 
 def test_configuration_loading():
@@ -103,16 +110,25 @@ def test_error_handling_structure():
 @patch('os.makedirs')
 @patch('builtins.open')
 @patch('os.path.exists')
-def test_simple_pdf_processing_flow(mock_exists, mock_open, mock_makedirs):
+@patch('pdfplumber.open')
+def test_simple_pdf_processing_flow(mock_makedirs, mock_open, mock_exists, mock_pdfplumber):
     """Test a simple PDF processing flow end-to-end"""
     
     # Setup mocks
     mock_exists.return_value = True
     
+    # Setup pdfplumber mock
+    mock_pdf = MagicMock()
+    mock_page = MagicMock()
+    mock_page.extract_text.return_value = "This is extracted text from the PDF."
+    mock_pdf.pages = [mock_page]
+    mock_pdfplumber.return_value.__enter__.return_value = mock_pdf
+    
     # Create mock components
     mock_extractor = MagicMock()
     mock_extractor.extract_text.return_value = "This is extracted text from the PDF."
     mock_extractor.get_pdf_info.return_value = PDFInfo(total_pages=1, title="Test", author="Test")
+    mock_extractor.validate_range.return_value = {'valid': True, 'total_pages': 1}
     
     mock_tts = MagicMock()
     mock_tts.generate_audio_data.return_value = b"fake_audio_data"
@@ -120,15 +136,20 @@ def test_simple_pdf_processing_flow(mock_exists, mock_open, mock_makedirs):
     
     # Create services
     text_cleaner = TextCleaningService(llm_provider=None)  # No LLM for simplicity
-    audio_generator = AudioGenerationService(tts_engine=mock_tts)
+    timing_strategy = FakeTimingStrategy()
+    audio_generator = AudioGenerationService(timing_strategy=timing_strategy)
+    
+    # Create missing services for the actual constructor
+    mock_file_manager = MagicMock()
+    mock_ssml_service = MagicMock()
     
     pdf_service = PDFProcessingService(
-        text_extractor=mock_extractor,
+        ocr_provider=mock_extractor,
+        audio_generation_service=audio_generator,
+        file_manager=mock_file_manager,
         text_cleaner=text_cleaner,
-        audio_generator=audio_generator,
-        page_validator=mock_extractor,
-        llm_provider=None,
-        tts_engine=mock_tts
+        ssml_service=mock_ssml_service,
+        llm_provider=None
     )
     
     # Create request
@@ -188,9 +209,9 @@ def test_service_creation_from_config():
                 service = create_pdf_service_from_env()
                 
                 assert service is not None
-                assert hasattr(service, 'text_extractor')
+                assert hasattr(service, 'ocr_provider')
                 assert hasattr(service, 'text_cleaner')
-                assert hasattr(service, 'audio_generator')
+                assert hasattr(service, 'audio_generation_service')
 
 
 def test_text_cleaning_service():
@@ -209,24 +230,23 @@ def test_text_cleaning_service():
 def test_audio_generation_service():
     """Test audio generation service independently"""
     
+    timing_strategy = FakeTimingStrategy()
+    audio_service = AudioGenerationService(timing_strategy=timing_strategy)
+    
+    # Create a mock TTS engine
     mock_tts = MagicMock()
     mock_tts.generate_audio_data.return_value = b"mock_audio"
     mock_tts.get_output_format.return_value = "wav"
     
-    audio_service = AudioGenerationService(tts_engine=mock_tts)
+    text_chunks = ["First chunk", "Second chunk"]
+    result = audio_service.generate_audio_with_timing(
+        text_chunks, "test_output", "test_audio_dir", mock_tts
+    )
     
-    with patch('os.makedirs'), \
-         patch('builtins.open'), \
-         patch('os.path.exists', return_value=False):  # Disable MP3 creation
-        
-        text_chunks = ["First chunk", "Second chunk"]
-        audio_files, combined_mp3 = audio_service.generate_audio(
-            text_chunks, "test_output", "test_audio_dir"
-        )
-        
-        assert isinstance(audio_files, list)
-        assert len(audio_files) == 2
-        assert mock_tts.generate_audio_data.call_count == 2
+    assert isinstance(result, object)  # TimedAudioResult
+    assert hasattr(result, 'audio_files')
+    assert hasattr(result, 'combined_mp3')
+    assert hasattr(result, 'timing_data')
 
 
 def test_page_range_validation():

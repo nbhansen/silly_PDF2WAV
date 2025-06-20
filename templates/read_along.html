@@ -1,5 +1,87 @@
 {% extends "base.html" %}
 {% block title %}READ-ALONG MODE - NICOLAIS PDF2WAV{% endblock %}
+
+{% block head %}
+<!-- Add any enhanced styles here -->
+<style>
+/* Enhanced highlighting styles */
+.text-segment {
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.text-segment.active {
+    background: linear-gradient(
+        to right,
+        #9BF04C 0%,
+        #9BF04C calc(var(--highlight-progress, 0) * 100%),
+        rgba(155, 240, 76, 0.3) calc(var(--highlight-progress, 0) * 100%),
+        rgba(155, 240, 76, 0.3) 100%
+    );
+}
+
+.text-segment.pre-active {
+    animation: pulse 0.5s ease-in-out;
+}
+
+.text-segment.upcoming {
+    opacity: 0.8;
+    border-bottom: 1px dashed rgba(155, 240, 76, 0.5);
+}
+
+.text-segment.low-confidence {
+    border-bottom: 1px dotted #FBFE65;
+}
+
+.segment-type-technical {
+    font-family: 'Courier New', monospace;
+    background-color: rgba(64, 49, 141, 0.2);
+}
+
+.segment-type-emphasis {
+    font-weight: bold;
+}
+
+.timing-quality-indicator {
+    position: sticky;
+    top: 0;
+    background: rgba(0, 0, 0, 0.9);
+    padding: 5px;
+    text-align: center;
+    font-size: 0.9em;
+    z-index: 10;
+    margin-bottom: 10px;
+}
+
+.timing-tooltip {
+    background: rgba(0, 0, 0, 0.9);
+    color: #50C8FC;
+    padding: 5px 10px;
+    border-radius: 3px;
+    font-size: 0.8em;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+/* Enhanced control styles */
+#speedControl {
+    background-color: #40318D;
+    color: #FFFFFF;
+    border: 2px solid #50C8FC;
+    padding: 8px 15px;
+    font-family: 'Courier Prime', monospace;
+    font-weight: 700;
+    margin-left: 10px;
+}
+</style>
+{% endblock %}
+
 {% block content %}
     <h1>◆ READ-ALONG MODE ◆</h1>
     
@@ -20,6 +102,7 @@
                 <div class="sync-controls">
                     <button id="toggleAutoScroll" class="control-btn">AUTO-SCROLL: ON</button>
                     <button id="resumeTracking" class="control-btn" style="display: none;">RESUME TRACKING</button>
+                    <!-- Enhanced controls will be added here by JavaScript -->
                 </div>
             </div>
         </div>
@@ -27,7 +110,7 @@
         <div class="text-display-section">
             <h3>📄 DOCUMENT TEXT</h3>
             <div id="textContainer" class="text-container">
-                <p class="loading-text">LOADING TEXT SYNCHRONIZATION...</p>
+                <p class="loading-text">LOADING ENHANCED TEXT SYNCHRONIZATION...</p>
             </div>
         </div>
     </div>
@@ -35,13 +118,14 @@
     <div class="rainbow-divider"></div>
     
     <div class="instructions">
-        <h4><span class="icon">►</span>READ-ALONG INSTRUCTIONS</h4>
+        <h4><span class="icon">►</span>ENHANCED READ-ALONG FEATURES</h4>
         <ul>
-            <li>TEXT WILL HIGHLIGHT AUTOMATICALLY AS AUDIO PLAYS</li>
-            <li>CLICK ANY SENTENCE TO JUMP AUDIO TO THAT POSITION</li>
-            <li>SCROLL MANUALLY TO DISABLE AUTO-SCROLL</li>
-            <li>CLICK "RESUME TRACKING" TO RE-SYNC TEXT WITH AUDIO</li>
-            <li>USE AUDIO CONTROLS FOR PLAY/PAUSE/VOLUME/SPEED</li>
+            <li>TEXT HIGHLIGHTS SMOOTHLY AS AUDIO PLAYS</li>
+            <li>CLICK ANY SENTENCE TO JUMP TO THAT POSITION</li>
+            <li>ADJUST PLAYBACK SPEED (0.75x - 1.5x)</li>
+            <li>TOGGLE BETWEEN SMOOTH AND INSTANT HIGHLIGHTING</li>
+            <li>HOVER OVER TEXT TO SEE TIMING CONFIDENCE</li>
+            <li>COLOR-CODED TEXT TYPES (TECHNICAL, EMPHASIS, ETC.)</li>
         </ul>
     </div>
 
@@ -54,211 +138,56 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- Load the enhanced read-along JavaScript -->
+<script src="{{ url_for('static', filename='js/enhanced_read_along.js') }}"></script>
+
+<!-- Initialize the enhanced player -->
 <script>
-    class ReadAlongPlayer {
-        constructor(timingApiUrl, audioElement) {
-            this.timingApiUrl = timingApiUrl;
-            this.audio = audioElement;
-            this.segments = [];
-            this.currentSegmentIndex = -1;
-            this.autoScroll = true;
-            this.isUserSeeking = false;
-            
-            this.initializeElements();
-            this.loadTimingData();
-            this.setupEventListeners();
-        }
-        
-        initializeElements() {
-            this.textContainer = document.getElementById('textContainer');
-            this.currentTimeDisplay = document.getElementById('currentTime');
-            this.totalTimeDisplay = document.getElementById('totalTime');
-            this.toggleAutoScrollBtn = document.getElementById('toggleAutoScroll');
-            this.resumeTrackingBtn = document.getElementById('resumeTracking');
-        }
-        
-        async loadTimingData() {
-            try {
-                const response = await fetch(this.timingApiUrl);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-                
-                const timingData = await response.json();
-                this.segments = timingData.text_segments || [];
-                this.renderText();
-                
-                console.log(`Loaded ${this.segments.length} text segments`);
-            } catch (error) {
-                console.error('Failed to load timing data:', error);
-                this.textContainer.innerHTML = `
-                    <p style="color: #FBFE65; text-align: center;">
-                        ❌ FAILED TO LOAD TIMING DATA<br>
-                        Error: ${error.message}
-                    </p>
-                `;
-            }
-        }
-        
-        renderText() {
-            if (this.segments.length === 0) {
-                this.textContainer.innerHTML = '<p style="color: #FBFE65;">No text segments available.</p>';
-                return;
-            }
-            
-            const textHtml = this.segments.map((segment, index) => 
-                `<span class="text-segment" data-index="${index}" data-start="${segment.start_time}">
-                    ${this.escapeHtml(segment.text)}
-                </span>`
-            ).join(' ');
-            
-            this.textContainer.innerHTML = textHtml;
-            
-            // Add click listeners to segments
-            this.textContainer.querySelectorAll('.text-segment').forEach(segment => {
-                segment.addEventListener('click', (e) => {
-                    const startTime = parseFloat(e.target.dataset.start);
-                    this.seekToTime(startTime);
-                });
-            });
-        }
-        
-        setupEventListeners() {
-            // Audio time updates
-            this.audio.addEventListener('timeupdate', () => {
-                if (!this.isUserSeeking) {
-                    this.updateHighlight();
-                    this.updateTimeDisplay();
-                }
-            });
-            
-            // Audio loaded
-            this.audio.addEventListener('loadedmetadata', () => {
-                this.updateTimeDisplay();
-            });
-            
-            // User seeking
-            this.audio.addEventListener('seeking', () => {
-                this.isUserSeeking = true;
-            });
-            
-            this.audio.addEventListener('seeked', () => {
-                this.isUserSeeking = false;
-                this.updateHighlight();
-            });
-            
-            // Control buttons
-            this.toggleAutoScrollBtn.addEventListener('click', () => {
-                this.toggleAutoScroll();
-            });
-            
-            this.resumeTrackingBtn.addEventListener('click', () => {
-                this.resumeTracking();
-            });
-            
-            // Scroll detection
-            this.textContainer.addEventListener('scroll', () => {
-                if (this.autoScroll) {
-                    this.autoScroll = false;
-                    this.updateAutoScrollButton();
-                    this.resumeTrackingBtn.style.display = 'inline-block';
-                }
-            });
-        }
-        
-        updateHighlight() {
-            const currentTime = this.audio.currentTime;
-            let activeIndex = -1;
-            
-            // Find current segment
-            for (let i = 0; i < this.segments.length; i++) {
-                const segment = this.segments[i];
-                if (currentTime >= segment.start_time && 
-                    currentTime < segment.start_time + segment.duration) {
-                    activeIndex = i;
-                    break;
-                }
-            }
-            
-            // Update segment highlighting
-            this.textContainer.querySelectorAll('.text-segment').forEach((element, index) => {
-                element.classList.remove('active', 'completed');
-                
-                if (index === activeIndex) {
-                    element.classList.add('active');
-                } else if (index < activeIndex) {
-                    element.classList.add('completed');
-                }
-            });
-            
-            // Auto-scroll to active segment
-            if (activeIndex !== -1 && this.autoScroll && activeIndex !== this.currentSegmentIndex) {
-                const activeElement = this.textContainer.querySelector(`[data-index="${activeIndex}"]`);
-                if (activeElement) {
-                    activeElement.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'center'
-                    });
-                }
-            }
-            
-            this.currentSegmentIndex = activeIndex;
-        }
-        
-        updateTimeDisplay() {
-            this.currentTimeDisplay.textContent = this.formatTime(this.audio.currentTime);
-            this.totalTimeDisplay.textContent = this.formatTime(this.audio.duration || 0);
-        }
-        
-        formatTime(seconds) {
-            const mins = Math.floor(seconds / 60);
-            const secs = Math.floor(seconds % 60);
-            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        }
-        
-        seekToTime(time) {
-            this.audio.currentTime = time;
-            this.updateHighlight();
-        }
-        
-        toggleAutoScroll() {
-            this.autoScroll = !this.autoScroll;
-            this.updateAutoScrollButton();
-            
-            if (this.autoScroll) {
-                this.resumeTrackingBtn.style.display = 'none';
-                this.updateHighlight(); // Re-scroll to current position
-            }
-        }
-        
-        updateAutoScrollButton() {
-            this.toggleAutoScrollBtn.textContent = `AUTO-SCROLL: ${this.autoScroll ? 'ON' : 'OFF'}`;
-        }
-        
-        resumeTracking() {
-            this.autoScroll = true;
-            this.updateAutoScrollButton();
-            this.resumeTrackingBtn.style.display = 'none';
-            this.updateHighlight();
-        }
-        
-        escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-    }
+    // Configuration passed from Flask
+    const READ_ALONG_CONFIG = {
+        timingApiUrl: '{{ timing_api_url }}',
+        audioFilename: '{{ audio_filename }}',
+        baseFilename: '{{ base_filename }}',
+        enableEnhancedFeatures: true
+    };
     
-    // Initialize read-along player
+    // Initialize when DOM is ready
     document.addEventListener('DOMContentLoaded', function() {
+        console.log('Initializing Enhanced Read-Along Player...');
+        
         const audioElement = document.getElementById('mainAudio');
-        const timingApiUrl = '{{ timing_api_url }}';
         
-        const player = new ReadAlongPlayer(timingApiUrl, audioElement);
+        // Check if enhanced player is available
+        if (typeof EnhancedReadAlongPlayer !== 'undefined') {
+            // Use enhanced player
+            console.log('✅ Using Enhanced Read-Along Player');
+            window.readAlongPlayer = new EnhancedReadAlongPlayer(
+                READ_ALONG_CONFIG.timingApiUrl, 
+                audioElement
+            );
+        } else {
+            // Fallback to basic player
+            console.log('⚠️ Enhanced player not found, using basic player');
+            
+            // You can keep your original ReadAlongPlayer as fallback
+            // Or show an error message
+            document.getElementById('textContainer').innerHTML = `
+                <p style="color: #FBFE65; text-align: center;">
+                    ❌ Enhanced player not loaded<br>
+                    Please check that enhanced_read_along.js is properly included
+                </p>
+            `;
+        }
         
-        console.log('Read-along player initialized');
-        console.log('Timing API URL:', timingApiUrl);
-        console.log('Audio file:', '{{ audio_filename }}');
+        // Debug information
+        console.log('Read-along configuration:', READ_ALONG_CONFIG);
+    });
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', function() {
+        if (window.readAlongPlayer && window.readAlongPlayer.destroy) {
+            window.readAlongPlayer.destroy();
+        }
     });
 </script>
 {% endblock %}

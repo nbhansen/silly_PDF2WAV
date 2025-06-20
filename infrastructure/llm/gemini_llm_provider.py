@@ -2,6 +2,7 @@
 from google import genai
 from google.genai import types
 from domain.interfaces import ILLMProvider
+from domain.errors import Result, llm_provider_error
 
 class GeminiLLMProvider(ILLMProvider):
     """Implementation of ILLMProvider using the unified Google Gen AI SDK"""
@@ -24,15 +25,14 @@ class GeminiLLMProvider(ILLMProvider):
             print(f"GeminiLLMProvider: Failed to initialize unified client: {e}")
             return None
     
-    def process_text(self, text: str) -> str:
+    def process_text(self, text: str) -> Result[str]:
         """Processes and enhances text - required by ILLMProvider interface"""
         return self.generate_content(text)
 
-    def generate_content(self, prompt: str) -> str:
+    def generate_content(self, prompt: str) -> Result[str]:
         """Generates content based on a prompt using the unified Gemini SDK"""
         if not self.client:
-            print("GeminiLLMProvider: Client not available, cannot generate content.")
-            return "LLM content generation skipped due to missing API key or initialization error."
+            return Result.failure(llm_provider_error("Client not available - missing API key or initialization error"))
         
         try:
             response = self.client.models.generate_content(
@@ -45,11 +45,9 @@ class GeminiLLMProvider(ILLMProvider):
             )
             
             if response and response.text:
-                return response.text
+                return Result.success(response.text)
             else:
-                print("GeminiLLMProvider: LLM response was empty.")
-                return "LLM content generation yielded no response."
+                return Result.failure(llm_provider_error("LLM response was empty"))
                 
         except Exception as e:
-            print(f"GeminiLLMProvider: Error during content generation: {e}")
-            return f"Error during LLM content generation: {str(e)}"
+            return Result.failure(llm_provider_error(f"Content generation failed: {str(e)}"))

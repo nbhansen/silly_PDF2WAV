@@ -16,7 +16,7 @@ class AudioGenerationService:
     choosing between async (cloud TTS) and sync (local TTS) processing.
     """
 
-    def __init__(self, timing_strategy: ITimingStrategy):
+    def __init__(self, timing_strategy: ITimingStrategy, async_coordinator=None):
         """
         Initializes the AudioGenerationService with a specific timing strategy.
 
@@ -25,10 +25,12 @@ class AudioGenerationService:
                                                ITimingStrategy interface. This
                                                strategy will be used for sync
                                                processing and timing generation.
+            async_coordinator: Optional AudioGenerationCoordinator for async processing
         """
         if not isinstance(timing_strategy, ITimingStrategy):
             raise TypeError("timing_strategy must be an instance of ITimingStrategy")
         self.timing_strategy = timing_strategy
+        self.async_coordinator = async_coordinator
 
     def should_use_async(self, tts_engine: ITTSEngine) -> bool:
         """
@@ -106,16 +108,26 @@ class AudioGenerationService:
         print(f"🌐 Using ASYNC generation for cloud TTS: {tts_engine.__class__.__name__}")
         
         try:
-            # Use the async audio generation service
-            from .async_audio_generation_service import run_async_audio_generation
+            # Use injected coordinator or create one if needed
+            if self.async_coordinator:
+                coordinator = self.async_coordinator
+            else:
+                # Fallback: create coordinator (not ideal but maintains compatibility)
+                from .audio_generation_coordinator import AudioGenerationCoordinator
+                from infrastructure.file.file_manager import FileManager
+                
+                file_manager = FileManager(upload_folder="uploads", output_folder=output_dir)
+                coordinator = AudioGenerationCoordinator(
+                    tts_engine=tts_engine,
+                    file_manager=file_manager,
+                    max_concurrent_requests=4
+                )
             
             # Generate audio files asynchronously (handles rate limits, concurrency)
-            audio_files, combined_mp3 = run_async_audio_generation(
+            audio_files, combined_mp3 = coordinator.sync_generate_audio(
                 text_chunks=text_chunks,
                 output_name=output_filename,
-                output_dir=output_dir,
-                tts_engine=tts_engine,
-                max_concurrent=4  # Reasonable concurrency for cloud APIs
+                output_dir=output_dir
             )
             
             if not audio_files:

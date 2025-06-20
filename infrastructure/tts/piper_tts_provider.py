@@ -7,6 +7,7 @@ import re
 from typing import Optional, Dict, Any, List
 from domain.interfaces import ITTSEngine, SSMLCapability  # FIXED: Removed ISSMLProcessor
 from domain.config import PiperConfig
+from domain.errors import Result, tts_engine_error
 
 # Check for Piper availability
 PIPER_AVAILABLE = False
@@ -58,30 +59,34 @@ if PIPER_AVAILABLE:
         
         # === ITTSEngine Implementation ===
         
-        def generate_audio_data(self, text_to_speak: str) -> bytes:
+        def generate_audio_data(self, text_to_speak: str) -> Result[bytes]:
             """Generate audio data using Piper TTS"""
             if not text_to_speak or text_to_speak.strip() == "":
-                return b""
+                return Result.failure(tts_engine_error("Empty text provided"))
             
             # Skip error messages
             if (text_to_speak.startswith("LLM cleaning skipped") or 
                 text_to_speak.startswith("Error:") or 
                 text_to_speak.startswith("Could not convert")):
-                return b""
+                return Result.failure(tts_engine_error("Cannot generate audio from error message"))
             
             # Basic SSML processing for Piper
             processed_text = self._process_text_for_piper(text_to_speak)
             if not processed_text.strip():
-                return b""
+                return Result.failure(tts_engine_error("Text processing resulted in empty content"))
             
             try:
                 if PIPER_METHOD == "python_library" and self.voice_instance:
-                    return self._generate_with_python_lib(processed_text)
+                    audio_data = self._generate_with_python_lib(processed_text)
                 else:
-                    return self._generate_with_command_line(processed_text)
+                    audio_data = self._generate_with_command_line(processed_text)
+                
+                if not audio_data:
+                    return Result.failure(tts_engine_error("TTS engine returned no audio data"))
+                
+                return Result.success(audio_data)
             except Exception as e:
-                print(f"PiperTTSProvider: Error generating audio: {e}")
-                return b""
+                return Result.failure(tts_engine_error(f"Audio generation failed: {str(e)}"))
         
         def get_output_format(self) -> str:
             return self.output_format
@@ -259,9 +264,8 @@ else:
             print("PiperTTSProvider: Piper TTS not available.")
             print("Install with: pip install piper-tts")
         
-        def generate_audio_data(self, text_to_speak: str) -> bytes:
-            print("PiperTTSProvider: Piper TTS not available")
-            return b""
+        def generate_audio_data(self, text_to_speak: str) -> Result[bytes]:
+            return Result.failure(tts_engine_error("PiperTTSProvider: Piper TTS not available"))
         
         def get_output_format(self) -> str:
             return "wav"

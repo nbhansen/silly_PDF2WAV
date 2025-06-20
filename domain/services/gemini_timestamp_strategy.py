@@ -6,12 +6,9 @@ information (word or sentence boundaries) along with the generated audio. It is
 fast and accurate, making it the preferred approach.
 """
 
-from domain.interfaces import ITimingStrategy, ITimestampedTTSEngine
+from domain.interfaces import ITimingStrategy, ITimestampedTTSEngine, IFileManager
 from domain.models import TimedAudioResult, TextSegment, TimingMetadata
 from domain.services.academic_ssml_service import AcademicSSMLService
-
-# --- Fix: Import the module, not the class, to avoid circular dependency ---
-from infrastructure.file import file_manager
 
 
 class GeminiTimestampStrategy(ITimingStrategy):
@@ -23,7 +20,7 @@ class GeminiTimestampStrategy(ITimingStrategy):
         self,
         tts_engine: ITimestampedTTSEngine,
         ssml_service: AcademicSSMLService,
-        file_manager, # Type hint removed to simplify import resolution
+        file_manager: IFileManager,
     ):
         if not hasattr(tts_engine, 'generate_audio_with_timestamps'):
             raise TypeError("The provided tts_engine does not support the required ITimestampedTTSEngine interface.")
@@ -51,7 +48,13 @@ class GeminiTimestampStrategy(ITimingStrategy):
 
         try:
             print("GeminiTimestampStrategy: Generating audio with timestamps...")
-            audio_data, text_segments = self.tts_engine.generate_audio_with_timestamps(full_ssml_text)
+            result = self.tts_engine.generate_audio_with_timestamps(full_ssml_text)
+            
+            if result.is_failure:
+                print(f"GeminiTimestampStrategy: Engine failed: {result.error}")
+                return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
+            
+            audio_data, text_segments = result.value
             
             if not audio_data:
                 print("GeminiTimestampStrategy: Engine returned no audio data.")
