@@ -140,7 +140,7 @@ class AudioProcessor(IAudioProcessor):
                     abs_path = os.path.abspath(audio_file)
                     # Escape single quotes for FFmpeg
                     escaped_path = abs_path.replace("'", "'\"'\"'")
-                    f.write(f"file '{escaped_path}'\\n")
+                    f.write(f"file '{escaped_path}'\n")
 
             # Run FFmpeg to combine files
             cmd = [
@@ -153,6 +153,19 @@ class AudioProcessor(IAudioProcessor):
                 '-ar', self.audio_sample_rate,
                 output_path
             ]
+            
+            print(f"AudioProcessor: Running FFmpeg command: {' '.join(cmd)}")
+            print(f"AudioProcessor: Concat file path: {concat_list_path}")
+            
+            # Show concat file contents for debugging
+            try:
+                with open(concat_list_path, 'r') as f:
+                    concat_contents = f.read()
+                    print(f"AudioProcessor: Concat file contents:")
+                    for line in concat_contents.strip().split('\n'):
+                        print(f"  {line}")
+            except Exception as e:
+                print(f"AudioProcessor: Could not read concat file: {e}")
 
             result = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=self.ffmpeg_timeout)
 
@@ -164,9 +177,15 @@ class AudioProcessor(IAudioProcessor):
         except subprocess.TimeoutExpired:
             return Result.failure(audio_generation_error("FFmpeg timed out during combination"))
         except subprocess.CalledProcessError as e:
-            return Result.failure(audio_generation_error(f"FFmpeg combination failed: {e.stderr}"))
+            error_msg = f"FFmpeg combination failed: {e.stderr}"
+            print(f"AudioProcessor: {error_msg}")
+            print(f"AudioProcessor: FFmpeg stdout: {e.stdout}")
+            print(f"AudioProcessor: FFmpeg return code: {e.returncode}")
+            return Result.failure(audio_generation_error(error_msg))
         except Exception as e:
-            return Result.failure(audio_generation_error(f"Unexpected error during combination: {str(e)}"))
+            error_msg = f"Unexpected error during combination: {str(e)}"
+            print(f"AudioProcessor: {error_msg}")
+            return Result.failure(audio_generation_error(error_msg))
         finally:
             # Clean up concat list file
             if concat_list_path and os.path.exists(concat_list_path):

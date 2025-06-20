@@ -47,8 +47,63 @@ class AudioFileProcessor:
         if not audio_files:
             return Result.failure(audio_generation_error("No audio files to combine"))
 
+        # Validate audio files before attempting combination
+        valid_files, invalid_files = self.validate_audio_files(audio_files)
+        
+        # Enhanced file debugging - always enabled for now to diagnose MP3 issue
+        print(f"AudioFileProcessor: Validating {len(audio_files)} audio files for MP3 combination")
+        for i, file_path in enumerate(audio_files):
+            if os.path.exists(file_path):
+                size = os.path.getsize(file_path)
+                print(f"  File {i+1}: {file_path} - Size: {size} bytes")
+                
+                # Try to validate as WAV file
+                try:
+                    import wave
+                    with wave.open(file_path, 'rb') as wav:
+                        frames = wav.getnframes()
+                        rate = wav.getframerate()
+                        channels = wav.getnchannels()
+                        duration = frames / rate if rate > 0 else 0
+                        print(f"    WAV info: {frames} frames, {rate}Hz, {channels} channels, {duration:.2f}s")
+                except Exception as e:
+                    print(f"    WAV validation failed: {e}")
+                
+                # Try to validate with ffprobe if available
+                try:
+                    import subprocess
+                    result = subprocess.run([
+                        'ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_format', file_path
+                    ], capture_output=True, text=True, timeout=10)
+                    
+                    if result.returncode == 0:
+                        print(f"    FFprobe: Valid audio file")
+                    else:
+                        print(f"    FFprobe: Invalid audio file - {result.stderr}")
+                except Exception as e:
+                    print(f"    FFprobe validation skipped: {e}")
+            else:
+                print(f"  File {i+1}: {file_path} - MISSING")
+        
+        if invalid_files:
+            print(f"AudioFileProcessor: Found {len(invalid_files)} invalid audio files: {invalid_files}")
+        
+        if not valid_files:
+            return Result.failure(audio_generation_error(f"No valid audio files found. Invalid files: {invalid_files}"))
+        
+        if len(valid_files) != len(audio_files):
+            print(f"AudioFileProcessor: Using {len(valid_files)} valid files out of {len(audio_files)} total")
+
         output_path = os.path.join(output_dir, f"{output_name}_combined.mp3")
-        return self.audio_processor.combine_audio_files(audio_files, output_path)
+        print(f"AudioFileProcessor: Attempting to create MP3: {output_path}")
+        
+        result = self.audio_processor.combine_audio_files(valid_files, output_path)
+        
+        if not result.is_success:
+            print(f"AudioFileProcessor: MP3 combination failed with error: {result.error}")
+            print(f"AudioFileProcessor: Error details: {result.error.details if hasattr(result.error, 'details') else 'No details available'}")
+        
+        return result
 
     def cleanup_temp_files(self, temp_files: List[str]) -> None:
         """Clean up temporary audio files"""

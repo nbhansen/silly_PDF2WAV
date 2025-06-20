@@ -38,6 +38,7 @@ class SystemConfig:
 
     # Gemini specific
     gemini_api_key: Optional[str] = None
+    gemini_model_name: str = "gemini-2.5-flash-preview-tts"  # TTS-capable model
     gemini_voice_name: str = "Kore"
     gemini_min_request_interval: float = 2.0
 
@@ -123,6 +124,7 @@ class SystemConfig:
             max_disk_usage_mb=cls._parse_int('MAX_DISK_USAGE_MB', 1000, min_val=10, max_val=10000),
 
             gemini_api_key=os.getenv('GOOGLE_AI_API_KEY'),
+            gemini_model_name=os.getenv('GEMINI_MODEL_NAME', 'gemini-2.5-flash-preview-tts'),
             gemini_voice_name=os.getenv('GEMINI_VOICE_NAME', 'Kore'),
             gemini_min_request_interval=cls._parse_float('GEMINI_MIN_REQUEST_INTERVAL', 2.0, min_val=0.1, max_val=10.0),
             piper_model_name=os.getenv('PIPER_MODEL_NAME', 'en_US-lessac-medium'),

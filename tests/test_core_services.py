@@ -97,6 +97,19 @@ def test_academic_ssml_service_creation():
     assert service is not None
 
 
+def test_academic_ssml_service_with_missing_config():
+    """Test AcademicSSMLService works with missing config file"""
+    fake_tts = FakeTTSEngine()
+    service = AcademicSSMLService(fake_tts, academic_terms_config='nonexistent.json')
+    
+    # Should still work with fallback defaults
+    chunks = ['This is a significant finding.']
+    enhanced = service.enhance_text_chunks(chunks)
+    
+    assert len(enhanced) == 1
+    assert enhanced[0] is not None
+
+
 def test_pdf_processing_service_creation():
     """Test PDFProcessingService can be created with all dependencies"""
     # Create all the dependencies

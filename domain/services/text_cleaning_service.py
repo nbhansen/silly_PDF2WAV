@@ -97,14 +97,14 @@ class TextCleaningService(ITextCleaner):
         if not text_chunk.strip():
             return text_chunk
 
-        prompt = f"""Clean this academic text for text-to-speech conversion:
+        prompt = f"""Clean this academic text for text-to-speech by ONLY removing artifacts. Do NOT rephrase or shorten the original content.
 
-TASKS:
-- Remove headers, footers, page numbers, citations like [1], [2]
-- Remove artifacts like "Figure 1", "Table 2", etc.
-- Add natural pause markers (...) after transition words and between sections
-- Keep all important content but optimize for listening
-- Make it flow naturally when spoken aloud
+STRICT RULES:
+- Remove ONLY: headers, footers, page numbers, citations like [1], [2], "Figure 1", "Table 2" references
+- Add natural pause markers (...) between paragraphs and after transition words
+- Keep ALL original sentences and wording exactly as written
+- Do NOT paraphrase, summarize, or "optimize" the text
+- Preserve the author's exact language and sentence structure
 
 TEXT TO CLEAN:
 {text_chunk}

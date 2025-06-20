@@ -6,6 +6,8 @@ from typing import List, Tuple, Optional, Dict
 import re
 import json
 import os
+import wave
+import struct
 from google import genai
 from google.genai import types
 
@@ -151,7 +153,9 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
             )
 
             if response.candidates and response.candidates[0].content.parts:
-                return response.candidates[0].content.parts[0].inline_data.data
+                raw_audio_data = response.candidates[0].content.parts[0].inline_data.data
+                # Convert raw audio to proper WAV format
+                return self._convert_to_wav(raw_audio_data)
 
         except Exception as e:
             print(f"Error generating audio: {e}")
@@ -285,6 +289,47 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
         # Remove style instructions
         text = re.sub(r'^Say \w+:\s*', '', text)
         return text.strip()
+
+    def _convert_to_wav(self, raw_audio_data: bytes) -> bytes:
+        """Convert raw audio data from Gemini to proper WAV format"""
+        if not raw_audio_data:
+            return b""
+        
+        try:
+            # Gemini TTS typically returns PCM16 at 22050 Hz, mono
+            # These are common parameters, but may need adjustment
+            sample_rate = 22050
+            channels = 1
+            sample_width = 2  # 16-bit = 2 bytes per sample
+            
+            # Create WAV header manually
+            # Calculate sizes
+            data_size = len(raw_audio_data)
+            file_size = data_size + 36  # 44 - 8 bytes for RIFF header
+            
+            # Create WAV header
+            wav_header = struct.pack('<4sI4s4sIHHIIHH4sI',
+                b'RIFF',           # Chunk ID
+                file_size,         # Chunk size
+                b'WAVE',           # Format
+                b'fmt ',           # Subchunk1 ID
+                16,                # Subchunk1 size (PCM)
+                1,                 # Audio format (PCM)
+                channels,          # Number of channels
+                sample_rate,       # Sample rate
+                sample_rate * channels * sample_width,  # Byte rate
+                channels * sample_width,  # Block align
+                sample_width * 8,  # Bits per sample
+                b'data',           # Subchunk2 ID
+                data_size          # Subchunk2 size
+            )
+            
+            return wav_header + raw_audio_data
+            
+        except Exception as e:
+            print(f"Warning: Failed to convert audio to WAV format: {e}")
+            # Return raw data as fallback
+            return raw_audio_data
 
     def _combine_audio_chunks(self, chunks: List[bytes]) -> bytes:
         """Combine audio chunks (simplified - real implementation would merge WAV data)"""

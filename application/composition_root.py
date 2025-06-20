@@ -99,7 +99,7 @@ class CompositionRoot:
             # Use enhanced Gemini provider with multi-voice support
             print("INFO: Using Enhanced Gemini TTS with audiobook features")
             return GeminiTTSProvider(
-                model_name="gemini-2.0-flash-exp",
+                model_name=self.config.gemini_model_name,
                 api_key=self.config.gemini_api_key,
                 voice_personas_config=self.config.voice_personas_config
             )

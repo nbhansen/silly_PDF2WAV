@@ -75,10 +75,15 @@ class EnhancedReadAlongPlayer {
     
     async loadTimingData() {
         try {
+            console.log('Loading timing data from:', this.timingApiUrl);
             const response = await fetch(this.timingApiUrl);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            console.log('Response status:', response.status);
+            
+            if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             
             const timingData = await response.json();
+            console.log('Timing data loaded:', timingData);
+            
             this.segments = this.processTimingData(timingData.text_segments || []);
             this.renderText();
             
@@ -355,7 +360,84 @@ class EnhancedReadAlongPlayer {
         }, { once: true });
     }
     
-    // ... (keep existing methods like seekToTime, updateTimeDisplay, etc.)
+    setupEventListeners() {
+        // Audio element event listeners
+        this.audio.addEventListener('timeupdate', () => {
+            if (!this.isUserSeeking) {
+                this.updateHighlight();
+            }
+        });
+
+        this.audio.addEventListener('seeking', () => {
+            this.isUserSeeking = true;
+        });
+
+        this.audio.addEventListener('seeked', () => {
+            this.isUserSeeking = false;
+            this.updateHighlight();
+        });
+
+        this.audio.addEventListener('loadedmetadata', () => {
+            this.updateTimeDisplay();
+        });
+
+        // Control button listeners
+        if (this.toggleAutoScrollBtn) {
+            this.toggleAutoScrollBtn.addEventListener('click', () => {
+                this.autoScroll = !this.autoScroll;
+                this.toggleAutoScrollBtn.textContent = `AUTO-SCROLL: ${this.autoScroll ? 'ON' : 'OFF'}`;
+            });
+        }
+
+        if (this.resumeTrackingBtn) {
+            this.resumeTrackingBtn.addEventListener('click', () => {
+                this.isUserSeeking = false;
+                this.resumeTrackingBtn.style.display = 'none';
+                this.updateHighlight();
+            });
+        }
+    }
+
+    seekToTime(time) {
+        this.audio.currentTime = time;
+        this.isUserSeeking = false;
+        this.updateHighlight();
+    }
+
+    updateTimeDisplay() {
+        if (this.currentTimeDisplay) {
+            const current = this.audio.currentTime || 0;
+            this.currentTimeDisplay.textContent = this.formatTime(current);
+        }
+        
+        if (this.totalTimeDisplay && this.audio.duration) {
+            this.totalTimeDisplay.textContent = this.formatTime(this.audio.duration);
+        }
+    }
+
+    formatTime(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    showError(message) {
+        console.error('Read-along error:', message);
+        this.textContainer.innerHTML = `
+            <p style="color: #FBFE65; text-align: center; padding: 20px;">
+                ❌ ERROR LOADING TEXT SYNCHRONIZATION<br>
+                <span style="font-size: 0.9em; color: #50C8FC;">${message}</span><br>
+                <br>
+                Check browser console for details.
+            </p>
+        `;
+    }
     
     destroy() {
         // Cleanup

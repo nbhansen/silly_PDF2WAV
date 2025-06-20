@@ -17,15 +17,16 @@ class AcademicSSMLService:
         self.tts_engine = tts_engine
         self.document_type = document_type
         self.capability = self._detect_engine_capability()
-        self.academic_terms = self._load_academic_terms(academic_terms_config)
 
-        # Default academic terminology (fallback)
+        # Default academic terminology (fallback) - define before loading
         self.default_academic_terms = {
             'significance': ['significant', 'significantly', 'important', 'crucial', 'essential', 'key', 'primary', 'major'],
             'findings': ['found', 'discovered', 'revealed', 'demonstrated', 'showed', 'indicated', 'concluded', 'established'],
             'methodology': ['analyzed', 'examined', 'investigated', 'measured', 'calculated', 'assessed', 'evaluated', 'tested'],
             'transition': ['however', 'therefore', 'furthermore', 'moreover', 'consequently', 'nevertheless', 'nonetheless']
         }
+        
+        self.academic_terms = self._load_academic_terms(academic_terms_config)
 
     def _load_academic_terms(self, config_path: str) -> Dict:
         """Load academic terms from configuration file"""
@@ -37,10 +38,10 @@ class AcademicSSMLService:
                 return terms
             else:
                 print(f"Warning: Academic terms config not found at {config_path}, using defaults")
-                return {}
+                return self.default_academic_terms
         except Exception as e:
             print(f"Warning: Failed to load academic terms from {config_path}: {e}")
-            return {}
+            return self.default_academic_terms
 
         print(f"AcademicSSMLService: Initialized for {self.document_type} with {self.capability.value} SSML support")
 
@@ -186,14 +187,16 @@ class AcademicSSMLService:
         """Add emphasis to important academic terms"""
 
         # Emphasize significance words
-        for word in self.academic_terms['significance']:
+        significance_words = self.academic_terms.get('significance', [])
+        for word in significance_words:
             pattern = f'\\b{word}\\b'
             if f'<emphasis' not in text or word not in text:  # Avoid double emphasis
                 replacement = f'<emphasis level="moderate">{word}</emphasis>'
                 text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
 
         # Emphasize findings words
-        for word in self.academic_terms['findings']:
+        findings_words = self.academic_terms.get('findings', [])
+        for word in findings_words:
             pattern = f'\\b{word}\\b'
             if f'<emphasis' not in text or word not in text:
                 replacement = f'<emphasis level="moderate">{word}</emphasis>'

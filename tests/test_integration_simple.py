@@ -26,6 +26,19 @@ def test_configuration_loading():
         assert config.enable_text_cleaning is False
         assert config.enable_ssml is False
         assert config.enable_file_cleanup is False
+        # Test new Gemini model configuration
+        assert config.gemini_model_name == "gemini-2.5-flash-preview-tts"
+
+
+def test_gemini_model_configuration():
+    """Test that Gemini model can be configured via environment"""
+    with patch.dict(os.environ, {
+        'TTS_ENGINE': 'piper',
+        'GEMINI_MODEL_NAME': 'gemini-2.5-pro-preview-tts',
+        'ENABLE_FILE_CLEANUP': 'false'
+    }):
+        config = SystemConfig.from_env()
+        assert config.gemini_model_name == "gemini-2.5-pro-preview-tts"
 
 
 def test_composition_root_creation():
