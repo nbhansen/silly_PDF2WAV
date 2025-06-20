@@ -1,47 +1,55 @@
-# infrastructure/llm/gemini_llm_provider.py - Updated imports
-import os
-import google.generativeai as genai
-from google.generativeai import types
+# infrastructure/llm/gemini_llm_provider.py - Updated for unified google-genai SDK
+from google import genai
+from google.genai import types
 from domain.interfaces import ILLMProvider
 
 class GeminiLLMProvider(ILLMProvider):
-    """Direct implementation of ILLMProvider for Google Gemini"""
+    """Implementation of ILLMProvider using the unified Google Gen AI SDK"""
     
     def __init__(self, api_key: str):
         self.api_key = api_key
-        self.model = self._init_model()
+        self.client = self._init_client()
     
-    def _init_model(self):
-        """Initialize the Gemini model"""
-        if not self.api_key or self.api_key == "YOUR_GOOGLE_AI_API_KEY" or self.api_key == "crawling in my skin":
+    def _init_client(self):
+        """Initialize the unified Gemini client"""
+        if not self.api_key or self.api_key == "YOUR_GOOGLE_AI_API_KEY":
             print("GeminiLLMProvider: No valid API key provided - LLM functionality will be limited.")
             return None
             
         try:
-            genai.configure(api_key=self.api_key)
-            model = genai.GenerativeModel('gemini-2.0-flash')
-            print("GeminiLLMProvider: Gemini initialized successfully.")
-            return model
+            client = genai.Client(api_key=self.api_key)
+            print("GeminiLLMProvider: Unified Gemini client initialized successfully.")
+            return client
         except Exception as e:
-            print(f"GeminiLLMProvider: Failed to initialize Gemini: {e}")
+            print(f"GeminiLLMProvider: Failed to initialize unified client: {e}")
             return None
+    
     def process_text(self, text: str) -> str:
         """Processes and enhances text - required by ILLMProvider interface"""
         return self.generate_content(text)
 
     def generate_content(self, prompt: str) -> str:
-        """Generates content based on a prompt using Gemini"""
-        if not self.model:
-            print("GeminiLLMProvider: LLM model not available, cannot generate content.")
+        """Generates content based on a prompt using the unified Gemini SDK"""
+        if not self.client:
+            print("GeminiLLMProvider: Client not available, cannot generate content.")
             return "LLM content generation skipped due to missing API key or initialization error."
         
         try:
-            response = self.model.generate_content(prompt)
-            if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
-                return response.candidates[0].content.parts[0].text
+            response = self.client.models.generate_content(
+                model="gemini-2.0-flash",  # Use the latest model
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    max_output_tokens=8192,
+                    temperature=0.3,
+                )
+            )
+            
+            if response and response.text:
+                return response.text
             else:
                 print("GeminiLLMProvider: LLM response was empty.")
                 return "LLM content generation yielded no response."
+                
         except Exception as e:
             print(f"GeminiLLMProvider: Error during content generation: {e}")
             return f"Error during LLM content generation: {str(e)}"

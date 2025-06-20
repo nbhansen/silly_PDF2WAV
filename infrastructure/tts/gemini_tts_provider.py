@@ -1,10 +1,12 @@
 """
-Modern Text-to-Speech provider using Google Gemini 2.5 TTS API.
-Uses the latest API features for high-quality speech generation.
+Modern Text-to-Speech provider using the unified Google Gen AI SDK.
+Uses the latest unified API for high-quality speech generation with proper WAV file creation.
 """
 
+import wave
+import io
 from typing import List, Tuple, Optional
-import google.generativeai as genai
+from google import genai
 from google.genai import types
 
 from domain.interfaces import ITTSEngine
@@ -13,53 +15,112 @@ from domain.services.text_cleaning_service import TextCleaningService
 
 class GeminiTTSProvider(ITTSEngine):
     """
-    Modern implementation using Gemini 2.5 TTS API with native audio output.
+    Modern implementation using unified Google Gen AI SDK with native audio output.
     Supports multiple voices, SSML, and natural language style control.
+    Properly converts raw PCM audio to WAV format.
     """
 
-    # Available voices in Gemini 2.5
+    # Available voices in Gemini 2.5 TTS models
     AVAILABLE_VOICES = {
-        "Kore": "Balanced, natural voice (default)",
+        "Kore": "Firm, balanced voice",
         "Puck": "Upbeat, energetic voice",  
-        "Charon": "Deep, authoritative voice",
-        "Fenrir": "Warm, friendly voice",
-        "Aoede": "Clear, professional voice",
-        "Leda": "Youthful, expressive voice"
+        "Charon": "Informative, deep voice",
+        "Fenrir": "Excitable, warm voice",
+        "Leda": "Youthful, clear voice",
+        "Aoede": "Breezy, professional voice",
+        "Zephyr": "Bright, clear voice",
+        "Orus": "Firm, authoritative voice",
+        "Callirhoe": "Easy-going, friendly voice",
+        "Enceladus": "Breathy, gentle voice",
+        "Autonoe": "Bright, optimistic voice",
+        "Despina": "Smooth, flowing voice",
+        "Erinome": "Clear, precise voice",
+        "Gacrux": "Mature, experienced voice",
+        "Laomedeia": "Upbeat, lively voice",
+        "Pulcherrima": "Forward, expressive voice",
+        "Sulafat": "Warm, welcoming voice",
+        "Vindemiatrix": "Gentle, kind voice",
+        "Achernar": "Soft, gentle voice",
+        "Achird": "Friendly, approachable voice",
+        "Algenib": "Gravelly texture voice",
+        "Algieba": "Smooth, pleasant voice",
+        "Alnilam": "Firm, strong voice",
+        "Iapetus": "Clear, articulate voice",
+        "Rasalgethi": "Informative, professional voice",
+        "Sadachbia": "Lively, animated voice",
+        "Schedar": "Even, steady voice",
+        "Umbriel": "Easy-going voice",
+        "Zubenelgenubi": "Casual voice",
+        "Sadaltager": "Knowledgeable voice"
     }
 
     def __init__(self, model_name: str, api_key: Optional[str] = None):
         if not api_key:
             raise ValueError("Google AI API key is required for GeminiTTSProvider.")
         
-        # Configure API
-        genai.configure(api_key=api_key)
+        # Create client with the unified SDK
+        self.client = genai.Client(api_key=api_key)
         
         # Determine model and voice
         if model_name in self.AVAILABLE_VOICES:
             # If given a voice name, use it with default TTS model
             self.voice_name = model_name
-            self.model_name = "gemini-2.5-flash-preview-tts"  # Cost-efficient
+            self.model_name = "gemini-2.5-flash-preview-tts"
         else:
             # Use provided model name with default voice
-            self.model_name = model_name
-            self.voice_name = "Kore"
+            self.model_name = model_name if model_name.endswith('-tts') else "gemini-2.5-flash-preview-tts"
+            self.voice_name = "Kore"  # Default voice
         
-        # Initialize client
-        self.client = genai.Client(api_key=api_key)
         self.text_cleaner = TextCleaningService()
         
         print(f"GeminiTTSProvider: Initialized with model '{self.model_name}' and voice '{self.voice_name}'")
         print(f"Voice description: {self.AVAILABLE_VOICES.get(self.voice_name, 'Custom voice')}")
 
+    def _create_wav_file(self, raw_audio_data: bytes) -> bytes:
+        """
+        Convert raw PCM audio data from Gemini TTS into a proper WAV file.
+        
+        Gemini TTS returns raw 24kHz 16-bit mono PCM data that needs WAV headers.
+        
+        Args:
+            raw_audio_data: Raw PCM audio bytes from Gemini
+            
+        Returns:
+            bytes: Properly formatted WAV file data
+        """
+        if not raw_audio_data:
+            return b""
+        
+        try:
+            # Create WAV file in memory
+            wav_buffer = io.BytesIO()
+            
+            with wave.open(wav_buffer, 'wb') as wav_file:
+                # Gemini TTS format specifications
+                wav_file.setnchannels(1)        # Mono audio
+                wav_file.setsampwidth(2)        # 16-bit (2 bytes per sample)
+                wav_file.setframerate(24000)    # 24kHz sample rate
+                wav_file.writeframes(raw_audio_data)
+            
+            wav_buffer.seek(0)
+            wav_data = wav_buffer.getvalue()
+            
+            print(f"GeminiTTSProvider: Created WAV file ({len(wav_data)} bytes) from raw PCM ({len(raw_audio_data)} bytes)")
+            return wav_data
+            
+        except Exception as e:
+            print(f"GeminiTTSProvider: Error creating WAV file: {e}")
+            return raw_audio_data  # Fallback to raw data
+
     def generate_audio_data(self, text_to_speak: str) -> bytes:
         """
-        Generate high-quality audio using Gemini 2.5 TTS.
+        Generate high-quality audio using unified Gen AI SDK.
         
         Args:
             text_to_speak: Text to convert to speech (supports SSML and natural language style)
             
         Returns:
-            bytes: WAV audio data
+            bytes: Proper WAV audio data
         """
         if not text_to_speak or not text_to_speak.strip():
             return b""
@@ -67,7 +128,7 @@ class GeminiTTSProvider(ITTSEngine):
         print(f"GeminiTTSProvider: Generating audio ({len(text_to_speak)} chars) with voice '{self.voice_name}'")
         
         try:
-            # Use Gemini 2.5 TTS API
+            # Use the unified API for TTS generation
             response = self.client.models.generate_content(
                 model=self.model_name,
                 contents=text_to_speak,
@@ -79,11 +140,11 @@ class GeminiTTSProvider(ITTSEngine):
                                 voice_name=self.voice_name
                             )
                         )
-                    )
+                    ),
                 )
             )
             
-            # Extract audio data
+            # Extract raw audio data from the response
             if (response.candidates and 
                 len(response.candidates) > 0 and
                 response.candidates[0].content and
@@ -91,20 +152,31 @@ class GeminiTTSProvider(ITTSEngine):
                 len(response.candidates[0].content.parts) > 0 and
                 response.candidates[0].content.parts[0].inline_data):
                 
-                audio_data = response.candidates[0].content.parts[0].inline_data.data
-                print(f"GeminiTTSProvider: Successfully generated {len(audio_data)} bytes of audio")
-                return audio_data
+                raw_audio_data = response.candidates[0].content.parts[0].inline_data.data
+                print(f"GeminiTTSProvider: Received {len(raw_audio_data)} bytes of raw audio data")
+                
+                # Convert raw PCM data to proper WAV file
+                wav_data = self._create_wav_file(raw_audio_data)
+                
+                if wav_data:
+                    print(f"GeminiTTSProvider: Successfully created WAV file ({len(wav_data)} bytes)")
+                    return wav_data
+                else:
+                    print("GeminiTTSProvider: Failed to create WAV file")
+                    return b""
             else:
                 print("GeminiTTSProvider: No audio data in response")
                 # Log response structure for debugging
                 print(f"Response structure: candidates={len(response.candidates) if response.candidates else 0}")
+                if response.candidates and response.candidates[0].content:
+                    print(f"Parts: {len(response.candidates[0].content.parts) if response.candidates[0].content.parts else 0}")
                 return b""
                 
         except Exception as e:
             print(f"GeminiTTSProvider: Error generating audio: {e}")
             import traceback
             traceback.print_exc()
-            raise
+            return b""
 
     def get_output_format(self) -> str:
         """Gemini TTS outputs WAV format"""
@@ -273,3 +345,35 @@ class GeminiTTSProvider(ITTSEngine):
             str: Enhanced text with style instruction
         """
         return f"Say {style_instruction}: {text}"
+
+    def get_audio_info(self, audio_data: bytes) -> dict:
+        """
+        Get information about generated audio data.
+        
+        Args:
+            audio_data: WAV audio data
+            
+        Returns:
+            dict: Audio information
+        """
+        if not audio_data:
+            return {"error": "No audio data"}
+        
+        try:
+            # Try to read WAV info
+            with wave.open(io.BytesIO(audio_data), 'rb') as wav_file:
+                return {
+                    "channels": wav_file.getnchannels(),
+                    "sample_width": wav_file.getsampwidth(),
+                    "frame_rate": wav_file.getframerate(),
+                    "frames": wav_file.getnframes(),
+                    "duration_seconds": wav_file.getnframes() / wav_file.getframerate(),
+                    "size_bytes": len(audio_data),
+                    "format": "WAV"
+                }
+        except Exception as e:
+            return {
+                "error": f"Could not read audio info: {e}",
+                "size_bytes": len(audio_data),
+                "format": "Unknown"
+            }
