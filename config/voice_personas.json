@@ -1,0 +1,26 @@
+{
+  "narrator": {
+    "voice": "Charon",
+    "style": "informative and clear",
+    "rate": "medium",
+    "description": "Deep, authoritative voice for main narration"
+  },
+  "emphasis": {
+    "voice": "Kore",
+    "style": "engaged and emphatic",
+    "rate": "slightly slower",
+    "description": "Balanced, natural voice for emphasized content"
+  },
+  "technical": {
+    "voice": "Aoede",
+    "style": "precise and measured",
+    "rate": "slower",
+    "description": "Clear, professional voice for technical terms"
+  },
+  "dialogue": {
+    "voice": "Leda",
+    "style": "conversational",
+    "rate": "natural",
+    "description": "Youthful, expressive voice for quoted content"
+  }
+}

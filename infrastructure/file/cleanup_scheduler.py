@@ -8,6 +8,7 @@ from typing import Dict
 
 from domain.interfaces import IFileManager
 
+
 class FileCleanupScheduler:
     """
     Manages a background thread to periodically clean up registered files
@@ -37,8 +38,8 @@ class FileCleanupScheduler:
 
         # Thread-safe structures for managing files
         self._lock = threading.Lock()
-        self._scheduled_files: Dict[str, float] = {} # {filepath: creation_timestamp}
-        
+        self._scheduled_files: Dict[str, float] = {}  # {filepath: creation_timestamp}
+
         self._stop_event = threading.Event()
         self._thread = threading.Thread(target=self._cleanup_job, daemon=True)
 
@@ -66,7 +67,7 @@ class FileCleanupScheduler:
         if self._thread.is_alive():
             print("Stopping background file cleanup thread.")
             self._stop_event.set()
-            self._thread.join(timeout=5) # Wait for thread to finish
+            self._thread.join(timeout=5)  # Wait for thread to finish
 
     def _cleanup_job(self) -> None:
         """The main loop for the background thread."""
@@ -87,10 +88,9 @@ class FileCleanupScheduler:
                         print(f"File expired: {os.path.basename(filepath)}. Deleting.")
                         self.file_manager.delete_file(filepath)
                         del self._scheduled_files[filepath]
-            
+
             except Exception as e:
                 print(f"Error in cleanup thread: {e}")
 
             # Wait for the next interval, but check for stop event more frequently
             self._stop_event.wait(self.check_interval_seconds)
-

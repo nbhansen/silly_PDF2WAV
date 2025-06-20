@@ -12,6 +12,8 @@ from domain.interfaces import IFileManager
 from domain.models import FileInfo
 
 # Correctly inherit from the IFileManager interface
+
+
 class FileManager(IFileManager):
     """Manages file I/O, pathing, and temporary file creation."""
 
@@ -42,14 +44,14 @@ class FileManager(IFileManager):
         """Saves content to a final output file and returns its full path."""
         if not filename:
             raise ValueError("Filename cannot be empty.")
-        
+
         # Sanitize filename to prevent directory traversal
         base_filename = os.path.basename(filename)
         output_path = os.path.join(self.output_folder, base_filename)
-        
+
         with open(output_path, "wb") as f:
             f.write(content)
-        
+
         print(f"Saved output file: {output_path}")
         return output_path
 
@@ -59,8 +61,8 @@ class FileManager(IFileManager):
             # For security, ensure path is within our managed folders
             abs_path = os.path.abspath(filepath)
             if not (abs_path.startswith(self.output_folder) or abs_path.startswith(self.upload_folder)):
-                 print(f"Security Warning: Attempted to delete file outside managed directories: {filepath}")
-                 return False
+                print(f"Security Warning: Attempted to delete file outside managed directories: {filepath}")
+                return False
 
             if os.path.exists(abs_path):
                 os.remove(abs_path)
@@ -76,7 +78,7 @@ class FileManager(IFileManager):
         filepath = os.path.join(self.output_folder, filename)
         if not os.path.exists(filepath):
             return None
-        
+
         stat = os.stat(filepath)
         return FileInfo(
             name=filename,

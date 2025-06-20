@@ -83,7 +83,7 @@ class ILLMProvider(ABC):
     def process_text(self, text: str) -> Result[str]:
         """Processes and enhances text."""
         pass
-    
+
     @abstractmethod
     def generate_content(self, prompt: str) -> Result[str]:
         """Generates content based on a prompt."""
@@ -162,22 +162,22 @@ class ITimingStrategy(ABC):
 
 class IAudioProcessor(ABC):
     """Interface for audio file processing operations (FFmpeg, etc.)"""
-    
+
     @abstractmethod
     def check_ffmpeg_availability(self) -> bool:
         """Check if FFmpeg is available on the system."""
         pass
-    
+
     @abstractmethod
     def combine_audio_files(self, audio_files: List[str], output_path: str) -> Result[str]:
         """Combine multiple audio files into a single file."""
         pass
-    
+
     @abstractmethod
     def convert_audio_format(self, input_path: str, output_path: str, format: str) -> Result[str]:
         """Convert audio file to specified format."""
         pass
-    
+
     @abstractmethod
     def get_audio_duration(self, audio_path: str) -> Result[float]:
         """Get duration of audio file in seconds."""
@@ -186,17 +186,17 @@ class IAudioProcessor(ABC):
 
 class ITimingCalculator(ABC):
     """Interface for calculating audio timing and duration estimation"""
-    
+
     @abstractmethod
     def estimate_text_duration(self, text: str, engine_type: str) -> float:
         """Estimate duration for text based on engine characteristics."""
         pass
-    
+
     @abstractmethod
     def calculate_phoneme_duration(self, text: str) -> float:
         """Calculate duration based on phoneme analysis."""
         pass
-    
+
     @abstractmethod
     def add_punctuation_pauses(self, text: str) -> float:
         """Calculate additional time for punctuation pauses."""
@@ -205,22 +205,22 @@ class ITimingCalculator(ABC):
 
 class IEngineCapabilityDetector(ABC):
     """Interface for detecting TTS engine capabilities"""
-    
+
     @abstractmethod
     def detect_ssml_capability(self, engine: ITTSEngine) -> SSMLCapability:
         """Detect SSML capability level of an engine."""
         pass
-    
+
     @abstractmethod
     def supports_timestamps(self, engine: ITTSEngine) -> bool:
         """Check if engine supports native timestamp generation."""
         pass
-    
+
     @abstractmethod
     def get_recommended_rate_limit(self, engine: ITTSEngine) -> float:
         """Get recommended rate limiting delay for engine."""
         pass
-    
+
     @abstractmethod
     def requires_async_processing(self, engine: ITTSEngine) -> bool:
         """Determine if engine should use async processing."""

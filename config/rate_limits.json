@@ -1,0 +1,28 @@
+{
+  "rate_limits": {
+    "GeminiTTSProvider": {
+      "delay_seconds": 2.0,
+      "max_retries": 3,
+      "backoff_multiplier": 2.0,
+      "max_delay_seconds": 30.0
+    },
+    "PiperTTSProvider": {
+      "delay_seconds": 0.1,
+      "max_retries": 2,
+      "backoff_multiplier": 1.5,
+      "max_delay_seconds": 5.0
+    },
+    "OpenAITTSProvider": {
+      "delay_seconds": 1.0,
+      "max_retries": 3,
+      "backoff_multiplier": 2.0,
+      "max_delay_seconds": 15.0
+    }
+  },
+  "default": {
+    "delay_seconds": 1.0,
+    "max_retries": 3,
+    "backoff_multiplier": 2.0,
+    "max_delay_seconds": 30.0
+  }
+}

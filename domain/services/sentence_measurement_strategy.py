@@ -42,11 +42,11 @@ class SentenceMeasurementStrategy(ITimingStrategy):
         # FIXED: Use the correct method name and approach
         print(f"SentenceMeasurementStrategy: Enhancing {len(text_chunks)} text chunks with SSML...")
         enhanced_chunks = self.ssml_service.enhance_text_chunks(text_chunks)
-        
+
         # Combine enhanced chunks into full text for sentence splitting
         full_enhanced_text = " ".join(enhanced_chunks)
         sentences = self.text_cleaning_service.split_into_sentences(full_enhanced_text)
-        
+
         if not sentences:
             print("SentenceMeasurementStrategy: No sentences found after processing")
             return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
@@ -61,13 +61,13 @@ class SentenceMeasurementStrategy(ITimingStrategy):
             try:
                 # Generate audio for this sentence
                 result = self.tts_engine.generate_audio_data(sentence_text)
-                
+
                 if result.is_success:
                     audio_data = result.value
                     # Save temporary audio file
                     temp_wav_path = self.file_manager.save_temp_file(audio_data, suffix=".wav")
                     temp_audio_files.append(temp_wav_path)
-                    
+
                     # Measure actual duration from audio file using AudioProcessor
                     duration_result = self.audio_processor.get_audio_duration(temp_wav_path)
                     if duration_result.is_failure:
@@ -90,17 +90,17 @@ class SentenceMeasurementStrategy(ITimingStrategy):
                     )
                     text_segments.append(segment)
                     cumulative_time += duration
-                    print(f"  - Generated segment {i+1}: '{segment.text[:50]}...' ({duration:.2f}s)")
+                    print(f"  - Generated segment {i + 1}: '{segment.text[:50]}...' ({duration:.2f}s)")
                 else:
-                    print(f"  - Failed to generate audio for sentence {i+1}: {result.error}")
+                    print(f"  - Failed to generate audio for sentence {i + 1}: {result.error}")
 
             except Exception as e:
-                print(f"SentenceMeasurementStrategy: Error processing sentence {i+1}: {e}")
+                print(f"SentenceMeasurementStrategy: Error processing sentence {i + 1}: {e}")
 
         # Create combined audio file if we have audio files and ffmpeg
         final_audio_path = None
         final_audio_files = []
-        
+
         if temp_audio_files:
             if self.audio_processor.check_ffmpeg_availability() and len(temp_audio_files) > 1:
                 # Create combined MP3 using AudioProcessor
@@ -121,12 +121,13 @@ class SentenceMeasurementStrategy(ITimingStrategy):
                 # Multiple files but no ffmpeg - copy all individual files
                 for i, temp_file in enumerate(temp_audio_files):
                     try:
-                        output_path = os.path.join(self.file_manager.get_output_dir(), f"{output_filename}_part{i+1:02d}.wav")
+                        output_path = os.path.join(self.file_manager.get_output_dir(),
+                                                   f"{output_filename}_part{i + 1:02d}.wav")
                         with open(temp_file, 'rb') as src, open(output_path, 'wb') as dst:
                             dst.write(src.read())
                         final_audio_files.append(os.path.basename(output_path))
                     except Exception as e:
-                        print(f"Failed to copy audio file {i+1}: {e}")
+                        print(f"Failed to copy audio file {i + 1}: {e}")
 
         # Clean up temporary files
         for temp_file in temp_audio_files:
@@ -145,12 +146,11 @@ class SentenceMeasurementStrategy(ITimingStrategy):
                 audio_files=final_audio_files
             )
 
-        print(f"SentenceMeasurementStrategy: Finished. Total duration: {cumulative_time:.2f}s, Generated {len(final_audio_files)} audio files")
-        
+        print(
+            f"SentenceMeasurementStrategy: Finished. Total duration: {cumulative_time:.2f}s, Generated {len(final_audio_files)} audio files")
+
         return TimedAudioResult(
             audio_files=final_audio_files,
             combined_mp3=final_audio_files[0] if final_audio_files else None,
             timing_data=timing_metadata
         )
-
-

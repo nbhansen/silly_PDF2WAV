@@ -6,12 +6,13 @@ from typing import Optional, List
 from domain.interfaces import ITextCleaner, ILLMProvider
 from domain.errors import llm_provider_error
 
+
 class TextCleaningService(ITextCleaner):
     """Simplified text cleaning service focusing on core text processing"""
-    
+
     def __init__(self, llm_provider: Optional[ILLMProvider] = None, config=None):
         self.llm_provider = llm_provider
-        
+
         # Use config values if provided, otherwise use defaults
         if config:
             self.max_chunk_size = config.llm_max_chunk_size
@@ -36,14 +37,14 @@ class TextCleaningService(ITextCleaner):
     def split_into_sentences(self, text: str) -> List[str]:
         """Splits a block of text into a list of sentences."""
         import re
-        
+
         # First strip any SSML tags
         clean_text = self.strip_ssml(text)
-        
+
         # Simple sentence splitting on common sentence endings
         # This handles most academic text reasonably well
         sentences = re.split(r'[.!?]+\s+', clean_text)
-        
+
         # Clean up and filter out empty sentences
         cleaned_sentences = []
         for sentence in sentences:
@@ -53,49 +54,49 @@ class TextCleaningService(ITextCleaner):
                 if not sentence[-1] in '.!?':
                     sentence += '.'
                 cleaned_sentences.append(sentence)
-        
+
         return cleaned_sentences
 
     def clean_text(self, raw_text: str, llm_provider: Optional[ILLMProvider] = None) -> List[str]:
         """Clean text for TTS - core responsibility only"""
         provider_to_use = llm_provider or self.llm_provider
-        
+
         if not raw_text.strip():
             return [""]
-            
+
         if raw_text.startswith("Error") or raw_text.startswith("Could not convert"):
             return [raw_text]
-        
+
         if not provider_to_use:
             return self._basic_tts_fallback(raw_text)
-        
+
         if len(raw_text) <= self.max_chunk_size:
             cleaned_text = self._clean_chunk_for_tts(raw_text, provider_to_use)
             return self._chunk_for_audio(cleaned_text)
         else:
             return self._process_large_text(raw_text, provider_to_use)
-    
+
     def _process_large_text(self, raw_text: str, llm_provider: ILLMProvider) -> List[str]:
         """Process large text in chunks"""
         initial_chunks = self._smart_split(raw_text, self.max_chunk_size)
         cleaned_chunks = []
-        
+
         for i, chunk in enumerate(initial_chunks):
-            print(f"TextCleaningService: Cleaning chunk {i+1}/{len(initial_chunks)}")
+            print(f"TextCleaningService: Cleaning chunk {i + 1}/{len(initial_chunks)}")
             if i > 0:
                 time.sleep(1)
-            
+
             cleaned_chunk = self._clean_chunk_for_tts(chunk, llm_provider)
             cleaned_chunks.append(cleaned_chunk)
-        
+
         combined_text = "\n\n... ...\n\n".join(cleaned_chunks)
         return self._chunk_for_audio(combined_text)
-    
+
     def _clean_chunk_for_tts(self, text_chunk: str, llm_provider: ILLMProvider) -> str:
         """Clean a single chunk using LLM with proper error handling"""
         if not text_chunk.strip():
             return text_chunk
-            
+
         prompt = f"""Clean this academic text for text-to-speech conversion:
 
 TASKS:
@@ -109,7 +110,7 @@ TEXT TO CLEAN:
 {text_chunk}
 
 CLEANED TEXT:"""
-        
+
         try:
             result = llm_provider.generate_content(prompt)
             if result.is_success:
@@ -131,13 +132,13 @@ CLEANED TEXT:"""
         """Split text intelligently at natural boundaries"""
         if len(text) <= max_chunk_size:
             return [text]
-        
+
         chunks = []
         remaining_text = text
-        
+
         while len(remaining_text) > max_chunk_size:
             chunk_end = max_chunk_size
-            
+
             # Find good split points in order of preference
             paragraph_break = remaining_text.rfind('\n\n', 0, chunk_end)
             if paragraph_break > max_chunk_size // 2:
@@ -153,13 +154,13 @@ CLEANED TEXT:"""
                 else:
                     whitespace = remaining_text.rfind(' ', 0, chunk_end)
                     split_point = whitespace + 1 if whitespace > max_chunk_size // 2 else max_chunk_size
-            
+
             chunk = remaining_text[:split_point].strip()
             if chunk:
                 chunks.append(chunk)
-            
+
             remaining_text = remaining_text[split_point:].strip()
-            
+
             # Safety check to prevent infinite loops
             if len(remaining_text) >= len(chunk):
                 if len(remaining_text) > max_chunk_size:
@@ -167,29 +168,29 @@ CLEANED TEXT:"""
                     remaining_text = remaining_text[max_chunk_size:]
                 else:
                     break
-        
+
         if remaining_text.strip():
             chunks.append(remaining_text.strip())
-        
+
         return chunks
-    
+
     def _chunk_for_audio(self, text: str) -> List[str]:
         """Split cleaned text into audio-friendly chunks"""
         target_size = self.audio_target_chunk_size
         max_chunk_size = self.audio_max_chunk_size
-        
+
         if len(text) <= target_size:
             return [text]
-        
+
         # Split on major section breaks
         sections = text.split('\n\n... ...\n\n')
         all_chunks = []
-        
+
         for section in sections:
             section = section.strip()
             if not section:
                 continue
-            
+
             if len(section) <= max_chunk_size:
                 all_chunks.append(section)
             else:
@@ -199,23 +200,23 @@ CLEANED TEXT:"""
                     split_point = section.rfind('. ', 0, max_chunk_size)
                     if split_point < max_chunk_size // 2:
                         split_point = max_chunk_size
-                    
+
                     all_chunks.append(section[:split_point].strip())
                     section = section[split_point:].strip()
-                
+
                 if section:
                     all_chunks.append(section)
-        
+
         return all_chunks
-    
+
     def _basic_tts_fallback(self, text: str) -> List[str]:
         """Basic TTS enhancement without LLM"""
         # Add pause markers
         text = re.sub(r'\n\s*\n', '\n\n... ', text)
-        
+
         # Add pauses around transition words
         transition_words = ['however', 'therefore', 'furthermore', 'moreover', 'consequently']
         for word in transition_words:
             text = re.sub(f'\\b{word}\\b', f'... {word} ...', text, flags=re.IGNORECASE)
-        
+
         return self._chunk_for_audio(text)

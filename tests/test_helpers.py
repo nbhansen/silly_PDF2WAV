@@ -54,6 +54,9 @@ class FakeTextExtractor(ITextExtractor, IPageRangeValidator):
         
     def validate_range(self, pdf_path: str, page_range: PageRange) -> Dict[str, Any]:
         return {'valid': True, 'total_pages': self.pdf_info.total_pages}
+    
+    def validate(self, pdf_path: str, page_range: PageRange) -> Dict[str, Any]:
+        return self.validate_range(pdf_path, page_range)
 
 def create_test_request(pdf_path="test.pdf", output_name="test_output", page_range=None):
     return ProcessingRequest(

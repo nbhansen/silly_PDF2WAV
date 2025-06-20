@@ -1,4 +1,9 @@
 # app.py - Fixed interface issues
+from infrastructure.file.cleanup_scheduler import FileCleanupScheduler
+from application.composition_root import create_pdf_service_from_env
+from domain.errors import ErrorCode, ApplicationError, audio_generation_error
+from domain.models import PageRange, ProcessingResult
+from application.config.system_config import SystemConfig
 import os
 import signal
 import sys
@@ -15,17 +20,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Import new configuration system and errors
-from application.config.system_config import SystemConfig
-from domain.models import PageRange, ProcessingResult
-from domain.errors import ErrorCode, ApplicationError, audio_generation_error
-from application.composition_root import create_pdf_service_from_env
-from infrastructure.file.cleanup_scheduler import FileCleanupScheduler
 
 # Helper function to detect Flask reloader
+
+
 def is_flask_reloader():
     """Check if we're in Flask debug reloader process"""
     return os.environ.get('WERKZEUG_RUN_MAIN') != 'true'
-
 
 
 # Initialize configuration and validate early
@@ -36,7 +37,6 @@ except Exception as e:
     print(f"FATAL: Configuration error - {e}")
     print("Please fix your environment variables before starting the application.")
     exit(1)
-
 
 
 # Flask App Setup using validated configuration
@@ -72,6 +72,8 @@ else:
     processor_available = False
 
 # Lazy initialization for reloader process
+
+
 def get_pdf_service():
     """Get PDF service, initializing if needed (for reloader process)"""
     global pdf_service, processor_available
@@ -87,10 +89,8 @@ def get_pdf_service():
     return pdf_service
 
 
-
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
 
 
 def parse_page_range_from_form(form) -> PageRange:
@@ -115,7 +115,6 @@ def parse_page_range_from_form(form) -> PageRange:
     return PageRange(start_page=start_page, end_page=end_page)
 
 
-
 def clean_text_for_display(text: str) -> str:
     """Remove SSML markup and pause markers from text for display"""
     # Remove SSML tags
@@ -129,18 +128,15 @@ def clean_text_for_display(text: str) -> str:
     return text.strip()
 
 
-
 # Routes
 @app.route('/')
 def index():
     return render_template('index.html')
 
 
-
 @app.route('/audio_outputs/<filename>')
 def serve_audio(filename):
     return send_from_directory(app.config['AUDIO_FOLDER'], filename)
-
 
 
 @app.route('/read-along/<filename>')
@@ -167,7 +163,6 @@ def read_along_view(filename):
                            timing_api_url=url_for('get_timing_data', filename=base_filename))
 
 
-
 @app.route('/api/timing/<filename>')
 def get_timing_data(filename):
     """Serve timing metadata as JSON"""
@@ -185,7 +180,6 @@ def get_timing_data(filename):
     except Exception as e:
         print(f"Error serving timing data: {e}")
         return jsonify({'error': 'Failed to load timing data'}), 500
-
 
 
 @app.route('/get_pdf_info', methods=['POST'])
@@ -226,7 +220,6 @@ def get_pdf_info():
         return jsonify({'error': str(e)}), 500
 
 
-
 def process_upload_request(request_form, uploaded_file, enable_timing=False):
     """
     Unified upload processing logic that preserves timing functionality.
@@ -245,10 +238,10 @@ def process_upload_request(request_form, uploaded_file, enable_timing=False):
         base_filename_no_ext = os.path.splitext(original_filename)[0]
         pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], original_filename)
         uploaded_file.save(pdf_path)
-        
+
         # Parse page range
         page_range = parse_page_range_from_form(request_form)
-        
+
         # Validate page range if specified
         service = get_pdf_service()
         if not page_range.is_full_document():
@@ -261,7 +254,7 @@ def process_upload_request(request_form, uploaded_file, enable_timing=False):
                     pass
                 return None, original_filename, base_filename_no_ext, \
                     f"Error: {validation.get('error', 'Invalid page range')}"
-        
+
         # Convert PageRange to page list for the service
         pages_list = None
         if not page_range.is_full_document():
@@ -272,32 +265,32 @@ def process_upload_request(request_form, uploaded_file, enable_timing=False):
                 pdf_info = service.ocr_provider.get_pdf_info(pdf_path)
                 end = pdf_info.total_pages
             pages_list = list(range(start - 1, end))  # Convert to 0-based indexing
-        
+
         # CRITICAL: Process using the correct service method
         print(f"Processing {'with timing data' if enable_timing else 'without timing'} for: {original_filename}")
-        
+
         # Use the existing method that returns TimedAudioResult
         timed_result = service.process_pdf_and_generate_audio(
             filepath=pdf_path,
             output_name=base_filename_no_ext,
             pages=pages_list
         )
-        
+
         # Clean up uploaded file
         try:
             os.remove(pdf_path)
         except Exception:
             pass
-        
+
         if not timed_result or not timed_result.audio_files:
             return ProcessingResult.failure_result(
                 audio_generation_error("No audio files were generated")
             ), original_filename, base_filename_no_ext, None
-        
+
         # Save timing data if available and requested
         if enable_timing and timed_result.timing_data:
             save_timing_data(base_filename_no_ext, timed_result.timing_data)
-        
+
         # Convert TimedAudioResult to ProcessingResult
         result = ProcessingResult.success_result(
             audio_files=[os.path.basename(f) for f in timed_result.audio_files],
@@ -306,11 +299,11 @@ def process_upload_request(request_form, uploaded_file, enable_timing=False):
                 "audio_files_count": len(timed_result.audio_files),
                 "combined_mp3_created": timed_result.combined_mp3 is not None,
                 "timing_data_created": enable_timing and timed_result.timing_data is not None,
-                "timing_segments": len(timed_result.timing_data.text_segments) \
+                "timing_segments": len(timed_result.timing_data.text_segments)
                 if (enable_timing and timed_result.timing_data) else 0
             }
         )
-        
+
         # Add file management stats to debug info
         if hasattr(service, 'file_manager') and service.file_manager:
             try:
@@ -319,7 +312,7 @@ def process_upload_request(request_form, uploaded_file, enable_timing=False):
                 result.debug_info['cleanup_enabled'] = app_config.enable_file_cleanup
             except Exception:
                 pass  # Don't fail upload if file stats fail
-        
+
         return result, original_filename, base_filename_no_ext, None
 
     except Exception as e:
@@ -328,7 +321,6 @@ def process_upload_request(request_form, uploaded_file, enable_timing=False):
         traceback.print_exc()
         return None, original_filename if 'original_filename' in locals() else 'unknown', '', \
             f"An unexpected error occurred: {str(e)}"
-
 
 
 def render_upload_result(result, original_filename, base_filename_no_ext, page_range, enable_timing=False):
@@ -349,7 +341,7 @@ def render_upload_result(result, original_filename, base_filename_no_ext, page_r
         display_filename = original_filename
         if not page_range.is_full_document():
             display_filename += f" (pages {page_range.start_page or 1}-{page_range.end_page or 'end'})"
-        
+
         # CRITICAL: Different template parameters based on timing
         template_params = {
             'audio_files': result.audio_files or [],
@@ -359,7 +351,7 @@ def render_upload_result(result, original_filename, base_filename_no_ext, page_r
             'file_count': len(result.audio_files) if result.audio_files else 0,
             'debug_info': result.debug_info
         }
-        
+
         # Add timing-specific parameters for read-along functionality
         if enable_timing:
             template_params.update({
@@ -383,7 +375,6 @@ def render_upload_result(result, original_filename, base_filename_no_ext, page_r
             return f"Error: {error_message}<br><br>💡 Suggestion: {retry_suggestion}"
         else:
             return f"Error: {error_message}"
-
 
 
 # Upload routes - THE CORRECT ROUTES!
@@ -416,7 +407,6 @@ def upload_file():
     return render_upload_result(result, original_filename, base_filename, page_range, enable_timing=False)
 
 
-
 @app.route('/upload-with-timing', methods=['POST'])
 def upload_file_with_timing():
     """Upload WITH timing data for read-along functionality"""
@@ -444,7 +434,6 @@ def upload_file_with_timing():
 
     # Render result WITH timing data (enables read-along button)
     return render_upload_result(result, original_filename, base_filename, page_range, enable_timing=True)
-
 
 
 def save_timing_data(base_filename, timing_metadata):
@@ -488,7 +477,6 @@ def save_timing_data(base_filename, timing_metadata):
         print(f"Failed to save timing data: {e}")
 
 
-
 # Fixed admin endpoints
 @app.route('/admin/file_stats')
 def get_file_stats():
@@ -526,7 +514,6 @@ def get_file_stats():
     except Exception as e:
         print(f"Admin file_stats error: {e}")
         return jsonify({'error': str(e)}), 500
-
 
 
 @app.route('/admin/cleanup', methods=['POST'])
@@ -587,7 +574,6 @@ def manual_cleanup():
         return jsonify({'error': str(e)}), 500
 
 
-
 @app.route('/admin/cleanup_scheduler', methods=['POST'])
 def trigger_scheduler_cleanup():
     """Trigger scheduler's manual cleanup"""
@@ -608,7 +594,6 @@ def trigger_scheduler_cleanup():
     except Exception as e:
         print(f"Scheduler cleanup error: {e}")
         return jsonify({'error': str(e)}), 500
-
 
 
 @app.route('/admin/test')
@@ -642,7 +627,6 @@ def test_admin():
         return jsonify({'error': str(e)}), 500
 
 
-
 def _get_user_friendly_error_message(error: 'ApplicationError') -> str:
     """Convert technical error to user-friendly message"""
     if error.code == ErrorCode.FILE_NOT_FOUND:
@@ -666,6 +650,7 @@ def _get_user_friendly_error_message(error: 'ApplicationError') -> str:
     else:
         return error.message
 
+
 def _get_retry_suggestion(error: 'ApplicationError') -> str:
     """Get retry suggestion based on error type"""
     if error.retryable:
@@ -684,10 +669,12 @@ def _get_retry_suggestion(error: 'ApplicationError') -> str:
             return f"Please use a smaller PDF file (maximum {app_config.max_file_size_mb}MB)."
         elif error.code == ErrorCode.INVALID_PAGE_RANGE:
             return "Please check the page numbers and try again."
-    
+
     return ""
 
 # Graceful shutdown handlers
+
+
 def shutdown_cleanup():
     """Clean shutdown with proper cleanup scheduler stop"""
     global cleanup_scheduler
@@ -695,20 +682,24 @@ def shutdown_cleanup():
         print("Shutting down file cleanup scheduler...")
         cleanup_scheduler.stop()
 
+
 def signal_handler(sig, frame):
     print(f"\nReceived signal {sig}, shutting down gracefully...")
     if not is_flask_reloader():
         shutdown_cleanup()
     sys.exit(0)
 
+
 # Register shutdown handlers
 atexit.register(lambda: shutdown_cleanup() if not is_flask_reloader() else None)
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
+
 @app.errorhandler(413)
 def too_large(e):
     return f"File is too large. Maximum file size is {app_config.max_file_size_mb}MB.", 413
+
 
 @app.errorhandler(Exception)
 def handle_exception(e):
@@ -718,6 +709,7 @@ def handle_exception(e):
     print(f"🚨 Exception type: {type(e)}")
     print(f"🚨 Exception message: {str(e)}")
     return f"An error occurred: {str(e)}", 500
+
 
 # Debug: Print all registered routes
 print("🔧 REGISTERED ROUTES:")
@@ -732,7 +724,7 @@ if __name__ == '__main__':
         print(f"TTS Engine: {app_config.tts_engine.value}")
         print(f"Text Cleaning: {'Enabled' if app_config.enable_text_cleaning else 'Disabled'}")
         print(f"File Cleanup: {'Enabled' if app_config.enable_file_cleanup else 'Disabled'}")
-    
+
     try:
         app.run(debug=True, host='0.0.0.0', port=5000)
     finally:

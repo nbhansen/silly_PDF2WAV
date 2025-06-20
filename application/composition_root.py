@@ -27,13 +27,15 @@ from infrastructure.ocr.tesseract_ocr_provider import TesseractOCRProvider
 from infrastructure.tts.gemini_tts_provider import GeminiTTSProvider
 from infrastructure.tts.piper_tts_provider import PiperTTSProvider
 
+
 class CompositionRoot:
     """
     Enhanced composition root for audiobook-quality output
     """
+
     def __init__(self, config: SystemConfig):
         self.config = config
-        
+
         # Core Infrastructure
         self.file_manager = FileManager(
             upload_folder=self.config.upload_folder,
@@ -51,12 +53,13 @@ class CompositionRoot:
         )
         self.academic_ssml_service = AcademicSSMLService(
             tts_engine=self.tts_engine,
-            document_type=self.config.document_type
+            document_type=self.config.document_type,
+            academic_terms_config=self.config.academic_terms_config
         )
 
         # Enhanced Timing Strategy Selection
         self.timing_strategy = self._create_enhanced_timing_strategy()  # ENHANCED
-        
+
         # Audio Generation Coordinator for async operations
         self.audio_coordinator = AudioGenerationCoordinator(
             tts_engine=self.tts_engine,
@@ -64,7 +67,7 @@ class CompositionRoot:
             audio_processor=self.audio_processor,
             max_concurrent_requests=self.config.max_concurrent_requests
         )
-        
+
         self.audio_generation_service = AudioGenerationService(
             timing_strategy=self.timing_strategy,
             async_coordinator=self.audio_coordinator
@@ -82,7 +85,7 @@ class CompositionRoot:
             ssml_service=self.academic_ssml_service,
             llm_provider=self.llm_provider
         )
-        
+
         print("Enhanced CompositionRoot: All services initialized with audiobook features")
 
     def _create_llm_provider(self) -> Optional[ILLMProvider]:
@@ -96,25 +99,33 @@ class CompositionRoot:
             # Use enhanced Gemini provider with multi-voice support
             print("INFO: Using Enhanced Gemini TTS with audiobook features")
             return GeminiTTSProvider(
-                model_name=self.config.gemini_voice_name,
-                api_key=self.config.gemini_api_key
+                model_name="gemini-2.0-flash-exp",
+                api_key=self.config.gemini_api_key,
+                voice_personas_config=self.config.voice_personas_config
             )
         elif self.config.tts_engine == self.config.tts_engine.PIPER:
-            return PiperTTSProvider(self.config.get_piper_config())
-        
+            return PiperTTSProvider(
+                self.config.get_piper_config(),
+                repository_url=self.config.piper_model_repository_url
+            )
+
         raise ValueError(f"Unsupported TTS provider: {self.config.tts_engine}")
 
     def _create_enhanced_timing_strategy(self) -> ITimingStrategy:
         """Create timing strategy with enhanced accuracy"""
-        
+
         # Check if we should use enhanced strategy
         use_enhanced = self.config.enable_enhanced_timing if hasattr(self.config, 'enable_enhanced_timing') else True
-        
+
         if self.config.tts_engine == self.config.tts_engine.GEMINI:
             if use_enhanced and hasattr(self.tts_engine, 'generate_audio_with_timestamps'):
-                # Use the new enhanced Gemini strategy with better timing
+                # Use the Gemini timestamp strategy wrapper
                 print("INFO: Using Enhanced Gemini Timing Strategy (Audiobook Quality)")
-                return self.tts_engine  # The new provider implements ITimestampedTTSEngine
+                return GeminiTimestampStrategy(
+                    tts_engine=self.tts_engine,
+                    ssml_service=self.academic_ssml_service,
+                    file_manager=self.file_manager
+                )
             else:
                 # Fallback to enhanced estimation strategy
                 print("INFO: Using Enhanced Timing Estimation Strategy")
@@ -133,15 +144,15 @@ class CompositionRoot:
                 text_cleaning_service=self.text_cleaning_service,
                 audio_processor=self.audio_processor
             )
-            
+
     def _create_and_start_scheduler(self) -> Optional[FileCleanupScheduler]:
         if not self.config.enable_file_cleanup:
             print("INFO: File cleanup is disabled")
             return None
-        
+
         max_file_age_seconds = int(self.config.max_file_age_hours * 3600)
         check_interval_seconds = int(self.config.auto_cleanup_interval_hours * 3600)
-    
+
         scheduler = FileCleanupScheduler(
             file_manager=self.file_manager,
             max_file_age_seconds=max_file_age_seconds,
@@ -150,17 +161,18 @@ class CompositionRoot:
         scheduler.start()
         return scheduler
 
+
 def create_pdf_service_from_env() -> PDFProcessingService:
     """
     Creates enhanced PDF service with audiobook features
     """
     config = SystemConfig.from_env()
-    
+
     # Enable enhanced features by default
     if not hasattr(config, 'enable_enhanced_timing'):
         config.enable_enhanced_timing = True
-    
+
     config.print_summary()
-    
+
     root = CompositionRoot(config)
     return root.pdf_processing_service

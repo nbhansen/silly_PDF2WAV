@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
+
 @dataclass
 class GeminiConfig:
     """Configuration for Gemini TTS engine"""
@@ -11,6 +12,7 @@ class GeminiConfig:
     min_request_interval: float = 2.0
     max_retries: int = 3
     base_retry_delay: int = 16
+
 
 @dataclass
 class PiperConfig:
