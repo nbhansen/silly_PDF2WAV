@@ -142,3 +142,9 @@ temp_*
 llm_tts_cleaned_chunk_*_debug.txt
 temp_*.wav
 temp_*.mp3
+
+# Claude stuff
+/node_modules
+CLAUDE*
+package*
+

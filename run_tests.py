@@ -9,13 +9,15 @@ import sys
 
 
 def run_tests(test_type="all"):
-    """Run tests with simple options"""
+    """Run tests with professional options including coverage"""
     
     commands = {
-        "all": ["python", "-m", "pytest", "tests/", "-v"],
-        "integration": ["python", "-m", "pytest", "tests/test_integration_fresh.py", "-v"],
-        "unit": ["python", "-m", "pytest", "tests/", "-v", "-m", "unit"],
-        "quick": ["python", "-m", "pytest", "tests/test_integration_fresh.py::test_can_create_processing_request", "-v"],
+        "all": ["python", "-m", "pytest", "tests/", "-v", "--cov", "--cov-report=term", "--cov-report=html"],
+        "unit": ["python", "-m", "pytest", "tests/unit/", "-v", "--cov", "--cov-report=term"],
+        "integration": ["python", "-m", "pytest", "tests/integration/", "-v"],
+        "quick": ["python", "-m", "pytest", "tests/unit/test_domain_models.py", "-v"],
+        "coverage": ["python", "-m", "pytest", "tests/", "--cov", "--cov-report=term", "--cov-report=html", "--cov-report=json"],
+        "no-cov": ["python", "-m", "pytest", "tests/", "-v"],
         "collect": ["python", "-m", "pytest", "tests/", "--collect-only"]
     }
     

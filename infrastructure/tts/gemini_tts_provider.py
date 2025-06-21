@@ -332,9 +332,67 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
             return raw_audio_data
 
     def _combine_audio_chunks(self, chunks: List[bytes]) -> bytes:
-        """Combine audio chunks (simplified - real implementation would merge WAV data)"""
-        # In production, this would properly merge WAV headers and data
-        return b''.join(chunks)
+        """Properly combine WAV audio chunks by merging their data sections"""
+        if not chunks:
+            return b""
+        
+        if len(chunks) == 1:
+            return chunks[0]
+        
+        try:
+            import io
+            import wave
+            
+            # Parse the first WAV file to get format info
+            first_wav = io.BytesIO(chunks[0])
+            with wave.open(first_wav, 'rb') as first_wave:
+                # Get audio parameters from first file
+                channels = first_wave.getnchannels()
+                sampwidth = first_wave.getsampwidth()
+                framerate = first_wave.getframerate()
+                
+                # Collect all audio data
+                combined_data = b""
+                total_frames = 0
+                
+                # Add data from first file
+                first_wav.seek(0)
+                with wave.open(first_wav, 'rb') as w:
+                    combined_data += w.readframes(w.getnframes())
+                    total_frames += w.getnframes()
+                
+                # Add data from remaining files
+                for chunk in chunks[1:]:
+                    chunk_io = io.BytesIO(chunk)
+                    try:
+                        with wave.open(chunk_io, 'rb') as w:
+                            # Verify format compatibility
+                            if (w.getnchannels() == channels and 
+                                w.getsampwidth() == sampwidth and
+                                w.getframerate() == framerate):
+                                combined_data += w.readframes(w.getnframes())
+                                total_frames += w.getnframes()
+                            else:
+                                print(f"Warning: Audio chunk format mismatch, skipping chunk")
+                    except Exception as e:
+                        print(f"Warning: Failed to read audio chunk: {e}")
+                        continue
+                
+                # Create combined WAV file
+                output_buffer = io.BytesIO()
+                with wave.open(output_buffer, 'wb') as combined_wave:
+                    combined_wave.setnchannels(channels)
+                    combined_wave.setsampwidth(sampwidth)
+                    combined_wave.setframerate(framerate)
+                    combined_wave.writeframes(combined_data)
+                
+                return output_buffer.getvalue()
+                
+        except Exception as e:
+            print(f"Error combining audio chunks: {e}")
+            # Fallback: try simple concatenation for emergency cases
+            print("Falling back to simple concatenation")
+            return b''.join(chunks)
 
     def get_output_format(self) -> str:
         return "wav"
