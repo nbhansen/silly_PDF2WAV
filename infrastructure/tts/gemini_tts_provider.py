@@ -24,28 +24,39 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
     - Natural language style control
     """
 
-    # Default voice personas (used if config file not found)
-    DEFAULT_VOICE_PERSONAS = {
-        "narrator": {
-            "voice": "Charon",
-            "style": "informative and clear",
-            "rate": "medium"
+    # Content-aware styling for different document types
+    DOCUMENT_STYLES = {
+        "research_paper": {
+            "narrator": "clearly and informatively",
+            "technical": "precisely and methodically", 
+            "emphasis": "with clear emphasis",
+            "dialogue": "naturally"
         },
-        "emphasis": {
-            "voice": "Kore",
-            "style": "engaged and emphatic",
-            "rate": "slightly slower"
+        "literature_review": {
+            "narrator": "thoughtfully and analytically",
+            "technical": "carefully and systematically",
+            "emphasis": "with scholarly emphasis", 
+            "dialogue": "conversationally"
+        },
+        "general": {
+            "narrator": "naturally and clearly",
+            "technical": "clearly and slowly",
+            "emphasis": "with emphasis",
+            "dialogue": "conversationally"
         }
     }
 
-    def __init__(self, model_name: str = "gemini-2.0-flash-exp", api_key: Optional[str] = None, voice_personas_config: str = "config/voice_personas.json"):
+    def __init__(self, model_name: str = "gemini-2.0-flash-exp", api_key: Optional[str] = None, voice_name: str = "Kore", document_type: str = "academic_paper"):
         if not api_key:
             raise ValueError("API key required for Gemini TTS")
 
         self.client = genai.Client(api_key=api_key)
         self.model_name = model_name
-        self.voice_personas = self._load_voice_personas(voice_personas_config)
-        self.current_voice = "Charon"  # Default narrator
+        self.configured_voice = voice_name  # Voice from environment config
+        self.document_type = document_type  # Content type for styling
+        
+        # Content-aware style mappings (single voice, different styles)
+        self.content_styles = self._get_content_styles_for_document_type(document_type)
 
         # Advanced timing estimation parameters
         self.base_wpm = 155  # Audiobook standard
@@ -55,23 +66,16 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
             '—': 0.3, '...': 0.6
         }
 
-    def _load_voice_personas(self, config_path: str) -> Dict:
-        """Load voice personas from configuration file"""
-        try:
-            if os.path.exists(config_path):
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            else:
-                print(f"Warning: Voice personas config not found at {config_path}, using defaults")
-                return self.DEFAULT_VOICE_PERSONAS
-        except Exception as e:
-            print(f"Warning: Failed to load voice personas from {config_path}: {e}")
-            return self.DEFAULT_VOICE_PERSONAS
+    def _get_content_styles_for_document_type(self, document_type: str) -> Dict[str, str]:
+        """Get content styles based on document type"""
+        styles = self.DOCUMENT_STYLES.get(document_type, self.DOCUMENT_STYLES["general"])
+        print(f"✅ Using {document_type} content styles with voice '{self.configured_voice}'")
+        return styles
 
     def generate_audio_data(self, text_to_speak: str) -> Result[bytes]:
         """Generate standard audio"""
         try:
-            audio_data = self._generate_with_persona(text_to_speak, "narrator")
+            audio_data = self._generate_with_content_style(text_to_speak, "narrator")
             if not audio_data:
                 return Result.failure(tts_engine_error("No audio data generated"))
             return Result.success(audio_data)
@@ -92,9 +96,9 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
             current_time = 0.0
 
             for seg_data in segments:
-                audio_data = self._generate_with_persona(
+                audio_data = self._generate_with_content_style(
                     seg_data['text'],
-                    seg_data['persona']
+                    seg_data['content_type']
                 )
 
                 if not audio_data:
@@ -102,7 +106,7 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
 
                 duration = self._calculate_precise_duration(
                     seg_data['text'],
-                    seg_data['persona']
+                    seg_data['content_type']
                 )
 
                 audio_chunks.append(audio_data)
@@ -129,38 +133,84 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
         except Exception as e:
             return Result.failure(tts_engine_error(f"Timestamped audio generation failed: {str(e)}"))
 
-    def _generate_with_persona(self, text: str, persona: str) -> bytes:
-        """Generate audio with specific voice persona"""
-        voice_config = self.voice_personas.get(persona, self.voice_personas.get("narrator", self.DEFAULT_VOICE_PERSONAS["narrator"]))
+    def _generate_with_content_style(self, text: str, content_type: str) -> bytes:
+        """Generate audio with content-aware styling using single voice"""
+        style = self.content_styles.get(content_type, self.content_styles["narrator"])
+        
+        # Enhance text with natural language style using configured voice
+        styled_text = f"Say {style}: {text}"
+        
+        # Use configured voice for all content
+        voice_config = {
+            "voice": self.configured_voice,
+            "style": style,
+            "rate": "medium"  # Consistent rate for single voice
+        }
 
-        # Enhance text with natural language style
-        styled_text = f"Say {voice_config['style']}: {text}"
+        return self._generate_with_retry(styled_text, voice_config)
 
-        try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=styled_text,
-                config=types.GenerateContentConfig(
-                    response_modalities=["AUDIO"],
-                    speech_config=types.SpeechConfig(
-                        voice_config=types.VoiceConfig(
-                            prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                                voice_name=voice_config['voice']
+    def _generate_with_retry(self, styled_text: str, voice_config: dict, max_retries: int = 3) -> bytes:
+        """Generate audio with exponential backoff retry logic"""
+        import time
+        
+        for attempt in range(max_retries + 1):
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=styled_text,
+                    config=types.GenerateContentConfig(
+                        response_modalities=["AUDIO"],
+                        speech_config=types.SpeechConfig(
+                            voice_config=types.VoiceConfig(
+                                prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                                    voice_name=voice_config['voice']
+                                )
                             )
                         )
                     )
                 )
-            )
 
-            if response.candidates and response.candidates[0].content.parts:
-                raw_audio_data = response.candidates[0].content.parts[0].inline_data.data
-                # Convert raw audio to proper WAV format
-                return self._convert_to_wav(raw_audio_data)
+                if response.candidates and response.candidates[0].content.parts:
+                    raw_audio_data = response.candidates[0].content.parts[0].inline_data.data
+                    # Convert raw audio to proper WAV format
+                    if attempt > 0:
+                        print(f"✅ Retry successful after {attempt} attempts")
+                    return self._convert_to_wav(raw_audio_data)
 
-        except Exception as e:
-            print(f"Error generating audio: {e}")
+            except Exception as e:
+                error_str = str(e)
+                
+                # Check if this is a rate limit error (429)
+                if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                    if attempt < max_retries:
+                        # Extract retry delay from error if available
+                        retry_delay = self._extract_retry_delay(error_str)
+                        if retry_delay is None:
+                            # Exponential backoff: 5s, 15s, 45s
+                            retry_delay = 5 * (3 ** attempt)
+                        
+                        print(f"🚀 Rate limited (attempt {attempt + 1}/{max_retries + 1}). Retrying in {retry_delay}s...")
+                        time.sleep(retry_delay)
+                        continue
+                    else:
+                        print(f"❌ Max retries ({max_retries}) exceeded. Rate limit persists.")
+                        
+                # For non-rate-limit errors, don't retry
+                print(f"Error generating audio: {e}")
+                break
 
         return b""
+    
+    def _extract_retry_delay(self, error_str: str) -> Optional[int]:
+        """Extract retry delay from Gemini error response"""
+        import re
+        
+        # Look for retryDelay in the error message
+        match = re.search(r"retryDelay.*?(\d+)s", error_str)
+        if match:
+            return int(match.group(1))
+        return None
+
 
     def _analyze_and_segment_content(self, text: str) -> List[Dict]:
         """
@@ -174,43 +224,42 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
         for sentence in sentences:
             # Determine content type and appropriate persona
             if self._is_technical_content(sentence):
-                persona = "technical"
+                content_type = "technical"
                 seg_type = "technical"
             elif self._is_emphasis_needed(sentence):
-                persona = "emphasis"
+                content_type = "emphasis"
                 seg_type = "emphasis"
             elif self._is_dialogue(sentence):
-                persona = "dialogue"
+                content_type = "dialogue"
                 seg_type = "dialogue"
             else:
-                persona = "narrator"
+                content_type = "narrator"
                 seg_type = "narrative"
 
             segments.append({
                 'text': sentence,
-                'persona': persona,
+                'content_type': content_type,
                 'type': seg_type
             })
 
         return segments
 
-    def _calculate_precise_duration(self, text: str, persona: str) -> float:
+    def _calculate_precise_duration(self, text: str, content_type: str) -> float:
         """
-        Calculate duration with persona-specific adjustments
+        Calculate duration with content-type adjustments using single voice
         """
         # Clean text for word counting
         clean_text = re.sub(r'<[^>]+>', '', text)
         words = clean_text.split()
         word_count = len(words)
 
-        # Get base rate for persona
-        voice_config = self.voice_personas.get(persona, self.voice_personas.get("narrator", self.DEFAULT_VOICE_PERSONAS["narrator"]))
+        # Consistent rate for single voice with slight content adjustments
         rate_adjustment = {
-            "medium": 1.0,
-            "slightly slower": 1.1,
-            "slower": 1.2,
-            "natural": 1.0
-        }.get(voice_config['rate'], 1.0)
+            "technical": 1.1,    # Slightly slower for technical content
+            "emphasis": 1.05,    # Slightly slower for emphasis
+            "dialogue": 1.0,     # Normal rate for dialogue
+            "narrator": 1.0      # Normal rate for narrative
+        }.get(content_type, 1.0)
 
         # Calculate base duration
         base_duration = (word_count / self.base_wpm) * 60 * rate_adjustment

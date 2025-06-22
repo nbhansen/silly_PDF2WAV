@@ -67,7 +67,6 @@ class SystemConfig:
     combined_file_suffix: str = "_combined"
     
     # Configuration file paths
-    voice_personas_config: str = "config/voice_personas.json"
     academic_terms_config: str = "config/academic_terms_en.json"
     rate_limits_config: str = "config/rate_limits.json"
     
@@ -157,7 +156,6 @@ class SystemConfig:
             audio_max_chunk_size=cls._parse_int('AUDIO_MAX_CHUNK_SIZE', 5000, min_val=1000, max_val=20000),
             
             # Configuration file paths
-            voice_personas_config=os.getenv('VOICE_PERSONAS_CONFIG', 'config/voice_personas.json'),
             academic_terms_config=os.getenv('ACADEMIC_TERMS_CONFIG', 'config/academic_terms_en.json'),
             rate_limits_config=os.getenv('RATE_LIMITS_CONFIG', 'config/rate_limits.json'),
             

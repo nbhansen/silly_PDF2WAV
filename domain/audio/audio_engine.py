@@ -101,20 +101,35 @@ class AudioEngine(IAudioEngine):
             if not audio_data:
                 return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
             
-            # Save audio file directly
-            audio_filename = f"{output_filename}_simple.mp3"
-            audio_path = self.file_manager.save_output_file(audio_data, audio_filename)
+            # Save audio file as WAV first (since TTS engines typically generate WAV)
+            temp_wav_filename = f"{output_filename}_temp.wav"
+            temp_wav_path = self.file_manager.save_output_file(audio_data, temp_wav_filename)
             
-            if not audio_path:
+            if not temp_wav_path:
                 return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
             
-            print(f"AudioEngine: Simple audio generated successfully: {audio_filename}")
+            # Convert WAV to MP3 using ffmpeg
+            mp3_filename = f"{output_filename}_simple.mp3"
+            mp3_path = os.path.join(self.file_manager.get_output_dir(), mp3_filename)
             
-            return TimedAudioResult(
-                audio_files=[audio_filename],
-                combined_mp3=audio_filename,
-                timing_data=None  # No timing data needed for simple generation
-            )
+            conversion_result = self._convert_wav_to_mp3(temp_wav_path, mp3_path)
+            
+            # Clean up temporary WAV file
+            try:
+                os.remove(temp_wav_path)
+            except:
+                pass
+            
+            if conversion_result.is_success:
+                print(f"AudioEngine: Simple audio generated and converted to MP3: {mp3_filename}")
+                return TimedAudioResult(
+                    audio_files=[mp3_filename],
+                    combined_mp3=mp3_filename,
+                    timing_data=None  # No timing data needed for simple generation
+                )
+            else:
+                print(f"AudioEngine: MP3 conversion failed: {conversion_result.error}")
+                return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
             
         except Exception as e:
             print(f"AudioEngine: Simple audio generation failed: {e}")
@@ -327,3 +342,27 @@ class AudioEngine(IAudioEngine):
             return 0.1  # Piper is local, minimal delay
         else:
             return 0.5  # Default for unknown engines
+    
+    def _convert_wav_to_mp3(self, wav_path: str, mp3_path: str) -> Result[str]:
+        """Convert WAV file to MP3 using ffmpeg"""
+        try:
+            import subprocess
+            
+            # Use ffmpeg to convert WAV to MP3 with good quality
+            cmd = [
+                'ffmpeg', '-i', wav_path,
+                '-codec:a', 'libmp3lame',
+                '-b:a', '128k',  # Good quality bitrate
+                '-ar', '22050',  # Sample rate
+                mp3_path, '-y'   # Overwrite if exists
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            
+            if result.returncode == 0:
+                return Result.success(mp3_path)
+            else:
+                return Result.failure(f"ffmpeg conversion failed: {result.stderr}")
+                
+        except Exception as e:
+            return Result.failure(f"MP3 conversion failed: {e}")

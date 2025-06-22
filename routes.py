@@ -390,7 +390,7 @@ def process_upload_request(request_form, uploaded_file, enable_timing=False):
         if processing_result.success:
             timed_result = TimedAudioResult(
                 audio_files=[os.path.join(app.config['AUDIO_FOLDER'], f) for f in processing_result.audio_files],
-                combined_mp3=os.path.join(app.config['AUDIO_FOLDER'], processing_result.combined_mp3) if processing_result.combined_mp3 else None,
+                combined_mp3=os.path.join(app.config['AUDIO_FOLDER'], processing_result.combined_mp3_file) if processing_result.combined_mp3_file else None,
                 timing_data=None  # Timing data would be generated separately if needed
             )
         else:

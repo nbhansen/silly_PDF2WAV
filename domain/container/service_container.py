@@ -136,7 +136,8 @@ class ServiceContainer(IServiceContainer):
             return GeminiTTSProvider(
                 model_name=self.config.gemini_model_name,
                 api_key=self.config.gemini_api_key,
-                voice_personas_config=self.config.voice_personas_config
+                voice_name=self.config.gemini_voice_name,
+                document_type=self.config.document_type
             )
         else:
             return PiperTTSProvider(

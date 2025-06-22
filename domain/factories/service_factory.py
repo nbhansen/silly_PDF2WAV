@@ -40,7 +40,8 @@ def create_tts_engine(config: SystemConfig):
         return GeminiTTSProvider(
             model_name=config.gemini_model_name,
             api_key=config.gemini_api_key,
-            voice_personas_config=config.voice_personas_config
+            voice_name=config.gemini_voice_name,
+            document_type=config.document_type
         )
     else:
         return PiperTTSProvider(
