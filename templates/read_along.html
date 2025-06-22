@@ -1,193 +1,326 @@
 {% extends "base.html" %}
-{% block title %}READ-ALONG MODE - NICOLAIS PDF2WAV{% endblock %}
+{% block title %}Read-Along Mode - PDF to Audio{% endblock %}
 
 {% block head %}
-<!-- Add any enhanced styles here -->
 <style>
-/* Enhanced highlighting styles */
+/* Read-Along Specific Enhancements */
 .text-segment {
-    position: relative;
-    transition: all 0.2s ease;
+    transition: all 0.3s ease;
+    padding: 2px 4px;
+    border-radius: var(--radius-sm);
+    margin: 0 1px;
+    cursor: pointer;
 }
 
 .text-segment.active {
-    background: linear-gradient(
-        to right,
-        #9BF04C 0%,
-        #9BF04C calc(var(--highlight-progress, 0) * 100%),
-        rgba(155, 240, 76, 0.3) calc(var(--highlight-progress, 0) * 100%),
-        rgba(155, 240, 76, 0.3) 100%
-    );
-}
-
-.text-segment.pre-active {
-    animation: pulse 0.5s ease-in-out;
+    background-color: var(--accent-color);
+    color: var(--primary-bg);
+    font-weight: 500;
+    box-shadow: 0 2px 8px rgba(234, 205, 0, 0.4);
 }
 
 .text-segment.upcoming {
-    opacity: 0.8;
-    border-bottom: 1px dashed rgba(155, 240, 76, 0.5);
+    background-color: rgba(234, 205, 0, 0.2);
+    color: var(--primary-text);
 }
 
-.text-segment.low-confidence {
-    border-bottom: 1px dotted #FBFE65;
+.text-segment.pre-active {
+    animation: pulse-highlight 0.5s ease-in-out;
 }
 
-.segment-type-technical {
-    font-family: 'Courier New', monospace;
-    background-color: rgba(64, 49, 141, 0.2);
+@keyframes pulse-highlight {
+    0%, 100% { 
+        background-color: rgba(234, 205, 0, 0.1);
+    }
+    50% { 
+        background-color: rgba(234, 205, 0, 0.3);
+    }
 }
 
-.segment-type-emphasis {
-    font-weight: bold;
-}
-
-.timing-quality-indicator {
+.read-along-controls {
     position: sticky;
-    top: 0;
-    background: rgba(0, 0, 0, 0.9);
-    padding: 5px;
+    top: 20px;
+    z-index: 100;
+    background-color: var(--primary-bg);
+    border: 2px solid var(--accent-color);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-xl);
+    box-shadow: 0 4px 20px rgba(234, 205, 0, 0.1);
+}
+
+.read-along-content {
+    background-color: rgba(246, 242, 237, 0.02);
+    padding: var(--spacing-xl);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--accent-hover);
+    line-height: 1.8;
+    font-size: 1.1rem;
+    font-family: var(--font-body);
+}
+
+.audio-controls {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    align-items: center;
+}
+
+.control-buttons {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.progress-info {
     text-align: center;
-    font-size: 0.9em;
-    z-index: 10;
-    margin-bottom: 10px;
+    color: var(--accent-hover);
+    font-family: var(--font-heading);
+    font-size: 0.9rem;
 }
 
-.timing-tooltip {
-    background: rgba(0, 0, 0, 0.9);
-    color: #50C8FC;
-    padding: 5px 10px;
-    border-radius: 3px;
-    font-size: 0.8em;
-    pointer-events: none;
-    z-index: 1000;
+.speed-control {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    color: var(--primary-text);
+    font-family: var(--font-heading);
+    font-size: 0.9rem;
 }
 
-@keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.7; }
-    100% { opacity: 1; }
+.speed-control select {
+    background-color: var(--primary-bg);
+    color: var(--primary-text);
+    border: 1px solid var(--accent-hover);
+    border-radius: var(--radius-sm);
+    padding: 4px 8px;
+    font-family: var(--font-body);
 }
 
-/* Enhanced control styles */
-#speedControl {
-    background-color: #40318D;
-    color: #FFFFFF;
-    border: 2px solid #50C8FC;
-    padding: 8px 15px;
-    font-family: 'Courier Prime', monospace;
-    font-weight: 700;
-    margin-left: 10px;
+.speed-control select:focus {
+    outline: none;
+    border-color: var(--accent-color);
 }
 </style>
 {% endblock %}
 
 {% block content %}
-    <h1>◆ READ-ALONG MODE ◆</h1>
-    
-    <div class="read-along-container">
-        <div class="audio-controls-section">
-            <h3>♫ AUDIO PLAYBACK CONTROLS ♫</h3>
-            <div class="main-audio-player">
-                <audio id="mainAudio" controls preload="metadata">
-                    <source src="{{ url_for('serve_audio', filename=audio_filename) }}" type="audio/{{ 'mpeg' if audio_filename.endswith('.mp3') else 'wav' }}">
-                    YOUR BROWSER DOES NOT SUPPORT AUDIO PLAYBACK.
-                </audio>
+    <header class="site-header">
+        <h1 class="site-title">
+            <i class="fas fa-book-reader"></i>
+            Read-Along Mode
+        </h1>
+        <p class="site-subtitle">Follow along with synchronized text highlighting</p>
+    </header>
+
+    <div class="read-along-controls">
+        <div class="audio-controls">
+            <audio id="audioPlayer" controls preload="metadata">
+                <source src="{{ url_for('serve_audio', filename=audio_filename) }}" type="audio/mpeg">
+                Your browser does not support audio playback.
+            </audio>
+            
+            <div class="control-buttons">
+                <button id="playPauseBtn" class="btn btn-primary">
+                    <i class="fas fa-play"></i> Play
+                </button>
+                <button id="skipBackBtn" class="btn btn-secondary">
+                    <i class="fas fa-backward"></i> Skip Back 10s
+                </button>
+                <button id="skipForwardBtn" class="btn btn-secondary">
+                    <i class="fas fa-forward"></i> Skip Forward 10s
+                </button>
             </div>
             
-            <div class="playback-info">
-                <div class="time-display">
-                    <span id="currentTime">00:00</span> / <span id="totalTime">00:00</span>
-                </div>
-                <div class="sync-controls">
-                    <button id="toggleAutoScroll" class="control-btn">AUTO-SCROLL: ON</button>
-                    <button id="resumeTracking" class="control-btn" style="display: none;">RESUME TRACKING</button>
-                    <!-- Enhanced controls will be added here by JavaScript -->
-                </div>
+            <div class="speed-control">
+                <label for="speedSelect">
+                    <i class="fas fa-tachometer-alt"></i> Playback Speed:
+                </label>
+                <select id="speedSelect">
+                    <option value="0.5">0.5×</option>
+                    <option value="0.75">0.75×</option>
+                    <option value="1" selected>1×</option>
+                    <option value="1.25">1.25×</option>
+                    <option value="1.5">1.5×</option>
+                    <option value="2">2×</option>
+                </select>
             </div>
-        </div>
-
-        <div class="text-display-section">
-            <h3>📄 DOCUMENT TEXT</h3>
-            <div id="textContainer" class="text-container">
-                <p class="loading-text">LOADING ENHANCED TEXT SYNCHRONIZATION...</p>
+            
+            <div class="progress-info">
+                <span id="progressText">Ready to play</span>
             </div>
         </div>
     </div>
 
-    <div class="rainbow-divider"></div>
-    
-    <div class="instructions">
-        <h4><span class="icon">►</span>ENHANCED READ-ALONG FEATURES</h4>
-        <ul>
-            <li>TEXT HIGHLIGHTS SMOOTHLY AS AUDIO PLAYS</li>
-            <li>CLICK ANY SENTENCE TO JUMP TO THAT POSITION</li>
-            <li>ADJUST PLAYBACK SPEED (0.75x - 1.5x)</li>
-            <li>TOGGLE BETWEEN SMOOTH AND INSTANT HIGHLIGHTING</li>
-            <li>HOVER OVER TEXT TO SEE TIMING CONFIDENCE</li>
-            <li>COLOR-CODED TEXT TYPES (TECHNICAL, EMPHASIS, ETC.)</li>
-        </ul>
+    <div class="read-along-content" id="textContent">
+        {% for segment in timing_data %}
+            <span class="text-segment" 
+                  data-start="{{ segment.start_time }}" 
+                  data-duration="{{ segment.duration }}"
+                  data-end="{{ segment.start_time + segment.duration }}">{{ segment.text }}</span>
+        {% endfor %}
     </div>
 
-    <div style="text-align: center; margin-top: 40px;">
-        <a href="{{ url_for('index') }}" class="back-btn">
-            << BACK TO CONVERTER
+    <div class="text-center mt-lg">
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Convert Another PDF
         </a>
     </div>
-
 {% endblock %}
 
 {% block scripts %}
-<!-- Load the enhanced read-along JavaScript -->
 <script src="{{ url_for('static', filename='enhanced_read_along.js') }}"></script>
 
-<!-- Initialize the enhanced player -->
 <script>
-    // Configuration passed from Flask
-    const READ_ALONG_CONFIG = {
-        timingApiUrl: '{{ timing_api_url }}',
-        audioFilename: '{{ audio_filename }}',
-        baseFilename: '{{ base_filename }}',
-        enableEnhancedFeatures: true
-    };
+    class ReadAlongController {
+        constructor() {
+            this.audio = document.getElementById('audioPlayer');
+            this.playPauseBtn = document.getElementById('playPauseBtn');
+            this.skipBackBtn = document.getElementById('skipBackBtn');
+            this.skipForwardBtn = document.getElementById('skipForwardBtn');
+            this.speedSelect = document.getElementById('speedSelect');
+            this.progressText = document.getElementById('progressText');
+            this.textSegments = document.querySelectorAll('.text-segment');
+            
+            this.currentSegmentIndex = -1;
+            this.isPlaying = false;
+            
+            this.init();
+        }
+        
+        init() {
+            // Audio event listeners
+            this.audio.addEventListener('play', () => this.onPlay());
+            this.audio.addEventListener('pause', () => this.onPause());
+            this.audio.addEventListener('timeupdate', () => this.onTimeUpdate());
+            this.audio.addEventListener('loadedmetadata', () => this.onLoadedMetadata());
+            
+            // Control button listeners
+            this.playPauseBtn.addEventListener('click', () => this.togglePlayPause());
+            this.skipBackBtn.addEventListener('click', () => this.skipBack());
+            this.skipForwardBtn.addEventListener('click', () => this.skipForward());
+            this.speedSelect.addEventListener('change', () => this.changeSpeed());
+            
+            // Text segment click listeners
+            this.textSegments.forEach((segment, index) => {
+                segment.addEventListener('click', () => this.jumpToSegment(index));
+            });
+            
+            console.log(`Read-along initialized with ${this.textSegments.length} segments`);
+        }
+        
+        onPlay() {
+            this.isPlaying = true;
+            this.playPauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
+        }
+        
+        onPause() {
+            this.isPlaying = false;
+            this.playPauseBtn.innerHTML = '<i class="fas fa-play"></i> Play';
+        }
+        
+        onTimeUpdate() {
+            const currentTime = this.audio.currentTime;
+            this.updateActiveSegment(currentTime);
+            this.updateProgress(currentTime);
+        }
+        
+        onLoadedMetadata() {
+            const duration = this.formatTime(this.audio.duration);
+            console.log(`Audio loaded: ${duration} duration`);
+        }
+        
+        updateActiveSegment(currentTime) {
+            // Find the active segment
+            let activeIndex = -1;
+            
+            this.textSegments.forEach((segment, index) => {
+                const startTime = parseFloat(segment.dataset.start);
+                const endTime = parseFloat(segment.dataset.end);
+                
+                // Clear previous classes
+                segment.classList.remove('active', 'upcoming', 'pre-active');
+                
+                if (currentTime >= startTime && currentTime < endTime) {
+                    segment.classList.add('active');
+                    activeIndex = index;
+                } else if (startTime > currentTime && startTime <= currentTime + 2) {
+                    segment.classList.add('upcoming');
+                } else if (startTime > currentTime && startTime <= currentTime + 0.5) {
+                    segment.classList.add('pre-active');
+                }
+            });
+            
+            // Auto-scroll to active segment
+            if (activeIndex !== this.currentSegmentIndex && activeIndex !== -1) {
+                this.currentSegmentIndex = activeIndex;
+                this.scrollToActiveSegment();
+            }
+        }
+        
+        updateProgress(currentTime) {
+            const current = this.formatTime(currentTime);
+            const total = this.formatTime(this.audio.duration);
+            const percentage = this.audio.duration ? (currentTime / this.audio.duration * 100).toFixed(1) : 0;
+            
+            this.progressText.textContent = `${current} / ${total} (${percentage}%)`;
+        }
+        
+        scrollToActiveSegment() {
+            const activeSegment = document.querySelector('.text-segment.active');
+            if (activeSegment) {
+                activeSegment.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center',
+                    inline: 'nearest'
+                });
+            }
+        }
+        
+        togglePlayPause() {
+            if (this.isPlaying) {
+                this.audio.pause();
+            } else {
+                this.audio.play();
+            }
+        }
+        
+        skipBack() {
+            this.audio.currentTime = Math.max(0, this.audio.currentTime - 10);
+        }
+        
+        skipForward() {
+            this.audio.currentTime = Math.min(this.audio.duration, this.audio.currentTime + 10);
+        }
+        
+        changeSpeed() {
+            this.audio.playbackRate = parseFloat(this.speedSelect.value);
+        }
+        
+        jumpToSegment(index) {
+            const segment = this.textSegments[index];
+            const startTime = parseFloat(segment.dataset.start);
+            this.audio.currentTime = startTime;
+            
+            // Auto-play if not already playing
+            if (!this.isPlaying) {
+                this.audio.play();
+            }
+        }
+        
+        formatTime(seconds) {
+            if (isNaN(seconds)) return '0:00';
+            
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+    }
     
     // Initialize when DOM is ready
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('Initializing Enhanced Read-Along Player...');
-        
-        const audioElement = document.getElementById('mainAudio');
-        
-        // Check if enhanced player is available
-        if (typeof EnhancedReadAlongPlayer !== 'undefined') {
-            // Use enhanced player
-            console.log('✅ Using Enhanced Read-Along Player');
-            window.readAlongPlayer = new EnhancedReadAlongPlayer(
-                READ_ALONG_CONFIG.timingApiUrl, 
-                audioElement
-            );
-        } else {
-            // Fallback to basic player
-            console.log('⚠️ Enhanced player not found, using basic player');
-            
-            // You can keep your original ReadAlongPlayer as fallback
-            // Or show an error message
-            document.getElementById('textContainer').innerHTML = `
-                <p style="color: #FBFE65; text-align: center;">
-                    ❌ Enhanced player not loaded<br>
-                    Please check that enhanced_read_along.js is properly included
-                </p>
-            `;
-        }
-        
-        // Debug information
-        console.log('Read-along configuration:', READ_ALONG_CONFIG);
-    });
-    
-    // Cleanup on page unload
-    window.addEventListener('beforeunload', function() {
-        if (window.readAlongPlayer && window.readAlongPlayer.destroy) {
-            window.readAlongPlayer.destroy();
-        }
+    document.addEventListener('DOMContentLoaded', () => {
+        new ReadAlongController();
     });
 </script>
 {% endblock %}

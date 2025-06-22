@@ -59,9 +59,15 @@ All configuration is managed through `application/config/system_config.py` using
 ### Core Settings
 - `TTS_ENGINE`: `piper` (local) or `gemini` (cloud)
 - `GOOGLE_AI_API_KEY`: Required for Gemini TTS/LLM features
+- `GEMINI_VOICE_NAME`: Single voice for all TTS generation (Kore, Charon, Aoede, Leda)
+- `DOCUMENT_TYPE`: Content-aware styling (`research_paper`, `literature_review`, `general`)
 - `ENABLE_TEXT_CLEANING`: Use LLM for text enhancement (default: True)
 - `ENABLE_SSML`: Apply SSML markup for better speech (default: True)
-- `DOCUMENT_TYPE`: `research_paper`, `literature_review`, or `general`
+
+### Voice System Logic Separation
+- **Content Processing**: `DOCUMENT_TYPE` determines how content is styled and emphasized
+- **Voice Selection**: `GEMINI_VOICE_NAME` determines which voice speaks (Gemini only)
+- **Engine Independence**: Piper uses model-based voices, Gemini uses API voices
 
 ### File Management
 - `ENABLE_FILE_CLEANUP`: Automatic file cleanup (default: True)
@@ -92,13 +98,19 @@ The `application/composition_root.py` handles all dependency injection:
 - Fast, no API costs
 - Basic SSML support
 - Models stored in `piper_models/`
-- Configuration: `PiperConfig` with model selection
+- Configuration: Uses `PIPER_MODEL_NAME` (e.g., en_US-lessac-high)
+- Voice: Determined by selected model
 
-### Gemini TTS (Cloud)
+### Gemini TTS (Cloud) - Simplified Single Voice System
 - Full SSML support with precise timestamps
 - Requires Google AI API key
-- Rate limiting and async processing
-- Configuration: `GeminiConfig` with voice selection
+- Rate limiting with intelligent retry logic
+- **Single Voice Configuration**: `GEMINI_VOICE_NAME` used for all content
+- **Content-Aware Styling**: `DOCUMENT_TYPE` drives speech patterns
+  - `research_paper`: "precisely and methodically" for technical content
+  - `literature_review`: "thoughtfully and analytically" for narrative
+  - `general`: Natural, conversational styles
+- **No Multi-Voice Complexity**: Removed voice personas JSON system
 
 ## Timing Strategies
 
@@ -136,8 +148,15 @@ Automatic cleanup system:
 ### When Adding New TTS Engines
 1. Implement `ITTSEngine` interface in `infrastructure/tts/`
 2. Add configuration to `SystemConfig`
-3. Update `CompositionRoot._create_tts_engine()`
+3. Update `service_factory.create_tts_engine()`
 4. Consider implementing `ITimestampedTTSEngine` for timing support
+5. **Voice Configuration**: Decide if engine uses single voice or model-based voices
+
+### Voice System Architecture
+- **Simplified Design**: Single voice per session, content-aware styling
+- **No Voice Personas**: Removed complex multi-voice JSON configuration
+- **Domain Separation**: Content processing vs voice selection are independent
+- **Engine Flexibility**: Each TTS engine handles voice configuration differently
 
 ### When Adding New Text Processing
 1. Define interface in `domain/interfaces.py`

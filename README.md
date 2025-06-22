@@ -34,9 +34,17 @@ pip install -r requirements.txt
 ### Configuration
 Create `.env` file:
 ```bash
-TTS_ENGINE=piper
+# Core settings
+TTS_ENGINE=gemini
 GOOGLE_AI_API_KEY=your_key_here    # Required for Gemini TTS
+
+# Voice configuration (Gemini only)
+GEMINI_VOICE_NAME=Kore             # Single voice for all content
+DOCUMENT_TYPE=research_paper       # Content-aware styling
+
+# Text processing
 ENABLE_TEXT_CLEANING=True
+ENABLE_SSML=True
 ```
 
 ### Run
@@ -47,19 +55,25 @@ Access at http://127.0.0.1:5000
 
 ## TTS Engines
 
-| Engine | Speed | Cost | API Required |
-|--------|-------|------|--------------|
-| Piper | Fast | Free | No |
-| Gemini | Slower | Paid | Yes |
+| Engine | Speed | Cost | API Required | Voice Configuration |
+|--------|-------|------|--------------|--------------------|
+| Piper | Fast | Free | No | Model-based (e.g., en_US-lessac-high) |
+| Gemini | Slower | Paid | Yes | Single voice with content-aware styling |
 
 ## Configuration
 
 Environment variables:
 - `TTS_ENGINE`: `piper` or `gemini`
 - `GOOGLE_AI_API_KEY`: For Gemini features
+- `GEMINI_VOICE_NAME`: Single voice for all TTS (Kore, Charon, Aoede, Leda)
+- `DOCUMENT_TYPE`: Content-aware styling (`research_paper`, `literature_review`, `general`)
 - `ENABLE_TEXT_CLEANING`: AI text enhancement (default: True)
 - `ENABLE_SSML`: Speech markup (default: True)
-- `DOCUMENT_TYPE`: `research_paper`, `literature_review`, or `general`
+
+### Voice System
+- **Gemini TTS**: Uses single voice (`GEMINI_VOICE_NAME`) with intelligent content styling
+- **Piper TTS**: Uses model-based voices (`PIPER_MODEL_NAME`), ignores Gemini voice config
+- **Content Processing**: `DOCUMENT_TYPE` drives emphasis and technical content handling
 
 See `application/config/system_config.py` for complete options.
 

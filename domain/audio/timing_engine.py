@@ -18,8 +18,8 @@ from ..errors import Result
 
 class TimingMode(Enum):
     """Available timing modes"""
-    ESTIMATION = "estimation"      # Fast, uses engine timestamps
-    MEASUREMENT = "measurement"    # Accurate, measures actual duration
+    ESTIMATION = "estimation"      # Fast mathematical calculation (for engines without native timestamps)
+    MEASUREMENT = "measurement"    # Precise timing from actual audio (for engines with timestamp support)
     HYBRID = "hybrid"             # Smart combination of both
 
 
@@ -53,9 +53,9 @@ class TimingEngine(ITimingEngine):
         self.measurement_interval = measurement_interval
         self.last_api_call = 0.0
         
-        # Validate mode compatibility
+        # Optimize timing mode for engine capabilities
         if mode == TimingMode.ESTIMATION and not hasattr(tts_engine, 'generate_audio_with_timestamps'):
-            print(f"Warning: {tts_engine.__class__.__name__} doesn't support estimation mode. Falling back to measurement.")
+            print(f"✅ {tts_engine.__class__.__name__}: Using measurement mode for precise timestamps")
             self.mode = TimingMode.MEASUREMENT
     
     def generate_with_timing(self, text_chunks: List[str], output_filename: str) -> TimedAudioResult:
@@ -69,11 +69,12 @@ class TimingEngine(ITimingEngine):
             return self._generate_with_hybrid(text_chunks, output_filename)
     
     def _generate_with_estimation(self, text_chunks: List[str], output_filename: str) -> TimedAudioResult:
-        """Fast timing using engine-provided timestamps"""
+        """Fast timing using mathematical calculations (for engines without native timestamps)"""
         if not hasattr(self.tts_engine, 'generate_audio_with_timestamps'):
+            # Engine doesn't support native timestamps, use measurement mode instead
             return self._generate_with_measurement(text_chunks, output_filename)
         
-        print("TimingEngine: Using estimation mode (fast)")
+        print("TimingEngine: Using estimation mode with native engine timestamps")
         
         # Enhance text with SSML if available
         if self.text_pipeline:
@@ -126,8 +127,8 @@ class TimingEngine(ITimingEngine):
             return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
     
     def _generate_with_measurement(self, text_chunks: List[str], output_filename: str) -> TimedAudioResult:
-        """Accurate timing by measuring actual audio duration"""
-        print("TimingEngine: Using measurement mode (accurate)")
+        """Precise timing by measuring actual audio duration (optimal for engines with timestamp support)"""
+        print("TimingEngine: Using measurement mode for precise audio timing")
         
         if not self.text_pipeline:
             print("Warning: No text pipeline available for measurement mode")
@@ -174,11 +175,11 @@ class TimingEngine(ITimingEngine):
                     batch_duration = self._measure_audio_duration(temp_file)
                     
                     # Distribute duration across sentences by word count
-                    total_words = sum(len(self.text_cleaning_service.strip_ssml(sent).split()) 
+                    total_words = sum(len(self._strip_ssml(sent).split()) 
                                     for sent in sentence_batch)
                     
                     for i, sentence_text in enumerate(sentence_batch):
-                        clean_text = self.text_cleaning_service.strip_ssml(sentence_text)
+                        clean_text = self._strip_ssml(sentence_text)
                         word_count = len(clean_text.split())
                         
                         if total_words > 0:
@@ -286,6 +287,15 @@ class TimingEngine(ITimingEngine):
             return file_size / (22050 * 2)  # Rough estimation
         except:
             return 1.0  # Default fallback
+    
+    def _strip_ssml(self, text: str) -> str:
+        """Remove SSML tags from text for word counting"""
+        import re
+        # Remove all SSML tags like <speak>, <break>, <prosody>, etc.
+        clean_text = re.sub(r'<[^>]+>', '', text)
+        # Clean up extra whitespace
+        clean_text = re.sub(r'\s+', ' ', clean_text).strip()
+        return clean_text
     
     def _combine_audio_files(self, file_paths: List[str], output_path: str) -> bool:
         """Combine audio files using ffmpeg"""

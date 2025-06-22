@@ -3,6 +3,7 @@ from domain.interfaces import (
     ITTSEngine, ILLMProvider, ITextExtractor, IPageRangeValidator,
     IAudioProcessor, IEngineCapabilityDetector, SSMLCapability
 )
+from domain.audio.timing_engine import ITimingEngine
 from domain.models import PDFInfo, PageRange, ProcessingRequest, TimedAudioResult, TimingMetadata
 from domain.errors import Result, tts_engine_error, llm_provider_error, audio_generation_error
 from typing import Dict, Any, List
@@ -134,20 +135,41 @@ class FakeAudioProcessor(IAudioProcessor):
         return Result.success(2.5)
 
 
-class FakeTimingCalculator(ITimingCalculator):
-    """Fake timing calculator for testing"""
+class FakeTimingEngine(ITimingEngine):
+    """Fake timing engine for testing"""
     
-    def estimate_text_duration(self, text: str, engine_type: str) -> float:
-        return len(text.split()) * 0.5  # Half second per word
-    
-    def calculate_phoneme_duration(self, text: str) -> float:
-        return len(text) * 0.1  # 0.1 seconds per character
-    
-    def add_punctuation_pauses(self, text: str) -> float:
-        return text.count('.') * 0.5 + text.count(',') * 0.2
-    
-    def estimate_sentence_duration(self, sentence: str, engine_type: str) -> float:
-        return self.estimate_text_duration(sentence, engine_type)
+    def generate_with_timing(self, text_chunks: List[str], output_filename: str) -> TimedAudioResult:
+        """Generate fake timed audio result for testing"""
+        from domain.models import TextSegment, TimingMetadata
+        
+        # Create fake segments
+        segments = []
+        current_time = 0.0
+        
+        for i, chunk in enumerate(text_chunks):
+            duration = len(chunk.split()) * 0.5  # Half second per word
+            segment = TextSegment(
+                text=chunk,
+                start_time=current_time,
+                duration=duration,
+                segment_type="sentence",
+                chunk_index=i,
+                sentence_index=i
+            )
+            segments.append(segment)
+            current_time += duration
+        
+        timing_metadata = TimingMetadata(
+            total_duration=current_time,
+            text_segments=segments,
+            audio_files=[f"{output_filename}.wav"]
+        )
+        
+        return TimedAudioResult(
+            audio_files=[f"{output_filename}.wav"],
+            combined_mp3=f"{output_filename}.mp3",
+            timing_data=timing_metadata
+        )
 
 
 class FakeEngineCapabilityDetector(IEngineCapabilityDetector):
@@ -180,32 +202,5 @@ class FakeEngineCapabilityDetector(IEngineCapabilityDetector):
         pass
 
 
-class FakeTimingStrategy(ITimingStrategy):
-    """Fake timing strategy for testing"""
-    
-    def __init__(self, should_fail=False):
-        self.should_fail = should_fail
-    
-    def generate_with_timing(self, text_chunks: List[str], output_filename: str) -> TimedAudioResult:
-        """Generate fake timed audio result"""
-        if self.should_fail:
-            return TimedAudioResult(
-                audio_files=[],
-                combined_mp3=None,
-                timing_data=None
-            )
-        
-        # Create fake audio files and timing data
-        audio_files = [f"{output_filename}_part{i+1:02d}.wav" for i in range(len(text_chunks))]
-        
-        timing_metadata = TimingMetadata(
-            total_duration=len(text_chunks) * 2.0,  # 2 seconds per chunk
-            text_segments=[],
-            audio_files=audio_files
-        )
-        
-        return TimedAudioResult(
-            audio_files=audio_files,
-            combined_mp3=f"{output_filename}_combined.mp3",
-            timing_data=timing_metadata
-        )
+# Alias for backward compatibility with tests
+FakeTimingStrategy = FakeTimingEngine

@@ -1,195 +1,208 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NICOLAIS PDF2WAV CONVERTER</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-    <div class="scanlines"></div>
-    <div class="rainbow-header"></div>
+{% extends "base.html" %}
+{% block title %}PDF to Audio Converter{% endblock %}
+
+{% block content %}
+    <header class="site-header">
+        <h1 class="site-title">PDF to Audio Converter</h1>
+        <p class="site-subtitle">Transform your documents into high-quality audio files</p>
+    </header>
     
-    <div class="container">
-        <div class="c64-logo">
-            <div class="rainbow-text">◆◇◆◇◆ HANSEN SYSTEMS PRESENTS ◆◇◆◇◆</div>
+    <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data" novalidate>
+        <div class="form-group">
+            <label for="pdf_file">
+                <i class="fas fa-file-pdf"></i> Select PDF Document
+            </label>
+            <input type="file" id="pdf_file" name="pdf_file" accept=".pdf" required>
         </div>
-        
-        <h1>PDF TO MP3 CONVERTER</h1>
-        
-        <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data">
+
+        <div class="options-card">
+            <div class="options-header">
+                <i class="fas fa-cog"></i>
+                <span>Advanced Options</span>
+            </div>
             
-            <div class="form-group">
-                <label for="pdf_file">>>> SELECT PDF FILE:</label>
-                <input type="file" id="pdf_file" name="pdf_file" accept=".pdf" required onchange="handleFileSelection()">
+            <div class="checkbox-group">
+                <input type="checkbox" id="use_page_range" name="use_page_range">
+                <label for="use_page_range" class="checkbox-label">Specify custom page range</label>
             </div>
-
-            <div class="page-range-container">
-                <div class="page-range-header">
-                    <span>■</span>
-                    <span>ADVANCED OPTIONS</span>
-                </div>
-                
-                <div class="checkbox-group">
-                    <input type="checkbox" id="use_page_range" name="use_page_range" onchange="togglePageRange()">
-                    <label for="use_page_range" class="checkbox-label">Specify custom page range (optional)</label>
-                </div>
-                
-                <div class="page-range-inputs" id="page_range_inputs">
-                    <div class="page-input-group">
-                        <span>FROM PAGE:</span>
-                        <input type="number" id="start_page" name="start_page" min="1" placeholder="1" onchange="validatePageRange()">
-                    </div>
-                    <div class="page-input-group">
-                        <span>TO PAGE:</span>
-                        <input type="number" id="end_page" name="end_page" min="1" placeholder="END" onchange="validatePageRange()">
-                    </div>
-                </div>
-                
-                <div class="error-message" id="page_error"></div>
-                
-                <!-- READ-ALONG OPTION -->
-                <div class="checkbox-group read-along-highlight">
-                    <input type="checkbox" id="enable_read_along" name="enable_read_along" onchange="updateFormAction()" {{ 'disabled' if tts_engine == 'gemini' else '' }}>
-                    <label for="enable_read_along" class="checkbox-label">📖 Enable Read-Along Mode (synchronized text highlighting){% if tts_engine == 'gemini' %} - Available with Piper TTS only{% endif %}</label>
-                </div>
-                
-                <div class="help-text">
-                    <strong>SYSTEM TIPS:</strong><br>
-                    • Leave page range unchecked to process entire PDF<br>
-                    • Academic papers: Skip title pages (start page 2-3)<br>
-                    • Skip references (end before last 10-20% pages)<br>
-                    • Both page fields optional - leave "to page" empty for end<br>
-                    • <strong>📖 Read-Along Mode:</strong> Generates timing data for synchronized text highlighting with audio playback
-                </div>
-            </div>
-
-            <div class="submit-container">
-                <input type="submit" id="submitBtn" value=">> PROCESS FILE <<">
-                
-                <div class="processing-indicator" id="processingIndicator">
-                    PROCESSING... PLEASE WAIT...
-                </div>
-            </div>
-        </form>
-    </div>
-
-    <script>
-        function togglePageRange() {
-            const checkbox = document.getElementById('use_page_range');
-            const inputs = document.getElementById('page_range_inputs');
-            const errorDiv = document.getElementById('page_error');
             
-            if (checkbox.checked) {
-                inputs.classList.add('active');
+            <div class="page-range-inputs" id="page_range_inputs">
+                <div class="page-input-group">
+                    <span>From Page</span>
+                    <input type="number" id="start_page" name="start_page" min="1" placeholder="1">
+                </div>
+                <div class="page-input-group">
+                    <span>To Page</span>
+                    <input type="number" id="end_page" name="end_page" min="1" placeholder="Last page">
+                </div>
+            </div>
+            
+            <div class="error-message" id="page_error"></div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="enable_read_along" name="enable_read_along" {{ 'disabled' if tts_engine == 'gemini' else '' }}>
+                <label for="enable_read_along" class="checkbox-label">
+                    <i class="fas fa-book-reader"></i> Enable read-along mode
+                    {% if tts_engine == 'gemini' %}
+                    <span style="opacity: 0.7;">(Available with Piper TTS only)</span>
+                    {% endif %}
+                </label>
+            </div>
+            
+            <div class="help-text">
+                <strong>Usage Tips:</strong><br>
+                • Leave page range unchecked to process the entire document<br>
+                • For academic papers: Consider starting from page 2-3 to skip title pages<br>
+                • End before references section for cleaner audio content<br>
+                • <strong>Read-along mode:</strong> Generates synchronized text highlighting during audio playback
+            </div>
+        </div>
+
+        <div class="form-group">
+            <input type="submit" id="submitBtn" value="Convert to Audio" class="btn btn-primary">
+            
+            <div class="processing-indicator" id="processingIndicator">
+                <i class="fas fa-spinner fa-spin"></i> Processing your document...
+            </div>
+        </div>
+    </form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Clean, consolidated JavaScript
+    class PDFConverter {
+        constructor() {
+            this.form = document.getElementById('uploadForm');
+            this.submitBtn = document.getElementById('submitBtn');
+            this.processingIndicator = document.getElementById('processingIndicator');
+            this.pageRangeCheckbox = document.getElementById('use_page_range');
+            this.pageRangeInputs = document.getElementById('page_range_inputs');
+            this.readAlongCheckbox = document.getElementById('enable_read_along');
+            this.errorDiv = document.getElementById('page_error');
+            this.fileInput = document.getElementById('pdf_file');
+            
+            this.isSubmitted = false;
+            this.init();
+        }
+        
+        init() {
+            // Event listeners
+            this.pageRangeCheckbox.addEventListener('change', () => this.togglePageRange());
+            this.readAlongCheckbox.addEventListener('change', () => this.updateFormAction());
+            this.fileInput.addEventListener('change', () => this.handleFileSelection());
+            
+            // Page range validation
+            document.getElementById('start_page').addEventListener('input', () => this.validatePageRange());
+            document.getElementById('end_page').addEventListener('input', () => this.validatePageRange());
+            
+            // Form submission
+            this.form.addEventListener('submit', (e) => this.handleSubmit(e));
+            
+            // Initialize form action
+            this.updateFormAction();
+        }
+        
+        togglePageRange() {
+            if (this.pageRangeCheckbox.checked) {
+                this.pageRangeInputs.classList.add('active');
             } else {
-                inputs.classList.remove('active');
+                this.pageRangeInputs.classList.remove('active');
                 document.getElementById('start_page').value = '';
                 document.getElementById('end_page').value = '';
-                hideError();
+                this.hideError();
             }
         }
-
-        function updateFormAction() {
-            const form = document.getElementById('uploadForm');
-            const readAlongCheckbox = document.getElementById('enable_read_along');
-            
-            if (readAlongCheckbox.checked) {
-                form.action = '/upload-with-timing';
-                document.getElementById('submitBtn').value = '>> PROCESS WITH READ-ALONG <<';
+        
+        updateFormAction() {
+            if (this.readAlongCheckbox.checked) {
+                this.form.action = '/upload-with-timing';
+                this.submitBtn.value = 'Convert with Read-Along';
             } else {
-                form.action = '/upload';
-                document.getElementById('submitBtn').value = '>> PROCESS FILE <<';
+                this.form.action = '/upload';
+                this.submitBtn.value = 'Convert to Audio';
             }
         }
-
-        function validatePageRange() {
+        
+        validatePageRange() {
             const startPage = parseInt(document.getElementById('start_page').value);
             const endPage = parseInt(document.getElementById('end_page').value);
             
-            hideError();
+            this.hideError();
             
             if (startPage && startPage < 1) {
-                showError('START PAGE MUST BE 1 OR GREATER');
+                this.showError('Start page must be 1 or greater');
                 return false;
             }
             
             if (endPage && endPage < 1) {
-                showError('END PAGE MUST BE 1 OR GREATER');
+                this.showError('End page must be 1 or greater');
                 return false;
             }
             
             if (startPage && endPage && startPage > endPage) {
-                showError('START PAGE CANNOT BE GREATER THAN END PAGE');
+                this.showError('Start page cannot be greater than end page');
                 return false;
             }
             
             return true;
         }
-
-        function showError(message) {
-            const errorDiv = document.getElementById('page_error');
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'block';
+        
+        showError(message) {
+            this.errorDiv.textContent = message;
+            this.errorDiv.style.display = 'block';
         }
-
-        function hideError() {
-            const errorDiv = document.getElementById('page_error');
-            errorDiv.style.display = 'none';
+        
+        hideError() {
+            this.errorDiv.style.display = 'none';
         }
-
-        function handleFileSelection() {
-            const fileInput = document.getElementById('pdf_file');
-            const file = fileInput.files[0];
+        
+        handleFileSelection() {
+            const file = this.fileInput.files[0];
             
             if (file) {
-                console.log('SELECTED FILE:', file.name, 'SIZE:', (file.size / 1024 / 1024).toFixed(1) + ' MB');
-                
                 const maxSize = 100 * 1024 * 1024; // 100MB
                 if (file.size > maxSize) {
-                    alert('FILE TOO LARGE. MAXIMUM SIZE IS 100MB.');
-                    fileInput.value = '';
+                    alert('File too large. Maximum size is 100MB.');
+                    this.fileInput.value = '';
+                    return;
                 }
+                
+                console.log(`Selected: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
             }
         }
-
-        document.getElementById('uploadForm').addEventListener('submit', function(e) {
-            const checkbox = document.getElementById('use_page_range');
-            
-            if (checkbox.checked) {
-                if (!validatePageRange()) {
-                    e.preventDefault();
-                    return false;
-                }
-            }
-            
-            const submitBtn = document.getElementById('submitBtn');
-            const processingIndicator = document.getElementById('processingIndicator');
-            
-            submitBtn.disabled = true;
-            processingIndicator.style.display = 'block';
-            
-            window.addEventListener('beforeunload', function() {
-                submitBtn.disabled = false;
-                updateFormAction(); // Reset button text properly
-                processingIndicator.style.display = 'none';
-            });
-        });
-
-        let formSubmitted = false;
-        document.getElementById('uploadForm').addEventListener('submit', function(e) {
-            if (formSubmitted) {
+        
+        handleSubmit(e) {
+            // Prevent double submission
+            if (this.isSubmitted) {
                 e.preventDefault();
                 return false;
             }
-            formSubmitted = true;
-        });
-
-        // Initialize form action on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            updateFormAction();
-        });
-    </script>
-</body>
-</html>
+            
+            // Validate page range if enabled
+            if (this.pageRangeCheckbox.checked && !this.validatePageRange()) {
+                e.preventDefault();
+                return false;
+            }
+            
+            // Show processing state
+            this.isSubmitted = true;
+            this.submitBtn.disabled = true;
+            this.processingIndicator.style.display = 'block';
+            
+            // Reset on page unload (if user navigates away)
+            window.addEventListener('beforeunload', () => {
+                this.isSubmitted = false;
+                this.submitBtn.disabled = false;
+                this.processingIndicator.style.display = 'none';
+                this.updateFormAction(); // Reset button text
+            });
+        }
+    }
+    
+    // Initialize when DOM is ready
+    document.addEventListener('DOMContentLoaded', () => {
+        new PDFConverter();
+    });
+</script>
+{% endblock %}

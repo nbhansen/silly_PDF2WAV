@@ -37,6 +37,7 @@ class ProcessingResult:
     """Result of PDF processing operation with structured error handling"""
     audio_files: Optional[List[str]] = None
     combined_mp3_file: Optional[str] = None
+    timing_data: Optional['TimingMetadata'] = None
     debug_info: Optional[Dict[str, Any]] = None
     error: Optional[ApplicationError] = None
 
@@ -52,11 +53,13 @@ class ProcessingResult:
 
     @classmethod
     def success_result(cls, audio_files: List[str], combined_mp3: Optional[str] = None,
+                       timing_data: Optional['TimingMetadata'] = None,
                        debug_info: Optional[Dict[str, Any]] = None) -> 'ProcessingResult':
         """Create a successful processing result"""
         return cls(
             audio_files=audio_files,
             combined_mp3_file=combined_mp3,
+            timing_data=timing_data,
             debug_info=debug_info,
             error=None
         )
@@ -67,6 +70,7 @@ class ProcessingResult:
         return cls(
             audio_files=None,
             combined_mp3_file=None,
+            timing_data=None,
             debug_info=None,
             error=error
         )

@@ -386,15 +386,8 @@ def process_upload_request(request_form, uploaded_file, enable_timing=False):
         # Use new document engine for complete processing
         processing_result = document_engine.process_document(request_obj, audio_engine, text_pipeline, enable_timing)
         
-        # Convert ProcessingResult to TimedAudioResult for compatibility
-        if processing_result.success:
-            timed_result = TimedAudioResult(
-                audio_files=[os.path.join(app.config['AUDIO_FOLDER'], f) for f in processing_result.audio_files],
-                combined_mp3=os.path.join(app.config['AUDIO_FOLDER'], processing_result.combined_mp3_file) if processing_result.combined_mp3_file else None,
-                timing_data=None  # Timing data would be generated separately if needed
-            )
-        else:
-            timed_result = None
+        # Extract timing data from ProcessingResult
+        timing_data = processing_result.timing_data if processing_result.success else None
 
         # Clean up uploaded file
         try:
@@ -406,17 +399,17 @@ def process_upload_request(request_form, uploaded_file, enable_timing=False):
             return processing_result, original_filename, base_filename_no_ext, None
 
         # Save timing data if available and requested
-        if enable_timing and timed_result.timing_data:
-            save_timing_data(base_filename_no_ext, timed_result.timing_data)
+        if enable_timing and timing_data:
+            save_timing_data(base_filename_no_ext, timing_data)
 
         # Use the ProcessingResult directly from new architecture
         result = processing_result
         
         # Add timing information to debug info if available
-        if enable_timing and timed_result and timed_result.timing_data:
+        if enable_timing and timing_data:
             result.debug_info.update({
                 "timing_data_created": True,
-                "timing_segments": len(timed_result.timing_data.text_segments)
+                "timing_segments": len(timing_data.text_segments)
             })
         else:
             result.debug_info.update({

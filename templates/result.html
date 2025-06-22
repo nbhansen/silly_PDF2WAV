@@ -1,190 +1,235 @@
 {% extends "base.html" %}
-{% block title %}CONVERSION COMPLETE - NICOLAIS PDF2WAV{% endblock %}
+{% block title %}Conversion Complete - PDF to Audio{% endblock %}
+
 {% block content %}
-    <h1>◆ CONVERSION COMPLETE ◆</h1>
+    <header class="site-header">
+        <h1 class="site-title">
+            <i class="fas fa-check-circle" style="color: var(--success-border);"></i>
+            Conversion Complete
+        </h1>
+        <p class="site-subtitle">Your audio file has been generated successfully</p>
+    </header>
+
     <div class="success-message">
-        *** AUDIO FILE GENERATION SUCCESSFUL ***
+        <i class="fas fa-volume-up"></i>
+        Audio conversion completed successfully
     </div>
-    <div class="file-info">
-        <h3>■ FILE INFORMATION</h3>
-        <p><strong>ORIGINAL PDF:</strong> {{ original_filename }}</p>
-        <p><strong>TTS ENGINE:</strong> {{ tts_engine }}</p>
-        <p><strong>AUDIO FORMAT:</strong> MP3 (COMPRESSED FOR PLAYBACK)</p>
-        {% if debug_info and debug_info.text_chunks_count %}
-            <p><strong>CONTENT SECTIONS:</strong> {{ debug_info.text_chunks_count }} PARTS COMBINED</p>
-        {% endif %}
-        {% if debug_info and debug_info.timing_segments %}
-            <p><strong>READ-ALONG SEGMENTS:</strong> {{ debug_info.timing_segments }} SYNCHRONIZED TEXT SECTIONS</p>
-        {% endif %}
-    </div>
-    
+
+    <!-- Audio Player Section -->
     {% if combined_mp3_file %}
-        <div class="audio-player-section">
-            <h3>♫ YOUR COMPLETE AUDIO FILE ♫</h3>
+        <section class="audio-player-section">
+            <h2><i class="fas fa-headphones"></i> Your Audio File</h2>
             <div class="main-audio-player">
                 <audio controls preload="metadata">
                     <source src="{{ url_for('serve_audio', filename=combined_mp3_file) }}" type="audio/mpeg">
-                    YOUR BROWSER DOES NOT SUPPORT AUDIO PLAYBACK.
+                    Your browser does not support audio playback.
                 </audio>
             </div>
             <div class="download-section">
-                <a href="{{ url_for('serve_audio', filename=combined_mp3_file) }}" download="{{ combined_mp3_file }}" class="download-btn">
-                    >> DOWNLOAD COMPLETE MP3 <<
-                    <span class="size-info">OPTIMIZED FOR CAR AUDIO SYSTEMS</span>
+                <a href="{{ url_for('serve_audio', filename=combined_mp3_file) }}" download="{{ combined_mp3_file }}" class="btn btn-primary download-btn">
+                    <i class="fas fa-download"></i> Download MP3
+                    <span class="size-info">Optimized for all devices</span>
                 </a>
                 
                 {% if has_timing_data and base_filename %}
-                <div class="read-along-section">
-                    <a href="{{ url_for('read_along_view', filename=combined_mp3_file) }}" class="read-along-btn">
-                        📖 READ ALONG MODE
-                        <span class="size-info">SYNCHRONIZED TEXT HIGHLIGHTING</span>
-                    </a>
-                </div>
+                <a href="{{ url_for('read_along_view', filename=combined_mp3_file) }}" class="btn btn-secondary read-along-btn">
+                    <i class="fas fa-book-reader"></i> Read-Along Mode
+                    <span class="size-info">Synchronized text highlighting</span>
+                </a>
                 {% endif %}
             </div>
-        </div>
+        </section>
     {% elif audio_files and audio_files|length == 1 %}
-        <div class="audio-player-section">
-            <h3>♫ YOUR AUDIO FILE ♫</h3>
+        <section class="audio-player-section">
+            <h2><i class="fas fa-headphones"></i> Your Audio File</h2>
             <div class="main-audio-player">
                 <audio controls preload="metadata">
                     <source src="{{ url_for('serve_audio', filename=audio_files[0]) }}" type="audio/{{ 'mpeg' if audio_files[0].endswith('.mp3') else 'wav' }}">
-                    YOUR BROWSER DOES NOT SUPPORT AUDIO PLAYBACK.
+                    Your browser does not support audio playback.
                 </audio>
             </div>
             <div class="download-section">
-                <a href="{{ url_for('serve_audio', filename=audio_files[0]) }}" download="{{ audio_files[0] }}" class="download-btn">
-                    >> DOWNLOAD AUDIO FILE <<
+                <a href="{{ url_for('serve_audio', filename=audio_files[0]) }}" download="{{ audio_files[0] }}" class="btn btn-primary download-btn">
+                    <i class="fas fa-download"></i> Download Audio
                 </a>
                 
                 {% if has_timing_data and base_filename %}
-                <div class="read-along-section">
-                    <a href="{{ url_for('read_along_view', filename=audio_files[0]) }}" class="read-along-btn">
-                        📖 READ ALONG MODE
-                        <span class="size-info">SYNCHRONIZED TEXT HIGHLIGHTING</span>
-                    </a>
-                </div>
+                <a href="{{ url_for('read_along_view', filename=audio_files[0]) }}" class="btn btn-secondary read-along-btn">
+                    <i class="fas fa-book-reader"></i> Read-Along Mode
+                    <span class="size-info">Synchronized text highlighting</span>
+                </a>
                 {% endif %}
             </div>
-        </div>
+        </section>
     {% else %}
-        <div class="fallback-info">
-            <strong>NOTICE:</strong> MP3 COMPRESSION WAS NOT AVAILABLE, BUT YOUR AUDIO FILES WERE GENERATED SUCCESSFULLY.
+        <div class="info-card">
+            <h3><i class="fas fa-info-circle"></i> Notice</h3>
+            <p>MP3 compression was not available, but your audio files were generated successfully.</p>
             {% if audio_files %}
-                <div style="margin-top: 20px;">
+                <div class="download-section mt-lg">
                     {% for audio_file in audio_files %}
-                        <a href="{{ url_for('serve_audio', filename=audio_file) }}" download="{{ audio_file }}" class="download-btn" style="font-size: 0.9em; padding: 10px 20px; margin: 8px;">
-                            >> DOWNLOAD PART {{ loop.index }} <<
+                        <a href="{{ url_for('serve_audio', filename=audio_file) }}" download="{{ audio_file }}" class="btn btn-primary">
+                            <i class="fas fa-download"></i> Download Part {{ loop.index }}
                         </a>
                     {% endfor %}
                 </div>
             {% endif %}
         </div>
     {% endif %}
-    
-    <div class="rainbow-divider"></div>
-    <div class="instructions">
-        <h4><span class="icon">►</span>SYSTEM USAGE INSTRUCTIONS</h4>
+
+    <!-- File Information -->
+    <div class="info-card file-info">
+        <h3><i class="fas fa-file-alt"></i> File Information</h3>
+        <div class="info-item">
+            <span class="info-label">Original PDF:</span>
+            <span>{{ original_filename }}</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">TTS Engine:</span>
+            <span>{{ tts_engine.title() }}</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">Audio Format:</span>
+            <span>MP3 (Compressed)</span>
+        </div>
+        {% if debug_info and debug_info.text_chunks_count %}
+        <div class="info-item">
+            <span class="info-label">Content Sections:</span>
+            <span>{{ debug_info.text_chunks_count }} parts combined</span>
+        </div>
+        {% endif %}
+        {% if debug_info and debug_info.timing_segments %}
+        <div class="info-item">
+            <span class="info-label">Read-Along Segments:</span>
+            <span>{{ debug_info.timing_segments }} synchronized sections</span>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Processing Information -->
+    {% if debug_info %}
+    <div class="info-card processing-info">
+        <h3><i class="fas fa-cogs"></i> Processing Details</h3>
+        {% if debug_info.raw_text_length %}
+        <div class="info-item">
+            <span class="info-label">Text Extracted:</span>
+            <span>{{ "{:,}".format(debug_info.raw_text_length) }} characters</span>
+        </div>
+        {% endif %}
+        {% if debug_info.page_range and debug_info.page_range != "full_document" %}
+        <div class="info-item">
+            <span class="info-label">Page Range:</span>
+            <span>{{ debug_info.page_range.range_description if debug_info.page_range.range_description else debug_info.page_range }}</span>
+        </div>
+        {% endif %}
+        {% if debug_info.ffmpeg_available is defined %}
+        <div class="info-item">
+            <span class="info-label">MP3 Compression:</span>
+            <span>
+                {% if debug_info.ffmpeg_available %}
+                    <i class="fas fa-check" style="color: var(--success-border);"></i> Available
+                {% else %}
+                    <i class="fas fa-times" style="color: var(--error-border);"></i> Not Available
+                {% endif %}
+            </span>
+        </div>
+        {% endif %}
+        {% if debug_info.ssml_enhancement %}
+        <div class="info-item">
+            <span class="info-label">SSML Enhancement:</span>
+            <span>{{ debug_info.ssml_enhancement.title() }}</span>
+        </div>
+        {% endif %}
+        {% if debug_info.timing_data_created %}
+        <div class="info-item">
+            <span class="info-label">Read-Along Data:</span>
+            <span>
+                {% if debug_info.timing_data_created %}
+                    <i class="fas fa-check" style="color: var(--success-border);"></i> Generated
+                {% else %}
+                    <i class="fas fa-times" style="color: var(--error-border);"></i> Not Generated
+                {% endif %}
+            </span>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Usage Instructions -->
+    <div class="info-card instructions">
+        <h4><i class="fas fa-lightbulb"></i> Usage Instructions</h4>
         <ul>
-            <li>USE AUDIO CONTROLS ABOVE TO PLAY, PAUSE, AND ADJUST VOLUME</li>
-            <li>CLICK "DOWNLOAD COMPLETE MP3" TO SAVE FILE TO YOUR DEVICE</li>
-            <li>RIGHT-CLICK DOWNLOAD BUTTON TO SAVE TO PREFERRED LOCATION</li>
+            <li>Use the audio controls above to play, pause, and adjust volume</li>
+            <li>Click "Download MP3" to save the file to your device</li>
+            <li>Right-click the download button to choose save location</li>
             {% if has_timing_data %}
-            <li>CLICK "📖 READ ALONG MODE" FOR SYNCHRONIZED TEXT HIGHLIGHTING</li>
+            <li>Click "Read-Along Mode" for synchronized text highlighting</li>
             {% endif %}
-            <li>AUDIO FILES ARE AUTOMATICALLY CLEANED FROM SERVER AFTER TIME</li>
+            <li>Files are automatically cleaned from the server after 24 hours</li>
         </ul>
     </div>
-    {% if debug_info %}
-        <div class="processing-info">
-            <h4><span class="icon">●</span>PROCESSING SUMMARY</h4>
-            {% if debug_info.raw_text_length %}
-                <div class="info-item">
-                    <span class="info-label">TEXT EXTRACTED:</span> {{ "{:,}".format(debug_info.raw_text_length) }} CHARACTERS
-                </div>
-            {% endif %}
-            {% if debug_info.page_range and debug_info.page_range != "full_document" %}
-                <div class="info-item">
-                    <span class="info-label">PAGE RANGE:</span> {{ debug_info.page_range.range_description if debug_info.page_range.range_description else debug_info.page_range }}
-                </div>
-            {% endif %}
-            {% if debug_info.tts_engine %}
-                <div class="info-item">
-                    <span class="info-label">TTS ENGINE:</span> {{ debug_info.tts_engine }}
-                </div>
-            {% endif %}
-            {% if debug_info.ffmpeg_available is defined %}
-                <div class="info-item">
-                    <span class="info-label">MP3 COMPRESSION:</span> {{ "✓ AVAILABLE" if debug_info.ffmpeg_available else "✗ NOT AVAILABLE" }}
-                </div>
-            {% endif %}
-            {% if debug_info.ssml_enhancement %}
-                <div class="info-item">
-                    <span class="info-label">SSML ENHANCEMENT:</span> {{ debug_info.ssml_enhancement.upper() }}
-                </div>
-            {% endif %}
-            {% if debug_info.timing_data_created %}
-                <div class="info-item">
-                    <span class="info-label">READ-ALONG DATA:</span> {{ "✓ GENERATED" if debug_info.timing_data_created else "✗ NOT GENERATED" }}
-                </div>
-            {% endif %}
-            {% if debug_info.timing_segments %}
-                <div class="info-item">
-                    <span class="info-label">TIMING SEGMENTS:</span> {{ debug_info.timing_segments }} SYNCHRONIZED SECTIONS
-                </div>
-            {% endif %}
-        </div>
-    {% endif %}
-    <div class="rainbow-divider"></div>
-    <div style="text-align: center; margin-top: 40px;">
-        <a href="{{ url_for('index') }}" class="back-btn">
-            << CONVERT ANOTHER PDF
+
+    <!-- Navigation -->
+    <div class="text-center mt-lg">
+        <a href="{{ url_for('index') }}" class="btn btn-secondary back-btn">
+            <i class="fas fa-arrow-left"></i> Convert Another PDF
         </a>
     </div>
 {% endblock %}
-{% block scripts %}
-<!-- Configuration data as JSON in a script tag -->
-<script type="application/json" id="page-config">
-{
-    "originalFilename": "{{ original_filename }}",
-    "hasTimingData": {{ 'true' if has_timing_data else 'false' }},
-    "debugMode": {{ 'true' if debug_info else 'false' }}
-}
-</script>
 
-<!-- Pure JavaScript with no Jinja syntax -->
+{% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Read configuration from JSON script tag
-        const configElement = document.getElementById('page-config');
-        const pageConfig = JSON.parse(configElement.textContent);
-        
-        console.log('AUDIO CONVERSION COMPLETED FOR:', pageConfig.originalFilename);
-        
-        if (pageConfig.hasTimingData) {
-            console.log('READ-ALONG MODE AVAILABLE');
+    class AudioResultHandler {
+        constructor() {
+            this.init();
         }
         
-        // Auto-scroll to audio section
-        const audioSection = document.querySelector('.audio-player-section');
-        if (audioSection) {
-            setTimeout(() => {
-                audioSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 500);
+        init() {
+            console.log('Audio conversion completed for:', '{{ original_filename }}');
+            
+            {% if has_timing_data %}
+            console.log('Read-along mode available');
+            {% endif %}
+            
+            // Auto-scroll to audio section
+            this.scrollToAudio();
+            
+            // Set up audio event listeners
+            this.setupAudioListeners();
         }
         
-        // Set up audio event listeners
-        document.querySelectorAll('audio').forEach(audio => {
-            audio.addEventListener('loadstart', function() {
-                console.log('LOADING AUDIO:', this.src);
+        scrollToAudio() {
+            const audioSection = document.querySelector('.audio-player-section');
+            if (audioSection) {
+                setTimeout(() => {
+                    audioSection.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'center' 
+                    });
+                }, 500);
+            }
+        }
+        
+        setupAudioListeners() {
+            document.querySelectorAll('audio').forEach(audio => {
+                audio.addEventListener('loadstart', () => {
+                    console.log('Loading audio:', audio.src);
+                });
+                
+                audio.addEventListener('canplay', () => {
+                    console.log('Audio ready to play:', audio.src);
+                });
+                
+                audio.addEventListener('error', (e) => {
+                    console.error('Audio loading error:', audio.src, e);
+                });
             });
-            audio.addEventListener('canplay', function() {
-                console.log('AUDIO READY TO PLAY:', this.src);
-            });
-            audio.addEventListener('error', function() {
-                console.error('AUDIO LOADING ERROR:', this.src);
-            });
-        });
+        }
+    }
+    
+    // Initialize when DOM is ready
+    document.addEventListener('DOMContentLoaded', () => {
+        new AudioResultHandler();
     });
 </script>
 {% endblock %}

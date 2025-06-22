@@ -152,10 +152,11 @@ class DocumentEngine(IDocumentEngine):
                     audio_generation_error("Audio generation failed to produce files")
                 )
             
-            # 5. Convert to ProcessingResult
+            # 5. Convert to ProcessingResult with timing data
             return ProcessingResult.success_result(
                 audio_files=[os.path.basename(f) for f in timed_result.audio_files],
                 combined_mp3=os.path.basename(timed_result.combined_mp3) if timed_result.combined_mp3 else None,
+                timing_data=timed_result.timing_data,  # Pass through timing data
                 debug_info={
                     "text_chunks_count": len(text_chunks),
                     "processed_chunks_count": len(processed_chunks),
