@@ -25,6 +25,11 @@ class IAudioEngine(ABC):
         pass
     
     @abstractmethod
+    def generate_simple_audio(self, text_chunks: List[str], output_filename: str) -> TimedAudioResult:
+        """Generate audio without timing complexity - for regular uploads"""
+        pass
+    
+    @abstractmethod
     def generate_audio_async(self, text_chunks: List[str], output_name: str, output_dir: str) -> Tuple[List[str], Optional[str]]:
         """Generate audio files concurrently with coordination"""
         pass
@@ -66,6 +71,54 @@ class AudioEngine(IAudioEngine):
         Delegates to timing engine for strategy-specific processing.
         """
         return self.timing_engine.generate_with_timing(text_chunks, output_filename)
+    
+    def generate_simple_audio(self, text_chunks: List[str], output_filename: str) -> TimedAudioResult:
+        """
+        Simple audio generation without timing complexity - bypasses TimingEngine.
+        Perfect for regular uploads that don't need timing data.
+        """
+        print(f"AudioEngine: Generating simple audio for {len(text_chunks)} chunks")
+        
+        if not text_chunks:
+            return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
+        
+        # Generate full text
+        full_text = " ".join(text_chunks)
+        
+        if not full_text.strip():
+            return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
+        
+        try:
+            # Direct TTS generation - no timing complexity
+            result = self.tts_engine.generate_audio_data(full_text)
+            
+            if result.is_failure:
+                print(f"AudioEngine: TTS generation failed: {result.error}")
+                return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
+            
+            audio_data = result.value
+            
+            if not audio_data:
+                return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
+            
+            # Save audio file directly
+            audio_filename = f"{output_filename}_simple.mp3"
+            audio_path = self.file_manager.save_output_file(audio_data, audio_filename)
+            
+            if not audio_path:
+                return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
+            
+            print(f"AudioEngine: Simple audio generated successfully: {audio_filename}")
+            
+            return TimedAudioResult(
+                audio_files=[audio_filename],
+                combined_mp3=audio_filename,
+                timing_data=None  # No timing data needed for simple generation
+            )
+            
+        except Exception as e:
+            print(f"AudioEngine: Simple audio generation failed: {e}")
+            return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
     
     def process_audio_file(self, file_path: str) -> Result[float]:
         """Get audio file duration using ffprobe or fallback"""

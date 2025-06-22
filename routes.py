@@ -3,7 +3,7 @@ import os
 import json
 import time
 from typing import Optional
-from flask import render_template, request, url_for, send_from_directory, jsonify
+from flask import render_template, request, url_for, send_from_directory, jsonify, current_app as app
 from werkzeug.utils import secure_filename
 
 from domain.errors import audio_generation_error
@@ -384,7 +384,7 @@ def process_upload_request(request_form, uploaded_file, enable_timing=False):
         )
         
         # Use new document engine for complete processing
-        processing_result = document_engine.process_document(request_obj, audio_engine, text_pipeline)
+        processing_result = document_engine.process_document(request_obj, audio_engine, text_pipeline, enable_timing)
         
         # Convert ProcessingResult to TimedAudioResult for compatibility
         if processing_result.success:

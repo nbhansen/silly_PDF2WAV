@@ -35,7 +35,7 @@ class IDocumentEngine(ABC):
         pass
     
     @abstractmethod
-    def process_document(self, request: ProcessingRequest, audio_engine: 'IAudioEngine', text_pipeline: 'ITextPipeline') -> ProcessingResult:
+    def process_document(self, request: ProcessingRequest, audio_engine: 'IAudioEngine', text_pipeline: 'ITextPipeline', enable_timing: bool = False) -> ProcessingResult:
         """Complete document processing workflow"""
         pass
 
@@ -97,7 +97,8 @@ class DocumentEngine(IDocumentEngine):
         self, 
         request: ProcessingRequest, 
         audio_engine: 'IAudioEngine', 
-        text_pipeline: 'ITextPipeline'
+        text_pipeline: 'ITextPipeline',
+        enable_timing: bool = False
     ) -> ProcessingResult:
         """
         Complete document processing workflow using new architecture components.
@@ -138,8 +139,13 @@ class DocumentEngine(IDocumentEngine):
             
             print(f"DocumentEngine: Processed {len(processed_chunks)} chunks through text pipeline")
             
-            # 4. Generate audio with timing
-            timed_result = audio_engine.generate_with_timing(processed_chunks, request.output_name)
+            # 4. Generate audio - choose appropriate method based on timing requirement
+            if enable_timing:
+                print("DocumentEngine: Using timing-aware audio generation")
+                timed_result = audio_engine.generate_with_timing(processed_chunks, request.output_name)
+            else:
+                print("DocumentEngine: Using simple audio generation (no timing complexity)")
+                timed_result = audio_engine.generate_simple_audio(processed_chunks, request.output_name)
             
             if not timed_result or not timed_result.audio_files:
                 return ProcessingResult.failure_result(
