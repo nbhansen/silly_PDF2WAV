@@ -21,6 +21,7 @@ class SystemConfig:
     upload_folder: str = "uploads"
     audio_folder: str = "audio_outputs"
     max_file_size_mb: int = 100
+    local_storage_dir: str = ".local"
 
     # Processing settings
     enable_text_cleaning: bool = True
@@ -46,7 +47,7 @@ class SystemConfig:
 
     # Piper specific
     piper_model_name: str = "en_US-lessac-medium"
-    piper_models_dir: str = "piper_models"
+    piper_models_dir: str = ".local/piper_models"
     piper_length_scale: float = 1.0
 
     # Audio processing settings

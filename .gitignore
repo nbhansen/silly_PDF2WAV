@@ -1,39 +1,61 @@
+# ========================================
+# PDF to Audio Application - .gitignore
+# ========================================
+
+# --------------------------------------
 # Python
+# --------------------------------------
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 *.log
+*.pyc
+*.pyo
+*.pyd
+.Python
 
-# Virtual environment
+# --------------------------------------
+# Virtual Environments
+# --------------------------------------
 venv/
-venv_tts_py311/
+venv_*/
 .venv/
 env/
 .env
 ENV/
 env.bak/
 venv.bak/
+.virtualenv
 
+# --------------------------------------
 # Testing & Coverage
+# --------------------------------------
 .pytest_cache/
 .coverage
 .coverage.*
 coverage.xml
+coverage.json
 htmlcov/
 .tox/
 .cache/
 nosetests.xml
 *.cover
 .hypothesis/
+.nox/
+pytestdebug.log
 
-# Type checking
+# --------------------------------------
+# Type Checking & Linting
+# --------------------------------------
 .mypy_cache/
 .pytype/
 .pyre/
+.ruff_cache/
 
-# Distribution / packaging
-.Python
+# --------------------------------------
+# Distribution / Packaging
+# --------------------------------------
 build/
 develop-eggs/
 dist/
@@ -51,16 +73,15 @@ wheels/
 *.egg
 MANIFEST
 
+# --------------------------------------
 # PyInstaller
+# --------------------------------------
 *.manifest
 *.spec
 
-# Unit test / coverage reports
-.nox/
-.coverage
-.pytest_cache/
-
-# IDE / Editor specific
+# --------------------------------------
+# IDE / Editor Specific
+# --------------------------------------
 .vscode/
 .idea/
 *.sublime-project
@@ -72,7 +93,9 @@ nbproject/
 .spyproject
 .ropeproject
 
-# OS-specific
+# --------------------------------------
+# OS-Specific
+# --------------------------------------
 .DS_Store
 .DS_Store?
 ._*
@@ -82,70 +105,124 @@ ehthumbs.db
 Thumbs.db
 Desktop.ini
 
-# User-generated files & downloaded models
+# --------------------------------------
+# Application-Specific: Generated Files
+# --------------------------------------
+# User uploads and outputs
 uploads/
 audio_outputs/
+
+# TTS Models (large files)
 piper_models/
+tts_models/
+*.onnx
+*.onnx.json
 
+# Generated audio files
+*.mp3
+*.wav
+*.m4a
+*.flac
 
-# Coqui TTS models are typically cached in ~/.local/share/tts/
-# but if you download them manually to the project, you might want to ignore that folder.
-# Example: tts_models_local/
+# Temporary files
+temp_*
+*.tmp
+.tmp/
+llm_tts_cleaned_chunk_*_debug.txt
 
+# --------------------------------------
+# Local Development Storage
+# --------------------------------------
+.local/
+.cache/
+.data/
+
+# --------------------------------------
+# Node.js (if using any frontend tools)
+# --------------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+.npm
+
+# --------------------------------------
+# Documentation & Development Notes
+# --------------------------------------
+# Keep core docs but ignore user-specific notes
+GEMINI_TIMING_FIX.md
+READ_ALONG_GEMINI_DISABLE.md
+REFACTOR_SUMMARY.md
+TEST_SETUP_COMPLETE.md
+coverage_targets.md
+
+# Backup files
+*_original.*
+*_backup.*
+*.bak
+
+# PlantUML cache
+*.puml.png
+*.puml.svg
+
+# --------------------------------------
 # Jupyter Notebook
+# --------------------------------------
 .ipynb_checkpoints
 
-# pyenv
+# --------------------------------------
+# Environment Variables
+# --------------------------------------
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# --------------------------------------
+# Version Management
+# --------------------------------------
 .python-version
 
-# pipenv
-Pipfile.lock
-
-# PEP 582
-__pypackages__/
-
-# Celery stuff
+# --------------------------------------
+# Celery
+# --------------------------------------
 celerybeat-schedule
 celerybeat.pid
 
-# SageMath parsed files
-*.sage.py
+# --------------------------------------
+# Database
+# --------------------------------------
+*.db
+*.sqlite
+*.sqlite3
 
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
+# --------------------------------------
+# Logs
+# --------------------------------------
+*.log
+logs/
+log/
 
-# Spyder project settings
-.spyderproject
-.spyproject
+# --------------------------------------
+# API Keys & Secrets
+# --------------------------------------
+.secrets/
+secrets.json
+*.key
+*.pem
 
-# Rope project settings
-.ropeproject
+# --------------------------------------
+# CI/CD
+# --------------------------------------
+.github/workflows/test-results/
+.circleci/
+.travis.yml
 
-# mkdocs documentation
-/site
-
-# Debugging files
-pytestdebug.log
-
-# Other
-*.bak
-temp_*
-.tmp/
-
-# Project-specific temp files
-llm_tts_cleaned_chunk_*_debug.txt
-temp_*.wav
-temp_*.mp3
-
-# Claude stuff
-/node_modules
-CLAUDE*
-package*
-
-/docs
+# --------------------------------------
+# Monitoring & Profiling
+# --------------------------------------
+.profile
+profile_*
+*.prof
