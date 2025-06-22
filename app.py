@@ -7,7 +7,7 @@ from typing import Optional
 from dotenv import load_dotenv
 
 from app_factory import create_app
-from application.composition_root import create_pdf_service_from_env
+from domain.factories.service_factory import create_pdf_service_from_env
 from application.config.system_config import SystemConfig
 from infrastructure.file.cleanup_scheduler import FileCleanupScheduler
 
@@ -57,7 +57,7 @@ def shutdown_cleanup():
         cleanup_scheduler.stop()
 
 
-def signal_handler(sig, frame):
+def signal_handler(sig, _frame):
     print(f"\nReceived signal {sig}, shutting down gracefully...")
     if not is_flask_reloader():
         shutdown_cleanup()
@@ -67,8 +67,9 @@ def signal_handler(sig, frame):
 # Initialize services
 initialize_services()
 
-# Register routes
-from routes import register_routes
+# Register routes and share services
+from routes import register_routes, set_services
+set_services(pdf_service, processor_available)
 register_routes(app)
 
 # Register shutdown handlers

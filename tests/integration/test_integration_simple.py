@@ -7,7 +7,7 @@ import os
 import tempfile
 from unittest.mock import patch, Mock
 
-from application.composition_root import create_pdf_service_from_env, CompositionRoot
+from domain.factories.service_factory import create_pdf_service_from_env
 from application.config.system_config import SystemConfig, TTSEngine
 from domain.models import ProcessingRequest, PageRange
 from tests.test_helpers import create_test_request
@@ -41,30 +41,25 @@ def test_gemini_model_configuration():
         assert config.gemini_model_name == "gemini-2.5-pro-preview-tts"
 
 
-def test_composition_root_creation():
-    """Test that CompositionRoot can create all services"""
+def test_service_factory_creation():
+    """Test that service factory can create all services"""
     with tempfile.TemporaryDirectory() as temp_dir:
-        config = SystemConfig(
-            tts_engine=TTSEngine.PIPER,
-            upload_folder=os.path.join(temp_dir, "uploads"),
-            audio_folder=os.path.join(temp_dir, "audio"),
-            enable_text_cleaning=False,
-            enable_ssml=False,
-            enable_file_cleanup=False
-        )
-        
         # Mock piper availability to avoid infrastructure dependency
         with patch('infrastructure.tts.piper_tts_provider.PIPER_AVAILABLE', True), \
              patch('infrastructure.tts.piper_tts_provider.PiperTTSProvider'):
             
-            root = CompositionRoot(config)
+            container = create_pdf_service_from_env()
             
-            # Verify all main services are created
-            assert root.pdf_processing_service is not None
-            assert root.audio_generation_service is not None
-            assert root.text_cleaning_service is not None
-            assert root.file_manager is not None
-            assert root.timing_strategy is not None
+            # Verify all main services are available
+            from domain.audio.audio_engine import IAudioEngine
+            from domain.text.text_pipeline import ITextPipeline
+            from domain.document.document_engine import IDocumentEngine
+            from infrastructure.file.file_manager import FileManager
+            
+            assert container.get(IAudioEngine) is not None
+            assert container.get(ITextPipeline) is not None  
+            assert container.get(IDocumentEngine) is not None
+            assert container.get(FileManager) is not None
 
 
 @pytest.mark.skip(reason="Requires external dependencies - run manually if needed")
@@ -125,15 +120,24 @@ def test_service_creation_with_mocked_dependencies():
             mock_ocr_instance.extract_text.return_value = "Sample extracted text"
             mock_ocr.return_value = mock_ocr_instance
             
-            # Create composition root
-            root = CompositionRoot(config)
+            # Create service container
+            container = create_pdf_service_from_env()
             
-            # Verify PDF service can be created and has expected structure
-            pdf_service = root.pdf_processing_service
-            assert pdf_service is not None
-            assert pdf_service.audio_generation_service is not None
-            assert pdf_service.text_cleaner is not None
-            assert pdf_service.file_manager is not None
+            # Verify services can be created and have expected structure
+            from domain.audio.audio_engine import IAudioEngine
+            from domain.text.text_pipeline import ITextPipeline
+            from domain.document.document_engine import IDocumentEngine
+            from infrastructure.file.file_manager import FileManager
+            
+            audio_engine = container.get(IAudioEngine)
+            text_pipeline = container.get(ITextPipeline)
+            document_engine = container.get(IDocumentEngine)
+            file_manager = container.get(FileManager)
+            
+            assert audio_engine is not None
+            assert text_pipeline is not None
+            assert document_engine is not None
+            assert file_manager is not None
 
 
 def test_basic_workflow_structure():

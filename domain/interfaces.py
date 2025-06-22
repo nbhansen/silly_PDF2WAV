@@ -132,30 +132,8 @@ class ITimestampedTTSEngine(ITTSEngine):
         pass
 
 
-# --- New Timing Strategy Interface ---
-
-class ITimingStrategy(ABC):
-    """
-    Interface for a strategy that generates a timed audio result.
-    This encapsulates the logic for how timing information is derived,
-    whether from the TTS engine directly or through manual measurement.
-    """
-
-    @abstractmethod
-    def generate_with_timing(self, text_chunks: list[str], output_filename: str) -> TimedAudioResult:
-        """
-        Generates a complete audio file and a corresponding TimedAudioResult
-        object with precise timing information for each segment.
-
-        Args:
-            text_chunks (list[str]): A list of text chunks to be synthesized.
-            output_filename (str): The path to save the final combined audio file.
-
-        Returns:
-            TimedAudioResult: An object containing the path to the final audio
-                              and a list of timed text segments.
-        """
-        pass
+# --- Legacy interfaces removed during refactor ---
+# ITimingStrategy was consolidated into TimingEngine
 
 
 # --- Phase 2 New Abstractions ---
@@ -184,23 +162,7 @@ class IAudioProcessor(ABC):
         pass
 
 
-class ITimingCalculator(ABC):
-    """Interface for calculating audio timing and duration estimation"""
-
-    @abstractmethod
-    def estimate_text_duration(self, text: str, engine_type: str) -> float:
-        """Estimate duration for text based on engine characteristics."""
-        pass
-
-    @abstractmethod
-    def calculate_phoneme_duration(self, text: str) -> float:
-        """Calculate duration based on phoneme analysis."""
-        pass
-
-    @abstractmethod
-    def add_punctuation_pauses(self, text: str) -> float:
-        """Calculate additional time for punctuation pauses."""
-        pass
+# ITimingCalculator was consolidated into TimingEngine
 
 
 class IEngineCapabilityDetector(ABC):

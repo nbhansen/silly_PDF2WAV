@@ -73,12 +73,7 @@ class Result(Generic[T]):
 # Helper functions for common error types
 
 
-def file_not_found_error(file_path: str) -> ApplicationError:
-    return ApplicationError(
-        code=ErrorCode.FILE_NOT_FOUND,
-        message=f"File not found: {file_path}",
-        retryable=False
-    )
+# file_not_found_error removed - unused
 
 
 def text_extraction_error(details: str) -> ApplicationError:
@@ -90,13 +85,7 @@ def text_extraction_error(details: str) -> ApplicationError:
     )
 
 
-def text_cleaning_error(details: str = None) -> ApplicationError:
-    return ApplicationError(
-        code=ErrorCode.TEXT_CLEANING_FAILED,
-        message="Text cleaning failed",
-        details=details,
-        retryable=True  # LLM errors might be transient
-    )
+# text_cleaning_error removed - unused
 
 
 def audio_generation_error(details: str = None) -> ApplicationError:

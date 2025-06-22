@@ -16,29 +16,27 @@ from utils import (
 )
 
 
-# Global variables (preserved from app.py)
+# Global variables for services (will be set by app.py)
 pdf_service = None
 processor_available = False
 app_config = SystemConfig.from_env()
 
 
 def get_pdf_service():
-    """Get PDF service, initializing if needed (for reloader process)"""
-    global pdf_service, processor_available
-    from domain.factories.service_factory import create_pdf_service_from_env
-
-    def is_flask_reloader():
-        return os.environ.get('WERKZEUG_RUN_MAIN') != 'true'
-
-    if pdf_service is None and is_flask_reloader():
-        try:
-            pdf_service = create_pdf_service_from_env()
-            processor_available = True
-        except Exception as e:
-            print(f"Failed to initialize PDF service in reloader: {e}")
-            processor_available = False
-
+    """Get PDF service"""
     return pdf_service
+
+
+def is_processor_available():
+    """Check if processor is available"""
+    return processor_available
+
+
+def set_services(service, available):
+    """Set the services from app.py to avoid circular import"""
+    global pdf_service, processor_available
+    pdf_service = service
+    processor_available = available
 
 
 def register_routes(app):
@@ -96,7 +94,7 @@ def register_routes(app):
     @app.route('/get_pdf_info', methods=['POST'])
     def get_pdf_info():
         service = get_pdf_service()
-        if not processor_available or service is None:
+        if not is_processor_available() or service is None:
             return jsonify({'error': 'PDF Service not available'}), 500
 
         if 'pdf_file' not in request.files:
@@ -135,7 +133,7 @@ def register_routes(app):
     def upload_file():
         """Regular upload WITHOUT timing data"""
         service = get_pdf_service()
-        if not processor_available or service is None:
+        if not is_processor_available() or service is None:
             return "Error: PDF Service is not available."
 
         if 'pdf_file' not in request.files:
@@ -166,7 +164,7 @@ def register_routes(app):
             return "Read-along mode is not available with Gemini TTS. Please use regular upload or switch to Piper TTS."
         
         service = get_pdf_service()
-        if not processor_available or service is None:
+        if not is_processor_available() or service is None:
             return "Error: PDF Service is not available."
 
         if 'pdf_file' not in request.files:

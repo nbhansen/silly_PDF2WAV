@@ -1,8 +1,7 @@
 # tests/test_helpers.py
 from domain.interfaces import (
     ITTSEngine, ILLMProvider, ITextExtractor, IPageRangeValidator,
-    IAudioProcessor, ITimingCalculator, IEngineCapabilityDetector, SSMLCapability,
-    ITimingStrategy
+    IAudioProcessor, IEngineCapabilityDetector, SSMLCapability
 )
 from domain.models import PDFInfo, PageRange, ProcessingRequest, TimedAudioResult, TimingMetadata
 from domain.errors import Result, tts_engine_error, llm_provider_error, audio_generation_error
@@ -125,7 +124,7 @@ class FakeAudioProcessor(IAudioProcessor):
         # Simulate combining files
         return Result.success(output_path)
     
-    def convert_audio_format(self, input_path: str, output_path: str, format: str) -> Result[str]:
+    def convert_audio_format(self, _input_path: str, output_path: str, _format: str) -> Result[str]:
         if not self._ffmpeg_available:
             return Result.failure(audio_generation_error("FFmpeg not available"))
         return Result.success(output_path)
@@ -177,7 +176,7 @@ class FakeEngineCapabilityDetector(IEngineCapabilityDetector):
             'output_format': 'wav'
         }
     
-    def register_engine_capabilities(self, engine_name: str, capabilities: Dict[str, any]) -> None:
+    def register_engine_capabilities(self, _engine_name: str, _capabilities: Dict[str, any]) -> None:
         pass
 
 

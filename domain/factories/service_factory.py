@@ -49,13 +49,14 @@ def create_tts_engine(config: SystemConfig):
         )
 
 
-def create_timing_engine(config: SystemConfig, tts_engine, file_manager: FileManager) -> ITimingEngine:
+def create_timing_engine(config: SystemConfig, tts_engine, file_manager: FileManager, text_pipeline: ITextPipeline) -> ITimingEngine:
     """Create timing engine with appropriate mode"""
     mode = TimingMode.MEASUREMENT if config.gemini_use_measurement_mode else TimingMode.ESTIMATION
     
     return TimingEngine(
         tts_engine=tts_engine,
         file_manager=file_manager,
+        text_pipeline=text_pipeline,
         mode=mode,
         measurement_interval=config.gemini_measurement_mode_interval
     )
@@ -69,8 +70,9 @@ def create_audio_engine(config: SystemConfig) -> IAudioEngine:
         output_folder=config.audio_folder
     )
     
+    text_pipeline = create_text_pipeline(config)
     tts_engine = create_tts_engine(config)
-    timing_engine = create_timing_engine(config, tts_engine, file_manager)
+    timing_engine = create_timing_engine(config, tts_engine, file_manager, text_pipeline)
     
     return AudioEngine(
         tts_engine=tts_engine,

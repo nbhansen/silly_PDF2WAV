@@ -61,7 +61,7 @@ class TextPipeline(ITextPipeline):
         try:
             # Use LLM for advanced cleaning
             cleaning_prompt = self._generate_cleaning_prompt(raw_text)
-            result = self.llm_provider.generate_text(cleaning_prompt)
+            result = self.llm_provider.generate_content(cleaning_prompt)
             
             if result.is_success:
                 cleaned = result.value

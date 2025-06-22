@@ -11,6 +11,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 
 from ..interfaces import ITTSEngine, ITimestampedTTSEngine, IFileManager
+from ..text.text_pipeline import ITextPipeline
 from ..models import TimedAudioResult, TextSegment, TimingMetadata
 from ..errors import Result
 
@@ -41,15 +42,13 @@ class TimingEngine(ITimingEngine):
         self,
         tts_engine: ITTSEngine,
         file_manager: IFileManager,
-        ssml_service: Optional['AcademicSSMLService'] = None,
-        text_cleaning_service: Optional['TextCleaningService'] = None,
+        text_pipeline: Optional[ITextPipeline] = None,
         mode: TimingMode = TimingMode.ESTIMATION,
         measurement_interval: float = 0.8
     ):
         self.tts_engine = tts_engine
         self.file_manager = file_manager
-        self.ssml_service = ssml_service
-        self.text_cleaning_service = text_cleaning_service
+        self.text_pipeline = text_pipeline
         self.mode = mode
         self.measurement_interval = measurement_interval
         self.last_api_call = 0.0
@@ -77,8 +76,8 @@ class TimingEngine(ITimingEngine):
         print("TimingEngine: Using estimation mode (fast)")
         
         # Enhance text with SSML if available
-        if self.ssml_service:
-            enhanced_chunks = self.ssml_service.enhance_text_chunks(text_chunks)
+        if self.text_pipeline:
+            enhanced_chunks = [self.text_pipeline.enhance_with_ssml(chunk) for chunk in text_chunks]
             full_text = " ".join(enhanced_chunks)
         else:
             full_text = " ".join(text_chunks)
@@ -130,19 +129,19 @@ class TimingEngine(ITimingEngine):
         """Accurate timing by measuring actual audio duration"""
         print("TimingEngine: Using measurement mode (accurate)")
         
-        if not self.text_cleaning_service:
-            print("Warning: No text cleaning service available for measurement mode")
+        if not self.text_pipeline:
+            print("Warning: No text pipeline available for measurement mode")
             return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
         
         # Enhance text with SSML if available
-        if self.ssml_service:
-            enhanced_chunks = self.ssml_service.enhance_text_chunks(text_chunks)
+        if self.text_pipeline:
+            enhanced_chunks = [self.text_pipeline.enhance_with_ssml(chunk) for chunk in text_chunks]
             full_text = " ".join(enhanced_chunks)
         else:
             full_text = " ".join(text_chunks)
         
         # Split into sentences for individual processing
-        sentences = self.text_cleaning_service.split_into_sentences(full_text)
+        sentences = self.text_pipeline.split_into_sentences(full_text)
         
         if not sentences:
             return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
