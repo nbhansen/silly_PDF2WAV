@@ -51,8 +51,8 @@
                 
                 <!-- READ-ALONG OPTION -->
                 <div class="checkbox-group read-along-highlight">
-                    <input type="checkbox" id="enable_read_along" name="enable_read_along" onchange="updateFormAction()">
-                    <label for="enable_read_along" class="checkbox-label">📖 Enable Read-Along Mode (synchronized text highlighting)</label>
+                    <input type="checkbox" id="enable_read_along" name="enable_read_along" onchange="updateFormAction()" {{ 'disabled' if tts_engine == 'gemini' else '' }}>
+                    <label for="enable_read_along" class="checkbox-label">📖 Enable Read-Along Mode (synchronized text highlighting){% if tts_engine == 'gemini' %} - Available with Piper TTS only{% endif %}</label>
                 </div>
                 
                 <div class="help-text">

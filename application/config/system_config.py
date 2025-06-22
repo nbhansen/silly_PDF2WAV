@@ -41,6 +41,8 @@ class SystemConfig:
     gemini_model_name: str = "gemini-2.5-flash-preview-tts"  # TTS-capable model
     gemini_voice_name: str = "Kore"
     gemini_min_request_interval: float = 2.0
+    gemini_measurement_mode_interval: float = 0.8  # Faster rate for measurement mode batches
+    gemini_use_measurement_mode: bool = False  # Enable for accurate read-along timing
 
     # Piper specific
     piper_model_name: str = "en_US-lessac-medium"
@@ -127,6 +129,8 @@ class SystemConfig:
             gemini_model_name=os.getenv('GEMINI_MODEL_NAME', 'gemini-2.5-flash-preview-tts'),
             gemini_voice_name=os.getenv('GEMINI_VOICE_NAME', 'Kore'),
             gemini_min_request_interval=cls._parse_float('GEMINI_MIN_REQUEST_INTERVAL', 2.0, min_val=0.1, max_val=10.0),
+            gemini_measurement_mode_interval=cls._parse_float('GEMINI_MEASUREMENT_MODE_INTERVAL', 0.8, min_val=0.1, max_val=5.0),
+            gemini_use_measurement_mode=cls._parse_bool('GEMINI_USE_MEASUREMENT_MODE', False),
             piper_model_name=os.getenv('PIPER_MODEL_NAME', 'en_US-lessac-medium'),
             piper_models_dir=os.getenv('PIPER_MODELS_DIR', 'piper_models'),
             piper_length_scale=cls._parse_float('PIPER_LENGTH_SCALE', 1.0, min_val=0.5, max_val=2.0),
