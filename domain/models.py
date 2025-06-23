@@ -57,10 +57,10 @@ class ProcessingResult:
                        debug_info: Optional[Dict[str, Any]] = None) -> 'ProcessingResult':
         """Create a successful processing result"""
         return cls(
-            audio_files=audio_files,
+            audio_files=audio_files.copy() if audio_files is not None else None,  # Create defensive copy
             combined_mp3_file=combined_mp3,
             timing_data=timing_data,
-            debug_info=debug_info,
+            debug_info=debug_info.copy() if debug_info is not None else None,  # Create defensive copy
             error=None
         )
 

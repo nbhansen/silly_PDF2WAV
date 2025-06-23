@@ -98,8 +98,8 @@ class SystemConfig:
     def from_env(cls) -> 'SystemConfig':
         """Load configuration from environment variables with validation"""
 
-        # Parse TTS engine
-        tts_engine_str = os.getenv('TTS_ENGINE', 'piper').lower()
+        # Parse TTS engine (strip whitespace and handle case-insensitive)
+        tts_engine_str = os.getenv('TTS_ENGINE', 'piper').strip().lower()
         try:
             tts_engine = TTSEngine(tts_engine_str)
         except ValueError:
@@ -258,21 +258,37 @@ class SystemConfig:
 
     def get_gemini_config(self):
         """Get Gemini-specific configuration"""
-        from domain.config.tts_config import GeminiConfig
-        return GeminiConfig(
-            voice_name=self.gemini_voice_name,
-            api_key=self.gemini_api_key,
-            min_request_interval=self.gemini_min_request_interval
-        )
+        try:
+            from domain.config.tts_config import GeminiConfig
+            return GeminiConfig(
+                voice_name=self.gemini_voice_name,
+                api_key=self.gemini_api_key,
+                min_request_interval=self.gemini_min_request_interval
+            )
+        except ImportError:
+            # Return a simple dict if the config class doesn't exist yet
+            return {
+                'voice_name': self.gemini_voice_name,
+                'api_key': self.gemini_api_key,
+                'min_request_interval': self.gemini_min_request_interval
+            }
 
     def get_piper_config(self):
         """Get Piper-specific configuration"""
-        from domain.config.tts_config import PiperConfig
-        return PiperConfig(
-            model_name=self.piper_model_name,
-            download_dir=self.piper_models_dir,
-            length_scale=self.piper_length_scale
-        )
+        try:
+            from domain.config.tts_config import PiperConfig
+            return PiperConfig(
+                model_name=self.piper_model_name,
+                download_dir=self.piper_models_dir,
+                length_scale=self.piper_length_scale
+            )
+        except ImportError:
+            # Return a simple dict if the config class doesn't exist yet
+            return {
+                'model_name': self.piper_model_name,
+                'download_dir': self.piper_models_dir,
+                'length_scale': self.piper_length_scale
+            }
 
     def print_summary(self) -> None:
         """Print configuration summary for debugging"""

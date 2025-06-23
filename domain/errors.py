@@ -81,7 +81,7 @@ def text_extraction_error(details: str) -> ApplicationError:
         code=ErrorCode.TEXT_EXTRACTION_FAILED,
         message="Failed to extract text from PDF",
         details=details,
-        retryable=False
+        retryable=True  # Text extraction errors are often transient (OCR, file access)
     )
 
 

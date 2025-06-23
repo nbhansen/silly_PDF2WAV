@@ -83,15 +83,19 @@ class TextPipeline(ITextPipeline):
         
         enhanced = text
         
-        # Add pauses for academic reading
-        if self.document_type == "research_paper":
-            enhanced = self._add_academic_pauses(enhanced)
-            enhanced = self._enhance_technical_terms(enhanced)
+        # Order matters: do non-interfering enhancements first
         
-        # Add emphasis for important terms
+        # 1. Add emphasis for quotes first (won't interfere with other patterns)
         enhanced = self._add_emphasis_markup(enhanced)
         
-        # Add breaks for punctuation
+        # 2. Add technical term emphasis (works on remaining text)
+        if self.document_type == "research_paper":
+            enhanced = self._enhance_technical_terms(enhanced)
+        
+        # 3. Add structural breaks and pauses (work on any text)
+        if self.document_type == "research_paper":
+            enhanced = self._add_academic_pauses(enhanced)
+        
         enhanced = self._add_punctuation_breaks(enhanced)
         
         return enhanced
@@ -101,8 +105,9 @@ class TextPipeline(ITextPipeline):
         # Clean SSML first if present
         clean_text = self.strip_ssml(text)
         
+        # Handle abbreviations better - don't split on Dr., Mr., etc.
         # Basic sentence splitting with common edge cases
-        sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z])', clean_text)
+        sentences = re.split(r'(?<!\bDr\.)(?<!\bMr\.)(?<!\bMs\.)(?<!\bProf\.)(?<=[.!?])\s+(?=[A-Z])', clean_text)
         
         # Filter out very short sentences and clean up
         filtered_sentences = []
@@ -115,10 +120,10 @@ class TextPipeline(ITextPipeline):
     
     def strip_ssml(self, text: str) -> str:
         """Remove SSML tags from text"""
-        # Remove all SSML tags
-        clean = re.sub(r'<[^>]+>', '', text)
+        # Remove all SSML tags but preserve spacing
+        clean = re.sub(r'<[^>]+>', ' ', text)
         
-        # Remove extra whitespace
+        # Normalize whitespace but preserve single spaces
         clean = re.sub(r'\s+', ' ', clean)
         
         return clean.strip()
@@ -151,9 +156,9 @@ Text to clean:
     
     def _add_academic_pauses(self, text: str) -> str:
         """Add pauses for academic content"""
-        # Add pauses after section headers
+        # Add pauses after section headers (case insensitive)
         text = re.sub(r'(Abstract|Introduction|Conclusion|References)(\s*[:\.]?\s*)', 
-                      r'\1\2<break time="1s"/>', text)
+                      r'\1\2<break time="1s"/>', text, flags=re.IGNORECASE)
         
         # Add pauses after numbered sections
         text = re.sub(r'(\d+\.\s*[A-Z][^.]*\.)', r'\1<break time="0.5s"/>', text)
@@ -163,6 +168,7 @@ Text to clean:
     def _enhance_technical_terms(self, text: str) -> str:
         """Add emphasis to technical terms"""
         # Common technical terms that benefit from emphasis
+        # Avoid words already inside SSML tags
         technical_patterns = [
             r'\b(algorithm|method|approach|technique|system)\b',
             r'\b(significant|important|critical|essential)\b',
@@ -170,7 +176,9 @@ Text to clean:
         ]
         
         for pattern in technical_patterns:
-            text = re.sub(pattern, r'<emphasis level="moderate">\1</emphasis>', text, flags=re.IGNORECASE)
+            # Use negative lookbehind/lookahead to avoid words inside SSML tags
+            enhanced_pattern = r'(?<!>)' + pattern + r'(?!<)'
+            text = re.sub(enhanced_pattern, r'<emphasis level="moderate">\1</emphasis>', text, flags=re.IGNORECASE)
         
         return text
     
@@ -178,9 +186,6 @@ Text to clean:
         """Add emphasis for naturally emphasized text"""
         # Emphasize text in quotes
         text = re.sub(r'"([^"]+)"', r'<emphasis level="moderate">"\1"</emphasis>', text)
-        
-        # Emphasize capitalized words (but not all caps)
-        text = re.sub(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b', r'<emphasis level="reduced">\1</emphasis>', text)
         
         return text
     
@@ -192,7 +197,7 @@ Text to clean:
         # Medium pause after semicolons
         text = re.sub(r';(\s+)', r';<break time="0.3s"/>\1', text)
         
-        # Longer pause after periods, exclamations, questions
-        text = re.sub(r'([.!?])(\s+)', r'\1<break time="0.5s"/>\2', text)
+        # Longer pause after periods, exclamations, questions (with or without following space)
+        text = re.sub(r'([.!?])(\s+|$)', r'\1<break time="0.5s"/>\2', text)
         
         return text

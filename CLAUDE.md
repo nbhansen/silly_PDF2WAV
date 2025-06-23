@@ -35,14 +35,51 @@ pdf_to_audio_app/
 python app.py                    # Start Flask development server
 ```
 
-### Testing
+### Testing Strategy
+
+The project uses a **hybrid testing approach** combining comprehensive TDD coverage for domain logic with integration testing for infrastructure components.
+
+#### Quick Commands (Most Common)
 ```bash
-./run_tests.py                   # Run all tests
-./run_tests.py integration       # Integration tests only
-./run_tests.py unit             # Unit tests only
-./run_tests.py quick            # Single fast test
-pytest tests/ -v --cov=. --cov-report=html  # Direct pytest with coverage
+# TDD Development Workflow
+./test-tdd.sh                    # All 187 TDD tests
+./test-tdd.sh fast               # TDD tests with fast failure
+./test-commit.sh                 # Pre-commit validation
+
+# Enhanced Test Runner
+python run_tests.py tdd          # All TDD tests (187 tests)
+python run_tests.py commit       # Pre-commit validation
+python run_tests.py models       # Domain models (47 tests)
+python run_tests.py pipeline     # Text processing (47 tests)
+python run_tests.py config       # Configuration (49 tests)
+python run_tests.py errors       # Error handling (44 tests)
 ```
+
+#### Comprehensive Testing
+```bash
+python run_tests.py all          # All tests with coverage
+python run_tests.py unit         # Unit tests with coverage
+python run_tests.py integration  # Integration tests only
+python run_tests.py coverage     # Full coverage report
+```
+
+#### When to Run Tests
+
+**Required (Must Run):**
+- **Before every commit**: `./test-commit.sh`
+- **After domain logic changes**: `./test-tdd.sh`
+- **Before merging PRs**: `python run_tests.py all`
+
+**During Development:**
+- **TDD cycle**: `./test-tdd.sh fast` (quick feedback)
+- **Component work**: `python run_tests.py models|pipeline|config|errors`
+- **Integration testing**: `python run_tests.py integration`
+
+#### TDD Test Coverage (187 Tests)
+- **Domain Models**: 47 tests - Data integrity and immutability
+- **Text Processing Pipeline**: 47 tests - Pure text processing logic  
+- **System Configuration**: 49 tests - Environment parsing and validation
+- **Error Handling System**: 44 tests - Structured error management
 
 ### Environment Setup
 ```bash
