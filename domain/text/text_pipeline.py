@@ -46,12 +46,18 @@ class TextPipeline(ITextPipeline):
         llm_provider: Optional['ILLMProvider'] = None,
         enable_cleaning: bool = True,
         enable_ssml: bool = True,
-        document_type: str = "research_paper"
+        document_type: str = "research_paper",
+        tts_supports_ssml: bool = True
     ):
         self.llm_provider = llm_provider
         self.enable_cleaning = enable_cleaning
         self.enable_ssml = enable_ssml
         self.document_type = document_type
+        self.tts_supports_ssml = tts_supports_ssml
+        
+        # If TTS doesn't support SSML, disable SSML enhancement
+        if not self.tts_supports_ssml:
+            self.enable_ssml = False
     
     def clean_text(self, raw_text: str) -> str:
         """Clean and prepare text for TTS processing"""
@@ -77,7 +83,11 @@ class TextPipeline(ITextPipeline):
             return self._basic_text_cleanup(raw_text)
     
     def enhance_with_ssml(self, text: str) -> str:
-        """Add SSML enhancements for better speech synthesis"""
+        """Add SSML enhancements or natural formatting for better speech synthesis"""
+        # If TTS doesn't support SSML, use natural formatting instead
+        if not self.tts_supports_ssml:
+            return self._enhance_with_natural_formatting(text)
+        
         if not self.enable_ssml:
             return text
         
@@ -145,9 +155,18 @@ class TextPipeline(ITextPipeline):
     
     def _generate_cleaning_prompt(self, text: str) -> str:
         """Generate LLM prompt for text cleaning"""
+        if self.tts_supports_ssml:
+            pause_instruction = 'Add appropriate pauses with "..." between major sections.'
+        else:
+            pause_instruction = '''Use natural punctuation for better speech rhythm:
+- Use "..." for medium pauses (between paragraphs or sections)
+- Use "...." or "....." for longer pauses (after major sections)
+- Add extra commas where natural pauses would occur in speech
+- Use line breaks to create natural breathing points'''
+        
         return f"""Clean the following text for text-to-speech conversion. 
 Remove headers, footers, page numbers, and artifacts. 
-Add appropriate pauses with "..." between major sections.
+{pause_instruction}
 Preserve the main content and structure.
 Document type: {self.document_type}
 
@@ -199,5 +218,65 @@ Text to clean:
         
         # Longer pause after periods, exclamations, questions (with or without following space)
         text = re.sub(r'([.!?])(\s+|$)', r'\1<break time="0.5s"/>\2', text)
+        
+        return text
+    
+    def _enhance_with_natural_formatting(self, text: str) -> str:
+        """Apply natural formatting tricks for TTS engines without SSML support"""
+        enhanced = text
+        
+        # 1. Add natural emphasis (order matters)
+        enhanced = self._add_natural_emphasis(enhanced)
+        
+        # 2. Add academic formatting for research papers
+        if self.document_type == "research_paper":
+            enhanced = self._add_natural_academic_formatting(enhanced)
+        
+        # 3. Enhance punctuation for better rhythm
+        enhanced = self._enhance_punctuation_for_natural_speech(enhanced)
+        
+        return enhanced
+    
+    def _add_natural_emphasis(self, text: str) -> str:
+        """Add natural emphasis without SSML tags"""
+        # Already quoted text gets natural emphasis from quotes
+        # No changes needed for quoted text as TTS engines naturally emphasize quotes
+        
+        # For research papers, we could uppercase key transitional words
+        # But this might sound unnatural, so we'll rely on punctuation
+        
+        return text
+    
+    def _add_natural_academic_formatting(self, text: str) -> str:
+        """Add natural formatting for academic content without SSML"""
+        # Add extra dots after section headers for longer pauses
+        text = re.sub(r'(Abstract|Introduction|Conclusion|References)(\s*[:\.]?\s*)', 
+                      r'\1\2... ', text, flags=re.IGNORECASE)
+        
+        # Add pause after numbered sections with extra dots
+        text = re.sub(r'(\d+\.\s*[A-Z][^.]*\.)', r'\1.. ', text)
+        
+        # Add line breaks around major transitions for natural pauses
+        text = re.sub(r'(However|Therefore|Furthermore|Moreover),', r'\n\1,', text, flags=re.IGNORECASE)
+        
+        return text
+    
+    def _enhance_punctuation_for_natural_speech(self, text: str) -> str:
+        """Enhance punctuation for better natural speech rhythm"""
+        # Add extra comma pauses where beneficial
+        # After introductory phrases
+        text = re.sub(r'^(In this paper|In this study|We present|We propose|This work),', 
+                      r'\1,,', text, flags=re.IGNORECASE | re.MULTILINE)
+        
+        # Convert single dots between sentences to double for slightly longer pauses
+        # But preserve ellipsis (...)
+        text = re.sub(r'(?<![.])\.(?![.])\s+(?=[A-Z])', r'.. ', text)
+        
+        # Add commas after "First", "Second", etc. if not already present
+        text = re.sub(r'\b(First|Second|Third|Fourth|Fifth|Finally|Additionally|Specifically)(?!,)\s', 
+                      r'\1, ', text, flags=re.IGNORECASE)
+        
+        # Ensure ellipsis has consistent spacing
+        text = re.sub(r'\.{3,}', '... ', text)
         
         return text

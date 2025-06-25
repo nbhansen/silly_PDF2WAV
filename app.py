@@ -11,14 +11,20 @@ from domain.factories.service_factory import create_pdf_service_from_env
 from application.config.system_config import SystemConfig
 from infrastructure.file.cleanup_scheduler import FileCleanupScheduler
 
-# Load environment variables first
+# Load environment variables as fallback
 load_dotenv()
 
-# Initialize configuration
-app_config = SystemConfig.from_env()
+# Initialize configuration - prefer YAML, fallback to env vars
+try:
+    app_config = SystemConfig.from_yaml()
+    print("✅ Loaded configuration from config.yaml")
+except FileNotFoundError:
+    print("⚠️  config.yaml not found, falling back to environment variables")
+    print("   Copy config.example.yaml to config.yaml for better configuration management")
+    app_config = SystemConfig.from_env()
 
-# Create Flask app
-app = create_app()
+# Create Flask app with our config
+app = create_app(app_config)
 
 # Global services
 pdf_service = None
@@ -38,7 +44,7 @@ def initialize_services():
     if not is_flask_reloader():
         print("Initializing PDF Processing Service...")
         try:
-            pdf_service = create_pdf_service_from_env()
+            pdf_service = create_pdf_service_from_env(app_config)
             print("PDF Processing Service initialized successfully")
             processor_available = True
         except Exception as e:
@@ -67,9 +73,9 @@ def signal_handler(sig, _frame):
 # Initialize services
 initialize_services()
 
-# Register routes and share services
+# Register routes and share services + config
 from routes import register_routes, set_services
-set_services(pdf_service, processor_available)
+set_services(pdf_service, processor_available, app_config)
 register_routes(app)
 
 # Register shutdown handlers

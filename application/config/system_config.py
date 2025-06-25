@@ -1,8 +1,10 @@
 # application/config/system_config.py
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Dict, Any
 import os
 from enum import Enum
+import yaml
+from pathlib import Path
 
 
 class TTSEngine(Enum):
@@ -95,6 +97,127 @@ class SystemConfig:
             self.audio_extensions = set(ext.strip() for ext in audio_ext_str.split(','))
 
     @classmethod
+    def from_yaml(cls, config_path: str = "config.yaml") -> 'SystemConfig':
+        """Load configuration from YAML file only (no environment variable fallback)"""
+        config_file = Path(config_path)
+        
+        if not config_file.exists():
+            raise FileNotFoundError(
+                f"Configuration file {config_path} not found. "
+                "Please copy config.example.yaml to config.yaml and customize it."
+            )
+        
+        try:
+            with open(config_file, 'r') as f:
+                yaml_config = yaml.safe_load(f)
+        except yaml.YAMLError as e:
+            raise ValueError(f"Invalid YAML in {config_path}: {e}")
+        
+        # Helper function to get nested config values from YAML only
+        def get_config(yaml_path: str, default=None):
+            keys = yaml_path.split('.')
+            value = yaml_config
+            for key in keys:
+                if isinstance(value, dict) and key in value:
+                    value = value[key]
+                else:
+                    return default
+            return value
+        
+        # Parse TTS engine
+        tts_engine_str = get_config('tts.engine', 'piper')
+        if not tts_engine_str:
+            raise ValueError("Missing required configuration: tts.engine")
+        tts_engine_str = str(tts_engine_str).strip().lower()
+        try:
+            tts_engine = TTSEngine(tts_engine_str)
+        except ValueError:
+            valid_engines = [e.value for e in TTSEngine]
+            raise ValueError(f"Invalid TTS engine '{tts_engine_str}'. Must be one of: {valid_engines}")
+        
+        # Create config from YAML with proper type parsing
+        config = cls(
+            tts_engine=tts_engine,
+            
+            # App settings
+            upload_folder=get_config('files.upload_folder', 'uploads'),
+            audio_folder=get_config('files.audio_folder', 'audio_outputs'),
+            max_file_size_mb=cls._parse_int_value(get_config('files.max_file_size_mb', 20), 20, min_val=1, max_val=1000),
+            local_storage_dir=get_config('files.local_storage_dir', '.local'),
+            
+            # Text processing
+            enable_text_cleaning=cls._parse_bool_value(get_config('text_processing.enable_text_cleaning', True), True),
+            enable_ssml=cls._parse_bool_value(get_config('text_processing.enable_ssml', True), True),
+            document_type=get_config('text_processing.document_type', 'research_paper'),
+            chunk_size=cls._parse_int_value(get_config('text_processing.chunk_size', 4000), 4000, min_val=1000, max_val=100000),
+            llm_max_chunk_size=cls._parse_int_value(get_config('text_processing.llm_max_chunk_size', 100000), 100000, min_val=1000, max_val=500000),
+            audio_target_chunk_size=cls._parse_int_value(get_config('text_processing.audio_target_chunk_size', 2000), 2000, min_val=500, max_val=10000),
+            audio_max_chunk_size=cls._parse_int_value(get_config('text_processing.audio_max_chunk_size', 3000), 3000, min_val=1000, max_val=20000),
+            
+            # Performance
+            enable_async_audio=cls._parse_bool_value(get_config('performance.enable_async_audio', True), True),
+            max_concurrent_requests=cls._parse_int_value(get_config('performance.max_concurrent_tts_requests', 3), 3, min_val=1, max_val=20),
+            
+            # File cleanup
+            enable_file_cleanup=cls._parse_bool_value(get_config('files.cleanup.enabled', True), True),
+            max_file_age_hours=cls._parse_float_value(get_config('files.cleanup.max_file_age_hours', 24.0), 24.0, min_val=0.1, max_val=168.0),
+            auto_cleanup_interval_hours=cls._parse_float_value(get_config('files.cleanup.auto_cleanup_interval_hours', 6.0), 6.0, min_val=0.1, max_val=24.0),
+            max_disk_usage_mb=cls._parse_int_value(get_config('files.cleanup.max_disk_usage_mb', 500), 500, min_val=10, max_val=10000),
+            
+            # Gemini settings
+            gemini_api_key=get_config('secrets.google_ai_api_key'),
+            gemini_model_name=get_config('tts.gemini.model_name', 'gemini-2.5-flash-preview-tts'),
+            gemini_voice_name=get_config('tts.gemini.voice_name', 'Kore'),
+            gemini_min_request_interval=cls._parse_float_value(get_config('tts.gemini.min_request_interval', 2.0), 2.0, min_val=0.1, max_val=10.0),
+            gemini_measurement_mode_interval=cls._parse_float_value(get_config('tts.gemini.measurement_mode_interval', 0.8), 0.8, min_val=0.1, max_val=5.0),
+            gemini_use_measurement_mode=cls._parse_bool_value(get_config('tts.gemini.use_measurement_mode', False), False),
+            
+            # Piper settings
+            piper_model_name=get_config('tts.piper.model_name', 'en_US-lessac-medium'),
+            piper_models_dir=get_config('tts.piper.models_dir', 'piper_models'),
+            piper_length_scale=cls._parse_float_value(get_config('tts.piper.length_scale', 1.0), 1.0, min_val=0.5, max_val=2.0),
+            
+            # Audio processing
+            audio_bitrate=get_config('audio.bitrate', '128k'),
+            audio_sample_rate=cls._parse_int_value(get_config('audio.sample_rate', 22050), 22050, min_val=8000, max_val=48000),
+            mp3_codec=get_config('audio.mp3_codec', 'libmp3lame'),
+            
+            # Timeouts
+            tts_timeout_seconds=cls._parse_int_value(get_config('timeouts.tts_seconds', 60), 60, min_val=10, max_val=300),
+            ocr_timeout_seconds=cls._parse_int_value(get_config('ocr.timeout_seconds', 30), 30, min_val=5, max_val=120),
+            ffmpeg_timeout_seconds=cls._parse_int_value(get_config('timeouts.ffmpeg_seconds', 300), 300, min_val=30, max_val=600),
+            
+            # OCR settings
+            ocr_dpi=cls._parse_int_value(get_config('ocr.dpi', 300), 300, min_val=150, max_val=600),
+            ocr_threshold=cls._parse_int_value(get_config('ocr.threshold', 180), 180, min_val=100, max_val=240),
+            ocr_language=get_config('ocr.language', 'eng'),
+            
+            # Configuration file paths
+            academic_terms_config=get_config('academic_terms_config', 'config/academic_terms_en.json'),
+            rate_limits_config=get_config('rate_limits_config', 'config/rate_limits.json'),
+            
+            # Model repository settings
+            piper_model_repository_url=get_config('tts.piper.model_repository_url', 'https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0'),
+            model_cache_dir=get_config('model_cache_dir', 'model_cache')
+        )
+        
+        # Handle file extensions
+        allowed_ext = get_config('files.allowed_extensions', ['pdf'])
+        if isinstance(allowed_ext, list):
+            config.allowed_extensions = set(allowed_ext)
+        else:
+            config.allowed_extensions = set(ext.strip() for ext in str(allowed_ext).split(','))
+            
+        audio_ext = get_config('files.audio_extensions', ['wav', 'mp3'])
+        if isinstance(audio_ext, list):
+            config.audio_extensions = set(audio_ext)
+        else:
+            config.audio_extensions = set(ext.strip() for ext in str(audio_ext).split(','))
+        
+        config.validate()
+        return config
+    
+    @classmethod
     def from_env(cls) -> 'SystemConfig':
         """Load configuration from environment variables with validation"""
 
@@ -152,7 +275,7 @@ class SystemConfig:
 
             # Text processing
             llm_max_chunk_size=cls._parse_int('LLM_MAX_CHUNK_SIZE', 100000, min_val=1000, max_val=500000),
-            audio_target_chunk_size=cls._parse_int('AUDIO_TARGET_CHUNK_SIZE', 3000, min_val=500, max_val=10000),
+            audio_target_chunk_size=cls._parse_int('AUDIO_TARGET_CHUNK_SIZE', 2000, min_val=500, max_val=10000),
             audio_max_chunk_size=cls._parse_int('AUDIO_MAX_CHUNK_SIZE', 5000, min_val=1000, max_val=20000),
             
             # Configuration file paths
@@ -253,6 +376,59 @@ class SystemConfig:
             raise ValueError(f"{env_var} must be >= {min_val}, got: {parsed}")
         if max_val is not None and parsed > max_val:
             raise ValueError(f"{env_var} must be <= {max_val}, got: {parsed}")
+
+        return parsed
+
+    @staticmethod
+    def _parse_bool_value(value: Any, default: bool = None) -> bool:
+        """Parse boolean from various representations (for YAML values)"""
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        if isinstance(value, str):
+            return value.lower() in ('true', '1', 'yes', 'on')
+        return default if default is not None else False
+
+    @staticmethod
+    def _parse_int_value(value: Any, default: int, min_val: int = None, max_val: int = None) -> int:
+        """Parse integer from various representations with validation"""
+        if value is None:
+            return default
+        
+        try:
+            if isinstance(value, bool):
+                # Handle bool before int since bool is subclass of int
+                parsed = 1 if value else 0
+            else:
+                parsed = int(value)
+        except (ValueError, TypeError):
+            raise ValueError(f"Value must be a valid integer, got: {value}")
+
+        if min_val is not None and parsed < min_val:
+            raise ValueError(f"Value must be >= {min_val}, got: {parsed}")
+        if max_val is not None and parsed > max_val:
+            raise ValueError(f"Value must be <= {max_val}, got: {parsed}")
+
+        return parsed
+
+    @staticmethod
+    def _parse_float_value(value: Any, default: float, min_val: float = None, max_val: float = None) -> float:
+        """Parse float from various representations with validation"""
+        if value is None:
+            return default
+
+        try:
+            parsed = float(value)
+        except (ValueError, TypeError):
+            raise ValueError(f"Value must be a valid number, got: {value}")
+
+        if min_val is not None and parsed < min_val:
+            raise ValueError(f"Value must be >= {min_val}, got: {parsed}")
+        if max_val is not None and parsed > max_val:
+            raise ValueError(f"Value must be <= {max_val}, got: {parsed}")
 
         return parsed
 

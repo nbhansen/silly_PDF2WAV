@@ -172,13 +172,19 @@ coverage_targets.md
 .ipynb_checkpoints
 
 # --------------------------------------
-# Environment Variables
+# Environment Variables & Configuration
 # --------------------------------------
 .env
 .env.local
 .env.development
 .env.test
 .env.production
+
+# User-specific YAML configuration (keep example file)
+config.yaml
+config.local.yaml
+config.dev.yaml
+config.prod.yaml
 
 # --------------------------------------
 # Version Management

@@ -20,7 +20,7 @@ from infrastructure.tts.gemini_tts_provider import GeminiTTSProvider
 from infrastructure.tts.piper_tts_provider import PiperTTSProvider
 
 
-def create_text_pipeline(config: SystemConfig) -> ITextPipeline:
+def create_text_pipeline(config: SystemConfig, tts_supports_ssml: bool = True) -> ITextPipeline:
     """Create text pipeline with optional LLM provider"""
     llm_provider = None
     if config.gemini_api_key:
@@ -30,7 +30,8 @@ def create_text_pipeline(config: SystemConfig) -> ITextPipeline:
         llm_provider=llm_provider,
         enable_cleaning=config.enable_text_cleaning,
         enable_ssml=config.enable_ssml,
-        document_type=config.document_type
+        document_type=config.document_type,
+        tts_supports_ssml=tts_supports_ssml
     )
 
 
@@ -71,15 +72,26 @@ def create_audio_engine(config: SystemConfig) -> IAudioEngine:
         output_folder=config.audio_folder
     )
     
-    text_pipeline = create_text_pipeline(config)
+    # Create TTS engine first to determine SSML support
     tts_engine = create_tts_engine(config)
+    
+    # Create text pipeline with TTS engine's SSML support status
+    text_pipeline = create_text_pipeline(config, tts_supports_ssml=tts_engine.supports_ssml())
+    
+    # Create timing engine with all dependencies
     timing_engine = create_timing_engine(config, tts_engine, file_manager, text_pipeline)
+    
+    print(f"🔍 ServiceFactory: Creating AudioEngine with chunk sizes:")
+    print(f"  - audio_target_chunk_size: {config.audio_target_chunk_size}")
+    print(f"  - audio_max_chunk_size: {config.audio_max_chunk_size}")
     
     return AudioEngine(
         tts_engine=tts_engine,
         file_manager=file_manager,
         timing_engine=timing_engine,
-        max_concurrent=config.max_concurrent_requests
+        max_concurrent=config.max_concurrent_requests,
+        audio_target_chunk_size=config.audio_target_chunk_size,
+        audio_max_chunk_size=config.audio_max_chunk_size
     )
 
 
@@ -109,9 +121,13 @@ def create_complete_service_set(config: Optional[SystemConfig] = None):
         output_folder=config.audio_folder
     )
     
-    # Create services
-    text_pipeline = create_text_pipeline(config)
+    # Create audio engine first (it will create TTS engine and text pipeline with correct SSML support)
     audio_engine = create_audio_engine(config)
+    
+    # Extract text pipeline from audio engine for other services
+    text_pipeline = audio_engine.timing_engine.text_pipeline
+    
+    # Create document engine
     document_engine = create_document_engine(config)
     
     return {
@@ -123,12 +139,13 @@ def create_complete_service_set(config: Optional[SystemConfig] = None):
     }
 
 
-def create_pdf_service_from_env():
+def create_pdf_service_from_env(config: SystemConfig = None):
     """
     Factory function that replaces CompositionRoot.create_pdf_service_from_env()
     Returns a simple service container with all dependencies configured
     """
-    config = SystemConfig.from_env()
+    if config is None:
+        config = SystemConfig.from_env()
     services = create_complete_service_set(config)
     
     # Create a simple container

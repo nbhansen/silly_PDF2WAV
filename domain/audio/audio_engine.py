@@ -57,13 +57,21 @@ class AudioEngine(IAudioEngine):
         tts_engine: ITTSEngine,
         file_manager: IFileManager,
         timing_engine: 'ITimingEngine',
-        max_concurrent: int = 4
+        max_concurrent: int = 4,
+        audio_target_chunk_size: int = 2000,
+        audio_max_chunk_size: int = 3000
     ):
         self.tts_engine = tts_engine
         self.file_manager = file_manager
         self.timing_engine = timing_engine
         self.max_concurrent = max_concurrent
+        self.audio_target_chunk_size = audio_target_chunk_size
+        self.audio_max_chunk_size = audio_max_chunk_size
         self.base_delay = self._get_base_delay_for_engine()
+        
+        print(f"🔍 AudioEngine: Initialized with chunk sizes:")
+        print(f"  - audio_target_chunk_size: {self.audio_target_chunk_size}")
+        print(f"  - audio_max_chunk_size: {self.audio_max_chunk_size}")
     
     def generate_with_timing(self, text_chunks: List[str], output_filename: str) -> TimedAudioResult:
         """
@@ -78,25 +86,78 @@ class AudioEngine(IAudioEngine):
         Perfect for regular uploads that don't need timing data.
         """
         print(f"AudioEngine: Generating simple audio for {len(text_chunks)} chunks")
+        print(f"🔍 AudioEngine: Chunk sizes: {[len(chunk) for chunk in text_chunks]}")
         
         if not text_chunks:
             return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
         
-        # Generate full text
-        full_text = " ".join(text_chunks)
+        # Check if we need to rechunk based on configuration
+        max_chunk_size = self.audio_target_chunk_size
+        print(f"🔍 AudioEngine: Using max_chunk_size = {max_chunk_size} (from self.audio_target_chunk_size)")
         
-        if not full_text.strip():
+        # Split chunks if any are too large
+        processed_chunks = []
+        for chunk in text_chunks:
+            if len(chunk) > max_chunk_size:
+                print(f"AudioEngine: Chunk too large ({len(chunk)} chars), splitting...")
+                # Split on sentences first, then words if needed
+                sentences = chunk.replace('. ', '.|').replace('! ', '!|').replace('? ', '?|').split('|')
+                current_subchunk = ""
+                for sentence in sentences:
+                    # If single sentence is too large, split by words
+                    if len(sentence) > max_chunk_size:
+                        words = sentence.split()
+                        temp_chunk = ""
+                        for word in words:
+                            if len(temp_chunk) + len(word) + 1 > max_chunk_size and temp_chunk:
+                                if current_subchunk:
+                                    processed_chunks.append(current_subchunk.strip())
+                                    current_subchunk = ""
+                                processed_chunks.append(temp_chunk.strip())
+                                temp_chunk = word
+                            else:
+                                temp_chunk += (" " + word if temp_chunk else word)
+                        if temp_chunk.strip():
+                            current_subchunk = temp_chunk.strip()
+                    elif len(current_subchunk) + len(sentence) > max_chunk_size and current_subchunk:
+                        processed_chunks.append(current_subchunk.strip())
+                        current_subchunk = sentence
+                    else:
+                        current_subchunk += (" " + sentence if current_subchunk else sentence)
+                if current_subchunk.strip():
+                    processed_chunks.append(current_subchunk.strip())
+            else:
+                processed_chunks.append(chunk)
+        
+        print(f"AudioEngine: Processing {len(processed_chunks)} chunks (max size: {max_chunk_size} chars)")
+        print(f"🔍 AudioEngine: After rechunking, chunk sizes: {[len(chunk) for chunk in processed_chunks]}")
+        
+        # Generate audio for each chunk and combine
+        audio_chunks = []
+        for i, chunk in enumerate(processed_chunks):
+            if not chunk.strip():
+                continue
+                
+            print(f"AudioEngine: Processing chunk {i+1}/{len(processed_chunks)} ({len(chunk)} chars)")
+            
+            try:
+                result = self.tts_engine.generate_audio_data(chunk)
+                if result.is_success and result.value:
+                    audio_chunks.append(result.value)
+                else:
+                    print(f"AudioEngine: Chunk {i+1} failed: {result.error if result.is_failure else 'No audio data'}")
+            except Exception as e:
+                print(f"AudioEngine: Exception processing chunk {i+1}: {e}")
+                continue
+        
+        if not audio_chunks:
+            print("AudioEngine: No successful audio chunks generated")
             return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
         
         try:
-            # Direct TTS generation - no timing complexity
-            result = self.tts_engine.generate_audio_data(full_text)
-            
-            if result.is_failure:
-                print(f"AudioEngine: TTS generation failed: {result.error}")
-                return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
-            
-            audio_data = result.value
+            # Combine audio chunks
+            combined_audio = self._combine_wav_chunks(audio_chunks)
+            audio_data = combined_audio
             
             if not audio_data:
                 return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
@@ -159,6 +220,44 @@ class AudioEngine(IAudioEngine):
             
         except Exception as e:
             return Result.failure(f"Failed to get audio duration: {e}")
+    
+    def _combine_wav_chunks(self, audio_chunks: List[bytes]) -> bytes:
+        """Combine multiple WAV audio chunks into a single WAV file"""
+        try:
+            import wave
+            import io
+            
+            if not audio_chunks:
+                return b''
+            
+            if len(audio_chunks) == 1:
+                return audio_chunks[0]
+            
+            # Read the first chunk to get audio parameters
+            first_chunk = io.BytesIO(audio_chunks[0])
+            with wave.open(first_chunk, 'rb') as first_wav:
+                params = first_wav.getparams()
+                
+            # Create output buffer
+            output_buffer = io.BytesIO()
+            
+            # Write combined WAV file
+            with wave.open(output_buffer, 'wb') as output_wav:
+                output_wav.setparams(params)
+                
+                # Append audio data from each chunk
+                for chunk_data in audio_chunks:
+                    chunk_buffer = io.BytesIO(chunk_data)
+                    with wave.open(chunk_buffer, 'rb') as chunk_wav:
+                        frames = chunk_wav.readframes(chunk_wav.getnframes())
+                        output_wav.writeframes(frames)
+            
+            return output_buffer.getvalue()
+            
+        except Exception as e:
+            print(f"AudioEngine: Error combining audio chunks: {e}")
+            # Fallback: return the first chunk if combination fails
+            return audio_chunks[0] if audio_chunks else b''
     
     def combine_audio_files(self, file_paths: List[str], output_path: str) -> Result[str]:
         """Combine multiple audio files using ffmpeg"""

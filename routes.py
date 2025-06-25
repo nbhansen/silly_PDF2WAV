@@ -19,7 +19,7 @@ from utils import (
 # Global variables for services (will be set by app.py)
 pdf_service = None
 processor_available = False
-app_config = SystemConfig.from_env()
+app_config = None  # Will be set by app.py via set_services()
 
 
 def get_pdf_service():
@@ -32,11 +32,13 @@ def is_processor_available():
     return processor_available
 
 
-def set_services(service, available):
-    """Set the services from app.py to avoid circular import"""
-    global pdf_service, processor_available
+def set_services(service, available, config=None):
+    """Set the services and config from app.py to avoid circular import"""
+    global pdf_service, processor_available, app_config
     pdf_service = service
     processor_available = available
+    if config is not None:
+        app_config = config
 
 
 def register_routes(app):
@@ -472,7 +474,7 @@ def render_upload_result(result, original_filename, base_filename_no_ext, page_r
     else:
         # Handle errors (common for both routes)
         error_message = _get_user_friendly_error_message(result.error)
-        retry_suggestion = _get_retry_suggestion(result.error)
+        retry_suggestion = _get_retry_suggestion(result.error, app_config)
 
         if retry_suggestion:
             return f"Error: {error_message}<br><br>💡 Suggestion: {retry_suggestion}"

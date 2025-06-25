@@ -117,7 +117,9 @@ class ServiceContainer(IServiceContainer):
                 tts_engine=self.get('tts_engine'),
                 file_manager=self.get(FileManager),
                 timing_engine=self.get(ITimingEngine),
-                max_concurrent=self.config.max_concurrent_requests
+                max_concurrent=self.config.max_concurrent_requests,
+                audio_target_chunk_size=self.config.audio_target_chunk_size,
+                audio_max_chunk_size=self.config.audio_max_chunk_size
             )
         )
         
@@ -146,7 +148,8 @@ class ServiceContainer(IServiceContainer):
             )
 
 
-def create_service_container() -> ServiceContainer:
+def create_service_container(config: SystemConfig = None) -> ServiceContainer:
     """Factory function to create configured service container"""
-    config = SystemConfig.from_env()
+    if config is None:
+        config = SystemConfig.from_env()
     return ServiceContainer(config)

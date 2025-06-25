@@ -1,0 +1,124 @@
+# =================================================================
+# PDF to Audio Converter - Configuration Template
+# =================================================================
+# Copy this file to config.yaml and customize for your deployment
+# config.yaml is gitignored for security
+
+# =================================================================
+# APPLICATION SETTINGS
+# =================================================================
+app:
+  name: "PDF to Audio Converter"
+  debug: false
+  host: "0.0.0.0"
+  port: 5000
+
+# =================================================================
+# SECRETS (Keep these secure!)
+# =================================================================
+secrets:
+  # Your Google AI API key (required for Gemini TTS and text cleaning)
+  # Get yours at: https://aistudio.google.com/app/apikey
+  google_ai_api_key: ""  # Fill this in your config.yaml
+
+# =================================================================
+# TEXT-TO-SPEECH CONFIGURATION
+# =================================================================
+tts:
+  # Choose: 'piper' (local, fast, no API key) or 'gemini' (cloud, high quality)
+  engine: "piper"
+  
+  # Piper TTS Settings (local engine)
+  piper:
+    model_name: "en_US-lessac-medium"
+    models_dir: "piper_models"
+    length_scale: 1.0  # Speech speed (0.5-2.0)
+    model_repository_url: "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0"
+  
+  # Gemini TTS Settings (cloud engine)
+  gemini:
+    model_name: "gemini-2.5-flash-preview-tts"
+    voice_name: "Kore"  # Options: Kore, Charon, Aoede, Leda
+    min_request_interval: 2.0  # Seconds between requests
+    use_measurement_mode: false  # Precise timing (slower)
+    measurement_mode_interval: 0.8
+
+# =================================================================
+# TEXT PROCESSING
+# =================================================================
+text_processing:
+  # Document type affects speech styling and emphasis
+  document_type: "research_paper"  # research_paper, literature_review, general
+  
+  # Enable LLM-powered text cleaning (requires google_ai_api_key)
+  enable_text_cleaning: true
+  
+  # Enable advanced SSML markup for better narration
+  enable_ssml: true
+  
+  # Text processing chunk sizes
+  chunk_size: 4000
+  llm_max_chunk_size: 100000
+  audio_target_chunk_size: 2000
+  audio_max_chunk_size: 3000
+
+# =================================================================
+# PERFORMANCE SETTINGS
+# =================================================================
+performance:
+  enable_async_audio: true
+  max_concurrent_tts_requests: 3
+  max_concurrent_requests: 4
+
+# =================================================================
+# FILE HANDLING
+# =================================================================
+files:
+  # Upload settings
+  upload_folder: "uploads"
+  audio_folder: "audio_outputs"
+  max_file_size_mb: 20  # Reduced for free service
+  allowed_extensions: ["pdf"]
+  audio_extensions: ["wav", "mp3"]
+  
+  # Storage settings
+  local_storage_dir: ".local"
+  
+  # Automatic cleanup
+  cleanup:
+    enabled: true
+    max_file_age_hours: 24.0
+    auto_cleanup_interval_hours: 6.0
+    max_disk_usage_mb: 500  # Reduced for free service
+
+# =================================================================
+# OCR SETTINGS
+# =================================================================
+ocr:
+  language: "eng"  # Tesseract language code
+  dpi: 300
+  threshold: 180
+  timeout_seconds: 30
+
+# =================================================================
+# AUDIO PROCESSING
+# =================================================================
+audio:
+  bitrate: "128k"
+  sample_rate: 22050
+  mp3_codec: "libmp3lame"
+
+# =================================================================
+# TIMEOUTS
+# =================================================================
+timeouts:
+  tts_seconds: 60
+  ffmpeg_seconds: 300
+
+# =================================================================
+# RATE LIMITING (for free service)
+# =================================================================
+rate_limits:
+  requests_per_minute: 5
+  requests_per_hour: 50
+  max_file_size_per_hour_mb: 100

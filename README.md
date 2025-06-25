@@ -32,6 +32,30 @@ pip install -r requirements.txt
 ```
 
 ### Configuration
+
+#### Option 1: YAML Configuration (Recommended)
+```bash
+cp config.example.yaml config.yaml
+# Edit config.yaml with your settings
+```
+
+Key settings in `config.yaml`:
+```yaml
+tts:
+  engine: "gemini"              # or "piper" for local TTS
+  gemini:
+    voice_name: "Kore"          # Options: Kore, Charon, Aoede, Leda
+
+secrets:
+  google_ai_api_key: ""         # Your API key here (required for Gemini)
+
+text_processing:
+  document_type: "research_paper"  # or "literature_review", "general"
+  enable_text_cleaning: true
+  enable_ssml: true
+```
+
+#### Option 2: Environment Variables (Fallback)
 Create `.env` file:
 ```bash
 # Core settings
@@ -60,22 +84,24 @@ Access at http://127.0.0.1:5000
 | Piper | Fast | Free | No | Model-based (e.g., en_US-lessac-high) |
 | Gemini | Slower | Paid | Yes | Single voice with content-aware styling |
 
-## Configuration
+## Configuration Details
 
-Environment variables:
-- `TTS_ENGINE`: `piper` or `gemini`
-- `GOOGLE_AI_API_KEY`: For Gemini features
-- `GEMINI_VOICE_NAME`: Single voice for all TTS (Kore, Charon, Aoede, Leda)
-- `DOCUMENT_TYPE`: Content-aware styling (`research_paper`, `literature_review`, `general`)
-- `ENABLE_TEXT_CLEANING`: AI text enhancement (default: True)
-- `ENABLE_SSML`: Speech markup (default: True)
+The application supports both YAML and environment variable configuration:
+
+### Core Settings
+- `tts.engine` / `TTS_ENGINE`: `piper` or `gemini`
+- `secrets.google_ai_api_key` / `GOOGLE_AI_API_KEY`: For Gemini features
+- `tts.gemini.voice_name` / `GEMINI_VOICE_NAME`: Single voice for all TTS (Kore, Charon, Aoede, Leda)
+- `text_processing.document_type` / `DOCUMENT_TYPE`: Content-aware styling (`research_paper`, `literature_review`, `general`)
+- `text_processing.enable_text_cleaning` / `ENABLE_TEXT_CLEANING`: AI text enhancement (default: true)
+- `text_processing.enable_ssml` / `ENABLE_SSML`: Speech markup (default: true)
 
 ### Voice System
-- **Gemini TTS**: Uses single voice (`GEMINI_VOICE_NAME`) with intelligent content styling
-- **Piper TTS**: Uses model-based voices (`PIPER_MODEL_NAME`), ignores Gemini voice config
-- **Content Processing**: `DOCUMENT_TYPE` drives emphasis and technical content handling
+- **Gemini TTS**: Uses single voice with intelligent content styling
+- **Piper TTS**: Uses model-based voices, ignores Gemini voice config
+- **Content Processing**: Document type drives emphasis and technical content handling
 
-See `application/config/system_config.py` for complete options.
+See `config.example.yaml` for all available options or `application/config/system_config.py` for defaults.
 
 ## Testing
 

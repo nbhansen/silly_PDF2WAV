@@ -69,9 +69,12 @@ def _get_user_friendly_error_message(error: 'ApplicationError') -> str:
         return error.message
 
 
-def _get_retry_suggestion(error: 'ApplicationError') -> str:
+def _get_retry_suggestion(error: 'ApplicationError', config: 'SystemConfig' = None) -> str:
     """Get retry suggestion based on error type"""
-    app_config = SystemConfig.from_env()
+    if config is None:
+        # Fallback - should be avoided in production
+        from application.config.system_config import SystemConfig
+        config = SystemConfig.from_env()
     
     if error.retryable:
         if error.code in [ErrorCode.TTS_ENGINE_ERROR, ErrorCode.AUDIO_GENERATION_FAILED]:
@@ -79,7 +82,10 @@ def _get_retry_suggestion(error: 'ApplicationError') -> str:
         elif error.code == ErrorCode.LLM_PROVIDER_ERROR:
             return "Please try again in a few moments, or disable text cleaning in your configuration."
         elif error.code == ErrorCode.TEXT_CLEANING_FAILED:
-            return "Try again or consider disabling text cleaning (set ENABLE_TEXT_CLEANING=False) if the problem persists."
+            if config.enable_text_cleaning:
+                return "Try again or consider disabling text cleaning if the problem persists."
+            else:
+                return "Text cleaning is already disabled. This might be a temporary issue - please try again."
         else:
             return "This error might be temporary. Please try again."
     else:

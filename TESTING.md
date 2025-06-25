@@ -5,7 +5,7 @@
 ### 🚀 Most Common Commands
 
 ```bash
-# TDD Development (187 tests)
+# TDD Development (201 tests)
 ./test-tdd.sh                    # All TDD tests
 ./test-tdd.sh fast               # TDD with fast failure
 ./test-commit.sh                 # Pre-commit validation
@@ -13,7 +13,7 @@
 # Component Testing
 python run_tests.py models       # Domain models (47 tests)
 python run_tests.py pipeline     # Text processing (47 tests)
-python run_tests.py config       # Configuration (49 tests)
+python run_tests.py config       # Configuration (63 tests)
 python run_tests.py errors       # Error handling (44 tests)
 ```
 
@@ -21,7 +21,7 @@ python run_tests.py errors       # Error handling (44 tests)
 
 #### TDD Workflows
 ```bash
-python run_tests.py tdd          # All TDD tests (187 tests)
+python run_tests.py tdd          # All TDD tests (201 tests)
 python run_tests.py tdd-fast     # TDD tests with fast failure
 python run_tests.py tdd-quiet    # TDD tests, minimal output
 python run_tests.py tdd-coverage # TDD tests with coverage

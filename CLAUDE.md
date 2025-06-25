@@ -42,16 +42,16 @@ The project uses a **hybrid testing approach** combining comprehensive TDD cover
 #### Quick Commands (Most Common)
 ```bash
 # TDD Development Workflow
-./test-tdd.sh                    # All 187 TDD tests
+./test-tdd.sh                    # All 201 TDD tests
 ./test-tdd.sh fast               # TDD tests with fast failure
 ./test-commit.sh                 # Pre-commit validation
 
 # Enhanced Test Runner
-python run_tests.py tdd          # All TDD tests (187 tests)
+python run_tests.py tdd          # All TDD tests (201 tests)
 python run_tests.py commit       # Pre-commit validation
 python run_tests.py models       # Domain models (47 tests)
 python run_tests.py pipeline     # Text processing (47 tests)
-python run_tests.py config       # Configuration (49 tests)
+python run_tests.py config       # Configuration (63 tests)
 python run_tests.py errors       # Error handling (44 tests)
 ```
 
@@ -75,10 +75,10 @@ python run_tests.py coverage     # Full coverage report
 - **Component work**: `python run_tests.py models|pipeline|config|errors`
 - **Integration testing**: `python run_tests.py integration`
 
-#### TDD Test Coverage (187 Tests)
+#### TDD Test Coverage (201 Tests)
 - **Domain Models**: 47 tests - Data integrity and immutability
 - **Text Processing Pipeline**: 47 tests - Pure text processing logic  
-- **System Configuration**: 49 tests - Environment parsing and validation
+- **System Configuration**: 63 tests - YAML and environment parsing, validation
 - **Error Handling System**: 44 tests - Structured error management
 
 ### Environment Setup
@@ -89,36 +89,57 @@ venv\Scripts\activate           # Windows
 pip install -r requirements.txt
 ```
 
+**IMPORTANT**: Always activate the virtual environment before running any Python commands or tools. Many commands will fail if the venv is not activated.
+
 ## Configuration System
 
-All configuration is managed through `application/config/system_config.py` using environment variables:
+All configuration is managed through `application/config/system_config.py` using YAML configuration files or environment variables:
+
+### Configuration Methods
+
+1. **YAML Configuration (Preferred)**
+   ```bash
+   cp config.example.yaml config.yaml
+   # Edit config.yaml with your settings
+   python app.py  # Automatically loads from config.yaml
+   ```
+
+2. **Environment Variables (Fallback)**
+   - Used when `config.yaml` is not present
+   - Useful for containerized deployments
+   - All settings can still be configured via env vars
 
 ### Core Settings
-- `TTS_ENGINE`: `piper` (local) or `gemini` (cloud)
-- `GOOGLE_AI_API_KEY`: Required for Gemini TTS/LLM features
-- `GEMINI_VOICE_NAME`: Single voice for all TTS generation (Kore, Charon, Aoede, Leda)
-- `DOCUMENT_TYPE`: Content-aware styling (`research_paper`, `literature_review`, `general`)
-- `ENABLE_TEXT_CLEANING`: Use LLM for text enhancement (default: True)
-- `ENABLE_SSML`: Apply SSML markup for better speech (default: True)
+- `tts.engine`: `piper` (local) or `gemini` (cloud)
+- `secrets.google_ai_api_key`: Required for Gemini TTS/LLM features
+- `tts.gemini.voice_name`: Single voice for all TTS generation (Kore, Charon, Aoede, Leda)
+- `text_processing.document_type`: Content-aware styling (`research_paper`, `literature_review`, `general`)
+- `text_processing.enable_text_cleaning`: Use LLM for text enhancement (default: true)
+- `text_processing.enable_ssml`: Apply SSML markup for better speech (default: true)
 
 ### Voice System Logic Separation
-- **Content Processing**: `DOCUMENT_TYPE` determines how content is styled and emphasized
-- **Voice Selection**: `GEMINI_VOICE_NAME` determines which voice speaks (Gemini only)
+- **Content Processing**: `document_type` determines how content is styled and emphasized
+- **Voice Selection**: `voice_name` determines which voice speaks (Gemini only)
 - **Engine Independence**: Piper uses model-based voices, Gemini uses API voices
 
 ### File Management
-- `ENABLE_FILE_CLEANUP`: Automatic file cleanup (default: True)
-- `MAX_FILE_AGE_HOURS`: File retention period (default: 24)
-- `MAX_DISK_USAGE_MB`: Disk usage limit (default: 1000)
+- `files.cleanup.enabled`: Automatic file cleanup (default: true)
+- `files.cleanup.max_file_age_hours`: File retention period (default: 24)
+- `files.cleanup.max_disk_usage_mb`: Disk usage limit (default: 500)
 
-The `SystemConfig.from_env()` method validates all configuration and fails fast with clear error messages.
+### Configuration Loading
+- `SystemConfig.from_yaml()`: Loads from YAML file with type validation
+- `SystemConfig.from_env()`: Loads from environment variables
+- Both methods validate configuration and fail fast with clear error messages
+
+See `config.example.yaml` for a complete configuration template with all available options.
 
 ## Dependency Injection
 
-The `application/composition_root.py` handles all dependency injection:
+The `domain/factories/service_factory.py` handles all dependency injection:
 - Creates and wires all services based on configuration
 - Manages the object graph and lifecycle
-- Entry point: `create_pdf_service_from_env()` returns fully configured service
+- Entry point: `create_pdf_service_from_env()` accepts SystemConfig and returns fully configured service
 
 ## Core Processing Flow
 
@@ -135,15 +156,15 @@ The `application/composition_root.py` handles all dependency injection:
 - Fast, no API costs
 - Basic SSML support
 - Models stored in `piper_models/`
-- Configuration: Uses `PIPER_MODEL_NAME` (e.g., en_US-lessac-high)
+- Configuration: Uses `tts.piper.model_name` (e.g., en_US-lessac-high)
 - Voice: Determined by selected model
 
 ### Gemini TTS (Cloud) - Simplified Single Voice System
 - Full SSML support with precise timestamps
 - Requires Google AI API key
 - Rate limiting with intelligent retry logic
-- **Single Voice Configuration**: `GEMINI_VOICE_NAME` used for all content
-- **Content-Aware Styling**: `DOCUMENT_TYPE` drives speech patterns
+- **Single Voice Configuration**: `tts.gemini.voice_name` used for all content
+- **Content-Aware Styling**: `text_processing.document_type` drives speech patterns
   - `research_paper`: "precisely and methodically" for technical content
   - `literature_review`: "thoughtfully and analytically" for narrative
   - `general`: Natural, conversational styles

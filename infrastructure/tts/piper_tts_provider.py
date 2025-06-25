@@ -45,23 +45,50 @@ if PIPER_AVAILABLE:
             self.voice_instance = None
             self.repository_url = repository_url
 
+            print(f"PiperTTSProvider: Initializing with config:")
+            print(f"  - Model name: {config.model_name}")
+            print(f"  - Model path: {config.model_path}")
+            print(f"  - Config path: {config.config_path}")
+            print(f"  - Models dir: {config.download_dir}")
+            print(f"  - PIPER_METHOD: {PIPER_METHOD}")
+
             # Ensure models directory exists
             os.makedirs(self.models_dir, exist_ok=True)
 
             # Auto-download model if no path specified
             if not self.model_path:
+                print("PiperTTSProvider: No model path specified, ensuring model...")
                 self.model_path, self.config_path = self._ensure_model()
+            
+            # Make paths absolute
+            if self.model_path and not os.path.isabs(self.model_path):
+                self.model_path = os.path.abspath(self.model_path)
+            if self.config_path and not os.path.isabs(self.config_path):
+                self.config_path = os.path.abspath(self.config_path)
+            
+            print(f"PiperTTSProvider: Using absolute paths:")
+            print(f"  - Model: {self.model_path}")
+            print(f"  - Config: {self.config_path}")
+            
+            # Verify files exist
+            if self.model_path and not os.path.exists(self.model_path):
+                raise FileNotFoundError(f"Model file not found: {self.model_path}")
+            if self.config_path and not os.path.exists(self.config_path):
+                raise FileNotFoundError(f"Config file not found: {self.config_path}")
 
             # Initialize Python library if available
             if PIPER_METHOD == "python_library":
                 self._init_python_library()
 
-            print(f"PiperTTSProvider: Using model {self.config.model_name}")
+            print(f"PiperTTSProvider: Initialization complete")
 
         # === ITTSEngine Implementation ===
 
         def generate_audio_data(self, text_to_speak: str) -> Result[bytes]:
             """Generate audio data using Piper TTS"""
+            print(f"PiperTTSProvider: generate_audio_data called with {len(text_to_speak)} chars")
+            print(f"PiperTTSProvider: Using method: {PIPER_METHOD}")
+            
             if not text_to_speak or text_to_speak.strip() == "":
                 return Result.failure(tts_engine_error("Empty text provided"))
 
@@ -71,23 +98,44 @@ if PIPER_AVAILABLE:
                     or text_to_speak.startswith("Could not convert")):
                 return Result.failure(tts_engine_error("Cannot generate audio from error message"))
 
-            # Basic SSML processing for Piper
+            # Strip ALL SSML tags for Piper (it doesn't support any SSML)
             processed_text = self._process_text_for_piper(text_to_speak)
             if not processed_text.strip():
                 return Result.failure(tts_engine_error("Text processing resulted in empty content"))
+            
+            # Debug: Check if SSML was present and stripped
+            if '<' in text_to_speak and '>' in text_to_speak:
+                print(f"🔍 PiperTTSProvider: Stripped SSML tags from text")
+                print(f"🔍 PiperTTSProvider: Original had {text_to_speak.count('<')} tags")
+            
+            print(f"PiperTTSProvider: Processed text length: {len(processed_text)} chars")
+
+            # Log warning if text is unusually large (should be chunked upstream)
+            if len(processed_text) > 3000:
+                print(f"🚨 PiperTTSProvider: WARNING - Received large text chunk ({len(processed_text)} chars)")
+                print("🚨 PiperTTSProvider: This exceeds the expected chunk size limit (2000-3000 chars)")
+                print(f"🚨 PiperTTSProvider: First 100 chars: {processed_text[:100]}...")
+            elif len(processed_text) > 2000:
+                print(f"⚠️  PiperTTSProvider: Received chunk at upper limit ({len(processed_text)} chars)")
 
             try:
                 if PIPER_METHOD == "python_library" and self.voice_instance:
+                    print("PiperTTSProvider: Using Python library method")
                     audio_data = self._generate_with_python_lib(processed_text)
                 else:
+                    print("PiperTTSProvider: Using command line method")
                     audio_data = self._generate_with_command_line(processed_text)
 
                 if not audio_data:
                     return Result.failure(tts_engine_error("TTS engine returned no audio data"))
 
+                print(f"PiperTTSProvider: Successfully generated {len(audio_data)} bytes of audio")
                 return Result.success(audio_data)
             except Exception as e:
-                return Result.failure(tts_engine_error(f"Audio generation failed: {str(e)}"))
+                import traceback
+                error_msg = f"Audio generation failed: {str(e)}\nTraceback: {traceback.format_exc()}"
+                print(f"PiperTTSProvider ERROR: {error_msg}")
+                return Result.failure(tts_engine_error(error_msg))
 
         def get_output_format(self) -> str:
             return self.output_format
@@ -96,32 +144,24 @@ if PIPER_AVAILABLE:
             return True  # Local engine, works well with sync processing
 
         def supports_ssml(self) -> bool:
-            return True  # Piper supports basic SSML
+            return False  # Piper does NOT support SSML - all tags must be stripped
 
         # === SSML Processing ===
 
         def _process_text_for_piper(self, text: str) -> str:
-            """Process text for Piper - keep basic SSML tags, strip others"""
+            """Process text for Piper - strip ALL SSML tags since Piper doesn't support SSML"""
             if not '<' in text:
                 return text
 
-            # Extract content from speak tags if present
-            if text.strip().startswith('<speak>') and text.strip().endswith('</speak>'):
-                text = text.strip()[7:-8]  # Remove <speak> and </speak>
-
-            # Keep basic SSML tags that Piper supports
-            # Remove unsupported tags but keep their content
-            unsupported_tags = ['voice', 'audio', 'mark', 'sub', 'phoneme', 'lexicon']
-            for tag in unsupported_tags:
-                text = re.sub(f'<{tag}[^>]*>', '', text)
-                text = re.sub(f'</{tag}>', '', text)
-
-            # Clean up any malformed tags
-            text = re.sub(r'<[^>]*$', '', text)  # Remove unclosed tags at end
-            text = re.sub(r'^[^<]*>', '', text)  # Remove orphaned closing tags at start
-            text = re.sub(r'\s+', ' ', text)     # Clean up multiple spaces
-
-            return text.strip()
+            # Remove ALL SSML tags - Piper doesn't support any SSML processing
+            # This includes <break>, <emphasis>, <prosody>, etc.
+            clean_text = re.sub(r'<[^>]+>', '', text)
+            
+            # Clean up any extra whitespace left after tag removal
+            clean_text = re.sub(r'\s+', ' ', clean_text)
+            clean_text = re.sub(r'\s+([.,;!?])', r'\1', clean_text)  # Fix space before punctuation
+            
+            return clean_text.strip()
 
         # === Audio Generation Methods ===
 
@@ -157,9 +197,12 @@ if PIPER_AVAILABLE:
 
         def _generate_with_command_line(self, text: str) -> bytes:
             """Generate using command line"""
+            temp_path = None
             try:
                 with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
                     temp_path = temp_file.name
+                
+                print(f"PiperTTSProvider: Created temp file: {temp_path}")
 
                 cmd = [
                     'piper',
@@ -174,33 +217,52 @@ if PIPER_AVAILABLE:
                 if self.config.speaker_id is not None:
                     cmd.extend(['--speaker', str(self.config.speaker_id)])
 
+                print(f"PiperTTSProvider: Running command: {' '.join(cmd)}")
+                print(f"PiperTTSProvider: Input text length: {len(text)} chars")
+                print(f"PiperTTSProvider: First 100 chars: {text[:100]}...")
+
                 # Piper command line can handle basic SSML
-                process = subprocess.run(cmd, input=text, capture_output=True, text=True, timeout=60)
+                # Use dynamic timeout based on text length (minimum 60 seconds)
+                timeout = max(60, len(text) // 100)  # ~1 second per 100 chars
+                print(f"PiperTTSProvider: Using timeout of {timeout} seconds for {len(text)} chars")
+                process = subprocess.run(cmd, input=text, capture_output=True, text=True, timeout=timeout)
+
+                print(f"PiperTTSProvider: Command completed with return code: {process.returncode}")
+                if process.stdout:
+                    print(f"PiperTTSProvider: Stdout: {process.stdout}")
+                if process.stderr:
+                    print(f"PiperTTSProvider: Stderr: {process.stderr}")
 
                 if process.returncode != 0:
-                    raise Exception(f"Piper command failed: {process.stderr}")
+                    raise Exception(f"Piper command failed with code {process.returncode}: {process.stderr}")
 
                 if os.path.exists(temp_path):
+                    file_size = os.path.getsize(temp_path)
+                    print(f"PiperTTSProvider: Output file size: {file_size} bytes")
+                    
                     with open(temp_path, 'rb') as f:
                         audio_data = f.read()
 
-                    try:
-                        os.unlink(temp_path)
-                    except:
-                        pass
-
                     if len(audio_data) > 0:
-                        print(f"PiperTTSProvider: Generated {len(audio_data)} bytes with command line")
+                        print(f"PiperTTSProvider: Successfully read {len(audio_data)} bytes from output file")
                         return audio_data
                     else:
-                        raise Exception("No audio data generated")
+                        raise Exception("Output file exists but contains no audio data")
                 else:
-                    raise Exception("Audio file was not created")
+                    raise Exception(f"Audio file was not created at {temp_path}")
 
             except subprocess.TimeoutExpired:
-                raise Exception("Piper command timed out")
+                raise Exception(f"Piper command timed out after {timeout} seconds")
             except Exception as e:
                 raise Exception(f"Command line generation failed: {e}")
+            finally:
+                # Always try to clean up temp file
+                if temp_path and os.path.exists(temp_path):
+                    try:
+                        os.unlink(temp_path)
+                        print(f"PiperTTSProvider: Cleaned up temp file: {temp_path}")
+                    except Exception as e:
+                        print(f"PiperTTSProvider: Failed to clean up temp file: {e}")
 
         # === Model Management ===
 
