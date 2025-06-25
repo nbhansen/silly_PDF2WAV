@@ -46,7 +46,7 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
         }
     }
 
-    def __init__(self, model_name: str = "gemini-2.0-flash-exp", api_key: Optional[str] = None, voice_name: str = "Kore", document_type: str = "academic_paper"):
+    def __init__(self, model_name: str, api_key: Optional[str] = None, voice_name: str = "Kore", document_type: str = "academic_paper"):
         if not api_key:
             raise ValueError("API key required for Gemini TTS")
 

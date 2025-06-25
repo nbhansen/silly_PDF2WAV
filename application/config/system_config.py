@@ -16,8 +16,10 @@ class TTSEngine(Enum):
 class SystemConfig:
     """Single source of truth for all application configuration"""
 
-    # Core TTS settings
+    # Core TTS settings (required fields first)
     tts_engine: TTSEngine
+    llm_model_name: str  # Required: LLM model for text cleaning
+    gemini_model_name: str  # Required: Gemini TTS model name
 
     # File handling
     upload_folder: str = "uploads"
@@ -41,7 +43,6 @@ class SystemConfig:
 
     # Gemini specific
     gemini_api_key: Optional[str] = None
-    gemini_model_name: str = "gemini-2.5-flash-preview-tts"  # TTS-capable model
     gemini_voice_name: str = "Kore"
     gemini_min_request_interval: float = 2.0
     gemini_measurement_mode_interval: float = 0.8  # Faster rate for measurement mode batches
@@ -164,9 +165,12 @@ class SystemConfig:
             auto_cleanup_interval_hours=cls._parse_float_value(get_config('files.cleanup.auto_cleanup_interval_hours', 6.0), 6.0, min_val=0.1, max_val=24.0),
             max_disk_usage_mb=cls._parse_int_value(get_config('files.cleanup.max_disk_usage_mb', 500), 500, min_val=10, max_val=10000),
             
+            # LLM settings (for text cleaning)
+            llm_model_name=get_config('llm.model_name'),
+            
             # Gemini settings
             gemini_api_key=get_config('secrets.google_ai_api_key'),
-            gemini_model_name=get_config('tts.gemini.model_name', 'gemini-2.5-flash-preview-tts'),
+            gemini_model_name=get_config('tts.gemini.model_name'),
             gemini_voice_name=get_config('tts.gemini.voice_name', 'Kore'),
             gemini_min_request_interval=cls._parse_float_value(get_config('tts.gemini.min_request_interval', 2.0), 2.0, min_val=0.1, max_val=10.0),
             gemini_measurement_mode_interval=cls._parse_float_value(get_config('tts.gemini.measurement_mode_interval', 0.8), 0.8, min_val=0.1, max_val=5.0),
@@ -248,8 +252,10 @@ class SystemConfig:
             auto_cleanup_interval_hours=cls._parse_float('AUTO_CLEANUP_INTERVAL_HOURS', 6.0, min_val=0.1, max_val=24.0),
             max_disk_usage_mb=cls._parse_int('MAX_DISK_USAGE_MB', 1000, min_val=10, max_val=10000),
 
+            llm_model_name=os.getenv('LLM_MODEL_NAME'),
+            
             gemini_api_key=os.getenv('GOOGLE_AI_API_KEY'),
-            gemini_model_name=os.getenv('GEMINI_MODEL_NAME', 'gemini-2.5-flash-preview-tts'),
+            gemini_model_name=os.getenv('GEMINI_MODEL_NAME'),
             gemini_voice_name=os.getenv('GEMINI_VOICE_NAME', 'Kore'),
             gemini_min_request_interval=cls._parse_float('GEMINI_MIN_REQUEST_INTERVAL', 2.0, min_val=0.1, max_val=10.0),
             gemini_measurement_mode_interval=cls._parse_float('GEMINI_MEASUREMENT_MODE_INTERVAL', 0.8, min_val=0.1, max_val=5.0),

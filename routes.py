@@ -70,9 +70,19 @@ def register_routes(app):
         if not os.path.exists(audio_path):
             return f"Audio file {filename} not found.", 404
 
+        # Load timing data for template rendering
+        import json
+        try:
+            with open(timing_path, 'r') as f:
+                timing_json = json.load(f)
+                timing_segments = timing_json.get('text_segments', [])
+        except Exception as e:
+            return f"Error loading timing data: {e}", 500
+
         return render_template('read_along.html',
                                audio_filename=filename,
                                base_filename=base_filename,
+                               timing_data=timing_segments,
                                timing_api_url=url_for('get_timing_data', filename=base_filename))
 
     @app.route('/api/timing/<filename>')
@@ -442,6 +452,7 @@ def render_upload_result(result, original_filename, base_filename_no_ext, page_r
     """
     Render the result template with appropriate parameters.
     """
+    print(f"🔍 DEBUG: result.success={result.success}, result.error={result.error}")
     if result.success:
         display_filename = original_filename
         if not page_range.is_full_document():

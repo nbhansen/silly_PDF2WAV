@@ -286,21 +286,13 @@ if PIPER_AVAILABLE:
 
             # Simple model mapping
             model_paths = {
-                # High quality models
-                "en_US-lessac-high": "en/en_US/lessac/high",
-                "en_US-ljspeech-high": "en/en_US/ljspeech/high",
+                # US Male voices
                 "en_US-ryan-high": "en/en_US/ryan/high",
-                "en_GB-alba-high": "en/en_GB/alba/high",
-
-                # Medium quality (existing)
-                "en_US-lessac-medium": "en/en_US/lessac/medium",
-                "en_US-ljspeech-medium": "en/en_US/ljspeech/medium",
                 "en_US-ryan-medium": "en/en_US/ryan/medium",
+                
+                # GB voices
+                "en_GB-cori-high": "en/en_GB/cori/high",
                 "en_GB-alba-medium": "en/en_GB/alba/medium",
-                "en_US-arctic-medium": "en/en_US/arctic/medium",
-
-                # Low quality (existing)
-                "en_US-amy-low": "en/en_US/amy/low",
             }
 
             model_path_segment = model_paths.get(model_name, "en/en_US/lessac/medium")  # fallback

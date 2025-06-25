@@ -8,8 +8,9 @@ from domain.errors import Result, llm_provider_error
 class GeminiLLMProvider(ILLMProvider):
     """Implementation of ILLMProvider using the unified Google Gen AI SDK"""
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, model_name: str):
         self.api_key = api_key
+        self.model_name = model_name
         self.client = self._init_client()
 
     def _init_client(self):
@@ -37,7 +38,7 @@ class GeminiLLMProvider(ILLMProvider):
 
         try:
             response = self.client.models.generate_content(
-                model="gemini-2.0-flash",  # Use the latest model
+                model=self.model_name,
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     max_output_tokens=8192,

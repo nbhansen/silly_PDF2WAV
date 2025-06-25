@@ -24,7 +24,7 @@ def create_text_pipeline(config: SystemConfig, tts_supports_ssml: bool = True) -
     """Create text pipeline with optional LLM provider"""
     llm_provider = None
     if config.gemini_api_key:
-        llm_provider = GeminiLLMProvider(api_key=config.gemini_api_key)
+        llm_provider = GeminiLLMProvider(api_key=config.gemini_api_key, model_name=config.llm_model_name)
     
     return TextPipeline(
         llm_provider=llm_provider,

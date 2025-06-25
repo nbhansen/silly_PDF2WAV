@@ -9,7 +9,7 @@
 # =================================================================
 app:
   name: "PDF to Audio Converter"
-  debug: false
+  debug: true
   host: "0.0.0.0"
   port: 5000
 
@@ -19,7 +19,7 @@ app:
 secrets:
   # Your Google AI API key (required for Gemini TTS and text cleaning)
   # Get yours at: https://aistudio.google.com/app/apikey
-  google_ai_api_key: ""  # Fill this in your config.yaml
+  google_ai_api_key: "YOUR_GOOGLE_AI_API_KEY"  # Fill this in your config.yaml
 
 # =================================================================
 # TEXT-TO-SPEECH CONFIGURATION
@@ -30,18 +30,30 @@ tts:
   
   # Piper TTS Settings (local engine)
   piper:
-    model_name: "en_US-lessac-medium"
+    # Available models:
+    # US Male: en_US-ryan-high, en_US-ryan-medium
+    # GB Female: en_GB-cori-high, en_GB-alba-medium
+    model_name: "en_US-ryan-high"
     models_dir: "piper_models"
     length_scale: 1.0  # Speech speed (0.5-2.0)
-    model_repository_url: "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0"
+    model_repository_url: "https://huggingface.co/rhasspy/piper-voices/resolve/main"
   
   # Gemini TTS Settings (cloud engine)
   gemini:
-    model_name: "gemini-2.5-flash-preview-tts"
+    # TTS-specific model (has -tts suffix, different from LLM model)
+    model_name: "gemini-2.5-pro-preview-tts"
     voice_name: "Kore"  # Options: Kore, Charon, Aoede, Leda
     min_request_interval: 2.0  # Seconds between requests
     use_measurement_mode: false  # Precise timing (slower)
     measurement_mode_interval: 0.8
+
+# =================================================================
+# LLM CONFIGURATION (for text cleaning)
+# =================================================================
+llm:
+  # LLM model for text cleaning and processing (NOT for TTS)
+  # Use regular Gemini models (no -tts suffix)
+  model_name: "gemini-2.5-pro"
 
 # =================================================================
 # TEXT PROCESSING
@@ -122,3 +134,20 @@ rate_limits:
   requests_per_minute: 5
   requests_per_hour: 50
   max_file_size_per_hour_mb: 100
+
+# =================================================================
+# CONFIGURATION NOTES
+# =================================================================
+# 
+# IMPORTANT MODEL SEPARATION:
+# - llm.model_name: For text cleaning (use regular Gemini models)
+# - tts.gemini.model_name: For audio generation (use -tts models)
+# 
+# PIPER VOICE OPTIONS:
+# - en_US-ryan-high/medium: US Male voice
+# - en_GB-cori-high: GB Female voice  
+# - en_GB-alba-medium: GB Female voice
+#
+# TTS ENGINE COMPARISON:
+# - Piper: Fast, local, no API costs, basic SSML
+# - Gemini: Slower, cloud, API costs, full SSML with timing

@@ -147,6 +147,10 @@ class DocumentEngine(IDocumentEngine):
                 print("DocumentEngine: Using simple audio generation (no timing complexity)")
                 timed_result = audio_engine.generate_simple_audio(processed_chunks, request.output_name)
             
+            print(f"🔍 DEBUG: timed_result={timed_result}")
+            if timed_result:
+                print(f"🔍 DEBUG: timed_result.audio_files={timed_result.audio_files}")
+            
             if not timed_result or not timed_result.audio_files:
                 return ProcessingResult.failure_result(
                     audio_generation_error("Audio generation failed to produce files")

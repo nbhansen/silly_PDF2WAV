@@ -256,20 +256,29 @@ class TimingEngine(ITimingEngine):
         
         # Combine all audio files
         final_audio_files = []
+        print(f"🔍 DEBUG: all_temp_audio_files count: {len(all_temp_audio_files)}")
         if all_temp_audio_files:
             if len(all_temp_audio_files) > 1:
+                print(f"🔍 DEBUG: Combining {len(all_temp_audio_files)} audio files")
                 combined_path = os.path.join(self.file_manager.get_output_dir(), f"{output_filename}_combined.mp3")
                 if self._combine_audio_files(all_temp_audio_files, combined_path):
                     final_audio_files = [os.path.basename(combined_path)]
+                    print(f"🔍 DEBUG: Audio combination successful: {final_audio_files}")
+                else:
+                    print(f"🔍 DEBUG: Audio combination FAILED")
             else:
+                print(f"🔍 DEBUG: Single file copy: {all_temp_audio_files[0]}")
                 # Single file
                 output_path = os.path.join(self.file_manager.get_output_dir(), f"{output_filename}.wav")
                 try:
                     import shutil
                     shutil.copy2(all_temp_audio_files[0], output_path)
                     final_audio_files = [os.path.basename(output_path)]
+                    print(f"🔍 DEBUG: Single file copy successful: {final_audio_files}")
                 except Exception as e:
-                    print(f"Failed to copy audio file: {e}")
+                    print(f"🔍 DEBUG: Failed to copy audio file: {e}")
+        else:
+            print(f"🔍 DEBUG: No temp audio files to process!")
         
         # Clean up temp files
         for temp_file in all_temp_audio_files:
@@ -353,13 +362,22 @@ class TimingEngine(ITimingEngine):
         try:
             import subprocess
             
+            print(f"🔍 DEBUG: Combining {len(file_paths)} files to {output_path}")
+            print(f"🔍 DEBUG: Input files: {file_paths}")
+            
             list_file = output_path + '.list'
             with open(list_file, 'w') as f:
                 for file_path in file_paths:
                     f.write(f"file '{file_path}'\n")
             
-            cmd = ['ffmpeg', '-f', 'concat', '-safe', '0', '-i', list_file, '-c', 'copy', output_path, '-y']
+            # Convert from WAV to MP3 since we can't use -c copy with format change
+            cmd = ['ffmpeg', '-f', 'concat', '-safe', '0', '-i', list_file, '-c:a', 'libmp3lame', '-b:a', '128k', output_path, '-y']
+            print(f"🔍 DEBUG: Running ffmpeg command: {' '.join(cmd)}")
             result = subprocess.run(cmd, capture_output=True, timeout=300)
+            
+            print(f"🔍 DEBUG: ffmpeg return code: {result.returncode}")
+            if result.stderr:
+                print(f"🔍 DEBUG: ffmpeg stderr: {result.stderr.decode()}")
             
             try:
                 os.remove(list_file)
@@ -367,5 +385,6 @@ class TimingEngine(ITimingEngine):
                 pass
             
             return result.returncode == 0
-        except:
+        except Exception as e:
+            print(f"🔍 DEBUG: Audio combination exception: {e}")
             return False
