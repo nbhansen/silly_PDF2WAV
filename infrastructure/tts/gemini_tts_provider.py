@@ -8,6 +8,8 @@ import json
 import os
 import wave
 import struct
+import asyncio
+import concurrent.futures
 from google import genai
 from google.genai import types
 
@@ -46,7 +48,16 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
         }
     }
 
-    def __init__(self, model_name: str, api_key: Optional[str] = None, voice_name: str = "Kore", document_type: str = "academic_paper"):
+    def __init__(
+        self, 
+        model_name: str, 
+        api_key: str,
+        voice_name: str,
+        document_type: str,
+        min_request_interval: float,
+        max_concurrent_requests: int,
+        requests_per_minute: int
+    ):
         if not api_key:
             raise ValueError("API key required for Gemini TTS")
 
@@ -65,6 +76,14 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
             ',': 0.2, ';': 0.3, ':': 0.3,
             '—': 0.3, '...': 0.6
         }
+        
+        # Optimized rate limiting parameters
+        self.min_request_interval = min_request_interval  # Config-driven rate limiting
+        self.max_concurrent_segments = max_concurrent_requests  # Config-driven concurrency
+        self.requests_per_minute = requests_per_minute  # Official rate limit
+        self.segment_semaphore = asyncio.Semaphore(self.max_concurrent_segments)
+        
+        print(f"🚀 GeminiTTSProvider: Optimized rate limiting - {requests_per_minute} RPM, {min_request_interval}s intervals, {max_concurrent_requests} concurrent")
 
     def _get_content_styles_for_document_type(self, document_type: str) -> Dict[str, str]:
         """Get content styles based on document type"""
@@ -82,45 +101,51 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
         except Exception as e:
             return Result.failure(tts_engine_error(f"Audio generation failed: {str(e)}"))
 
+    async def generate_audio_data_async(self, text_to_speak: str) -> Result[bytes]:
+        """Generate audio data asynchronously using internal async infrastructure"""
+        try:
+            # Use the async segment processing for a single chunk
+            # This leverages our existing async infrastructure 
+            segments = [{'text': text_to_speak, 'content_type': 'narrator', 'type': 'narrative'}]
+            
+            # Create a single async task for this text
+            async with self.segment_semaphore:
+                loop = asyncio.get_event_loop()
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    audio_data = await loop.run_in_executor(
+                        executor,
+                        self._generate_with_content_style,
+                        text_to_speak,
+                        "narrator"
+                    )
+                
+                # Add rate limiting delay based on configuration
+                await asyncio.sleep(self.min_request_interval)
+                
+                if not audio_data:
+                    return Result.failure(tts_engine_error("No audio data generated"))
+                return Result.success(audio_data)
+                
+        except Exception as e:
+            return Result.failure(tts_engine_error(f"Async audio generation failed: {str(e)}"))
+
     def generate_audio_with_timestamps(self, text_to_speak: str) -> Result[Tuple[bytes, List[TextSegment]]]:
         """
-        Generate audio with intelligent content-aware processing
+        Generate audio with intelligent content-aware processing using async segment processing
         """
         try:
             # Analyze content and split into segments with appropriate personas
             segments = self._analyze_and_segment_content(text_to_speak)
 
-            # Generate audio for each segment with appropriate voice
-            audio_chunks = []
-            timing_segments = []
-            current_time = 0.0
-
-            for seg_data in segments:
-                audio_data = self._generate_with_content_style(
-                    seg_data['text'],
-                    seg_data['content_type']
+            # Generate audio for segments concurrently using asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                audio_chunks, timing_segments = loop.run_until_complete(
+                    self._generate_segments_async(segments)
                 )
-
-                if not audio_data:
-                    return Result.failure(tts_engine_error(f"Failed to generate audio for segment: {seg_data['text'][:50]}..."))
-
-                duration = self._calculate_precise_duration(
-                    seg_data['text'],
-                    seg_data['content_type']
-                )
-
-                audio_chunks.append(audio_data)
-
-                timing_segments.append(TextSegment(
-                    text=self._clean_for_display(seg_data['text']),
-                    start_time=current_time,
-                    duration=duration,
-                    segment_type=seg_data['type'],
-                    chunk_index=0,
-                    sentence_index=len(timing_segments)
-                ))
-
-                current_time += duration
+            finally:
+                loop.close()
 
             # Combine audio chunks
             combined_audio = self._combine_audio_chunks(audio_chunks)
@@ -132,6 +157,73 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
 
         except Exception as e:
             return Result.failure(tts_engine_error(f"Timestamped audio generation failed: {str(e)}"))
+
+    async def _generate_segments_async(self, segments: List[Dict]) -> Tuple[List[bytes], List[TextSegment]]:
+        """
+        Generate audio for segments concurrently with rate limiting
+        """
+        # Create tasks for concurrent processing
+        tasks = []
+        for i, seg_data in enumerate(segments):
+            task = self._generate_segment_async(seg_data, i)
+            tasks.append(task)
+        
+        # Execute all tasks concurrently with semaphore control
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Process results maintaining order
+        audio_chunks = []
+        timing_segments = []
+        current_time = 0.0
+        
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                raise result
+            
+            audio_data, seg_data = result
+            
+            if not audio_data:
+                raise Exception(f"Failed to generate audio for segment: {seg_data['text'][:50]}...")
+            
+            duration = self._calculate_precise_duration(
+                seg_data['text'],
+                seg_data['content_type']
+            )
+            
+            audio_chunks.append(audio_data)
+            
+            timing_segments.append(TextSegment(
+                text=self._clean_for_display(seg_data['text']),
+                start_time=current_time,
+                duration=duration,
+                segment_type=seg_data['type'],
+                chunk_index=0,
+                sentence_index=i
+            ))
+            
+            current_time += duration
+        
+        return audio_chunks, timing_segments
+
+    async def _generate_segment_async(self, seg_data: Dict, index: int) -> Tuple[bytes, Dict]:
+        """
+        Generate audio for a single segment with async rate limiting
+        """
+        async with self.segment_semaphore:
+            # Use thread pool for blocking API call
+            loop = asyncio.get_event_loop()
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                audio_data = await loop.run_in_executor(
+                    executor,
+                    self._generate_with_content_style,
+                    seg_data['text'],
+                    seg_data['content_type']
+                )
+            
+            # Add rate limiting delay based on configuration  
+            await asyncio.sleep(self.min_request_interval)
+            
+            return audio_data, seg_data
 
     def _generate_with_content_style(self, text: str, content_type: str) -> bytes:
         """Generate audio with content-aware styling using single voice"""

@@ -4,7 +4,6 @@ Clean, minimal factory functions that replace the complex CompositionRoot.
 Focuses on creating consolidated services with clear dependencies.
 """
 
-from typing import Optional
 
 from application.config.system_config import SystemConfig
 from domain.audio.audio_engine import AudioEngine, IAudioEngine
@@ -24,7 +23,13 @@ def create_text_pipeline(config: SystemConfig, tts_supports_ssml: bool = True) -
     """Create text pipeline with optional LLM provider"""
     llm_provider = None
     if config.gemini_api_key:
-        llm_provider = GeminiLLMProvider(api_key=config.gemini_api_key, model_name=config.llm_model_name)
+        llm_provider = GeminiLLMProvider(
+            api_key=config.gemini_api_key, 
+            model_name=config.llm_model_name,
+            min_request_interval=config.llm_min_request_interval,
+            max_concurrent_requests=config.llm_max_concurrent_requests,
+            requests_per_minute=config.llm_requests_per_minute
+        )
     
     return TextPipeline(
         llm_provider=llm_provider,
@@ -42,7 +47,10 @@ def create_tts_engine(config: SystemConfig):
             model_name=config.gemini_model_name,
             api_key=config.gemini_api_key,
             voice_name=config.gemini_voice_name,
-            document_type=config.document_type
+            document_type=config.document_type,
+            min_request_interval=config.gemini_min_request_interval,
+            max_concurrent_requests=config.gemini_max_concurrent_requests,
+            requests_per_minute=config.gemini_requests_per_minute
         )
     else:
         return PiperTTSProvider(
@@ -110,11 +118,8 @@ def create_document_engine(config: SystemConfig) -> IDocumentEngine:
     )
 
 
-def create_complete_service_set(config: Optional[SystemConfig] = None):
+def create_complete_service_set(config: SystemConfig):
     """Create complete set of consolidated services"""
-    if config is None:
-        config = SystemConfig.from_env()
-    
     # Create shared file manager
     file_manager = FileManager(
         upload_folder=config.upload_folder,
@@ -139,13 +144,11 @@ def create_complete_service_set(config: Optional[SystemConfig] = None):
     }
 
 
-def create_pdf_service_from_env(config: SystemConfig = None):
+def create_pdf_service_from_env(config: SystemConfig):
     """
     Factory function that replaces CompositionRoot.create_pdf_service_from_env()
     Returns a simple service container with all dependencies configured
     """
-    if config is None:
-        config = SystemConfig.from_env()
     services = create_complete_service_set(config)
     
     # Create a simple container

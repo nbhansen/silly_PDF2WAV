@@ -13,32 +13,38 @@ from domain.models import ProcessingRequest, PageRange
 from tests.test_helpers import create_test_request
 
 
+def create_test_config() -> SystemConfig:
+    """Create a minimal SystemConfig for testing"""
+    return SystemConfig(
+        tts_engine=TTSEngine.PIPER,
+        llm_model_name="test-llm-model",
+        gemini_model_name="test-gemini-model",
+        enable_text_cleaning=False,
+        enable_ssml=False,
+        enable_file_cleanup=False
+    )
+
+
 def test_configuration_loading():
-    """Test that configuration can be loaded with minimal environment"""
-    with patch.dict(os.environ, {
-        'TTS_ENGINE': 'piper',
-        'ENABLE_TEXT_CLEANING': 'false',
-        'ENABLE_SSML': 'false',
-        'ENABLE_FILE_CLEANUP': 'false'
-    }):
-        config = SystemConfig.from_env()
-        assert config.tts_engine == TTSEngine.PIPER
-        assert config.enable_text_cleaning is False
-        assert config.enable_ssml is False
-        assert config.enable_file_cleanup is False
-        # Test new Gemini model configuration
-        assert config.gemini_model_name == "gemini-2.5-flash-preview-tts"
+    """Test that configuration can be loaded with minimal setup"""
+    config = create_test_config()
+    assert config.tts_engine == TTSEngine.PIPER
+    assert config.enable_text_cleaning is False
+    assert config.enable_ssml is False
+    assert config.enable_file_cleanup is False
+    # Test new Gemini model configuration
+    assert config.gemini_model_name == "test-gemini-model"
 
 
 def test_gemini_model_configuration():
-    """Test that Gemini model can be configured via environment"""
-    with patch.dict(os.environ, {
-        'TTS_ENGINE': 'piper',
-        'GEMINI_MODEL_NAME': 'gemini-2.5-pro-preview-tts',
-        'ENABLE_FILE_CLEANUP': 'false'
-    }):
-        config = SystemConfig.from_env()
-        assert config.gemini_model_name == "gemini-2.5-pro-preview-tts"
+    """Test that Gemini model can be configured"""
+    config = SystemConfig(
+        tts_engine=TTSEngine.PIPER,
+        llm_model_name="test-llm-model",
+        gemini_model_name="gemini-2.5-pro-preview-tts",
+        enable_file_cleanup=False
+    )
+    assert config.gemini_model_name == "gemini-2.5-pro-preview-tts"
 
 
 def test_service_factory_creation():
@@ -48,7 +54,8 @@ def test_service_factory_creation():
         with patch('infrastructure.tts.piper_tts_provider.PIPER_AVAILABLE', True), \
              patch('infrastructure.tts.piper_tts_provider.PiperTTSProvider'):
             
-            container = create_pdf_service_from_env()
+            config = create_test_config()
+            container = create_pdf_service_from_env(config)
             
             # Verify all main services are available
             from domain.audio.audio_engine import IAudioEngine
@@ -80,7 +87,8 @@ def test_create_pdf_service_from_env_integration():
              patch('infrastructure.tts.piper_tts_provider.PiperTTSProvider'), \
              patch('infrastructure.ocr.tesseract_ocr_provider.TesseractOCRProvider'):
             
-            service = create_pdf_service_from_env()
+            config = create_test_config()
+            service = create_pdf_service_from_env(config)
             assert service is not None
             
             # Test basic service methods work
@@ -121,7 +129,7 @@ def test_service_creation_with_mocked_dependencies():
             mock_ocr.return_value = mock_ocr_instance
             
             # Create service container
-            container = create_pdf_service_from_env()
+            container = create_pdf_service_from_env(config)
             
             # Verify services can be created and have expected structure
             from domain.audio.audio_engine import IAudioEngine

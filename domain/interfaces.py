@@ -89,6 +89,14 @@ class ILLMProvider(ABC):
         """Generates content based on a prompt."""
         pass
 
+    @abstractmethod
+    async def generate_content_async(self, prompt: str) -> Result[str]:
+        """
+        Generates content based on a prompt asynchronously.
+        For providers that don't support native async, this can wrap the sync method.
+        """
+        pass
+
 
 class IOCRProvider(ABC):
     """Interface for an Optical Character Recognition provider."""
@@ -106,6 +114,16 @@ class ITTSEngine(ABC):
     def generate_audio_data(self, text_to_speak: str) -> Result[bytes]:
         """
         Generates raw audio data from text.
+        Returns:
+            Result[bytes]: Success with audio content or failure with error.
+        """
+        pass
+
+    @abstractmethod
+    async def generate_audio_data_async(self, text_to_speak: str) -> Result[bytes]:
+        """
+        Generates raw audio data from text asynchronously.
+        For engines that don't support native async, this can wrap the sync method.
         Returns:
             Result[bytes]: Success with audio content or failure with error.
         """

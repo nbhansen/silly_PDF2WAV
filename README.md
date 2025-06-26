@@ -33,7 +33,7 @@ pip install -r requirements.txt
 
 ### Configuration
 
-#### Option 1: YAML Configuration (Recommended)
+**YAML Configuration (Required)**
 ```bash
 cp config.example.yaml config.yaml
 # Edit config.yaml with your settings
@@ -55,22 +55,6 @@ text_processing:
   enable_ssml: true
 ```
 
-#### Option 2: Environment Variables (Fallback)
-Create `.env` file:
-```bash
-# Core settings
-TTS_ENGINE=gemini
-GOOGLE_AI_API_KEY=your_key_here    # Required for Gemini TTS
-
-# Voice configuration (Gemini only)
-GEMINI_VOICE_NAME=Kore             # Single voice for all content
-DOCUMENT_TYPE=research_paper       # Content-aware styling
-
-# Text processing
-ENABLE_TEXT_CLEANING=True
-ENABLE_SSML=True
-```
-
 ### Run
 ```bash
 python app.py
@@ -86,15 +70,15 @@ Access at http://127.0.0.1:5000
 
 ## Configuration Details
 
-The application supports both YAML and environment variable configuration:
+The application uses YAML configuration exclusively:
 
 ### Core Settings
-- `tts.engine` / `TTS_ENGINE`: `piper` or `gemini`
-- `secrets.google_ai_api_key` / `GOOGLE_AI_API_KEY`: For Gemini features
-- `tts.gemini.voice_name` / `GEMINI_VOICE_NAME`: Single voice for all TTS (Kore, Charon, Aoede, Leda)
-- `text_processing.document_type` / `DOCUMENT_TYPE`: Content-aware styling (`research_paper`, `literature_review`, `general`)
-- `text_processing.enable_text_cleaning` / `ENABLE_TEXT_CLEANING`: AI text enhancement (default: true)
-- `text_processing.enable_ssml` / `ENABLE_SSML`: Speech markup (default: true)
+- `tts.engine`: `piper` or `gemini`
+- `secrets.google_ai_api_key`: For Gemini features
+- `tts.gemini.voice_name`: Single voice for all TTS (Kore, Charon, Aoede, Leda)
+- `text_processing.document_type`: Content-aware styling (`research_paper`, `literature_review`, `general`)
+- `text_processing.enable_text_cleaning`: AI text enhancement (default: true)
+- `text_processing.enable_ssml`: Speech markup (default: true)
 
 ### Voice System
 - **Gemini TTS**: Uses single voice with intelligent content styling

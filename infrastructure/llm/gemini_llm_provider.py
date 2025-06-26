@@ -1,4 +1,6 @@
 # infrastructure/llm/gemini_llm_provider.py - Updated for unified google-genai SDK
+import asyncio
+import concurrent.futures
 from google import genai
 from google.genai import types
 from domain.interfaces import ILLMProvider
@@ -8,10 +10,25 @@ from domain.errors import Result, llm_provider_error
 class GeminiLLMProvider(ILLMProvider):
     """Implementation of ILLMProvider using the unified Google Gen AI SDK"""
 
-    def __init__(self, api_key: str, model_name: str):
+    def __init__(
+        self, 
+        api_key: str, 
+        model_name: str,
+        min_request_interval: float = 0.5,
+        max_concurrent_requests: int = 3,
+        requests_per_minute: int = 120
+    ):
         self.api_key = api_key
         self.model_name = model_name
         self.client = self._init_client()
+        
+        # Rate limiting parameters for text cleaning
+        self.min_request_interval = min_request_interval
+        self.max_concurrent_requests = max_concurrent_requests 
+        self.requests_per_minute = requests_per_minute
+        self.request_semaphore = asyncio.Semaphore(self.max_concurrent_requests)
+        
+        print(f"🚀 GeminiLLMProvider: Optimized text cleaning - {requests_per_minute} RPM, {min_request_interval}s intervals, {max_concurrent_requests} concurrent")
 
     def _init_client(self):
         """Initialize the unified Gemini client"""
@@ -53,3 +70,28 @@ class GeminiLLMProvider(ILLMProvider):
 
         except Exception as e:
             return Result.failure(llm_provider_error(f"Content generation failed: {str(e)}"))
+
+    async def generate_content_async(self, prompt: str) -> Result[str]:
+        """Asynchronously generates content with rate limiting"""
+        if not self.client:
+            return Result.failure(llm_provider_error("Client not available - missing API key or initialization error"))
+
+        try:
+            # Apply rate limiting with semaphore
+            async with self.request_semaphore:
+                # Use thread pool for blocking API call
+                loop = asyncio.get_event_loop()
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    result = await loop.run_in_executor(
+                        executor,
+                        self.generate_content,
+                        prompt
+                    )
+                
+                # Add rate limiting delay
+                await asyncio.sleep(self.min_request_interval)
+                
+                return result
+        
+        except Exception as e:
+            return Result.failure(llm_provider_error(f"Async content generation failed: {str(e)}"))

@@ -15,6 +15,15 @@ from domain.errors import Result
 from application.config.system_config import SystemConfig, TTSEngine
 
 
+def create_test_config(tts_engine: str = 'piper') -> SystemConfig:
+    """Create a minimal SystemConfig for testing"""
+    return SystemConfig(
+        tts_engine=TTSEngine(tts_engine),
+        llm_model_name="test-llm-model",
+        gemini_model_name="test-gemini-model"
+    )
+
+
 class TestAudioEngine:
     """Test the consolidated AudioEngine"""
     
@@ -234,11 +243,7 @@ class TestServiceContainer:
     
     def test_service_container_creation(self):
         """ServiceContainer should be creatable with SystemConfig"""
-        # Create a minimal config for testing
-        import os
-        os.environ['TTS_ENGINE'] = 'piper'  # Set to avoid needing API key
-        
-        config = SystemConfig.from_env()
+        config = create_test_config('piper')
         container = ServiceContainer(config)
         
         assert container.config == config
@@ -246,7 +251,7 @@ class TestServiceContainer:
     
     def test_service_container_registration_and_retrieval(self):
         """ServiceContainer should register and retrieve services correctly"""
-        config = SystemConfig.from_env()
+        config = create_test_config('piper')
         container = ServiceContainer(config)
         
         # Register a test service
@@ -259,7 +264,7 @@ class TestServiceContainer:
     
     def test_service_container_singleton_behavior(self):
         """ServiceContainer should return same instance for repeated calls"""
-        config = SystemConfig.from_env()
+        config = create_test_config('piper')
         container = ServiceContainer(config)
         
         # Register a service that creates new instances
@@ -280,10 +285,7 @@ class TestServiceContainer:
     
     def test_service_container_text_pipeline_registration(self):
         """ServiceContainer should register TextPipeline correctly"""
-        import os
-        os.environ['TTS_ENGINE'] = 'piper'
-        
-        config = SystemConfig.from_env()
+        config = create_test_config('piper')
         container = ServiceContainer(config)
         
         # Should be able to get text pipeline

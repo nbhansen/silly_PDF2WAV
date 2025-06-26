@@ -43,7 +43,14 @@ tts:
     # TTS-specific model (has -tts suffix, different from LLM model)
     model_name: "gemini-2.5-pro-preview-tts"
     voice_name: "Kore"  # Options: Kore, Charon, Aoede, Leda
-    min_request_interval: 2.0  # Seconds between requests
+    
+    # Rate limiting optimized for Gemini TTS limits (10 RPM)
+    min_request_interval: 6.5  # Seconds between requests (optimized for 10 RPM)
+    max_concurrent_requests: 2  # Optimal concurrency for rate limits
+    requests_per_minute: 10  # Official Gemini TTS rate limit
+    chunk_size_multiplier: 2.0  # Increase chunk sizes for efficiency
+    
+    # Advanced timing settings  
     use_measurement_mode: false  # Precise timing (slower)
     measurement_mode_interval: 0.8
 
@@ -71,15 +78,15 @@ text_processing:
   # Text processing chunk sizes
   chunk_size: 4000
   llm_max_chunk_size: 100000
-  audio_target_chunk_size: 2000
-  audio_max_chunk_size: 3000
+  audio_target_chunk_size: 4000  # Increased for Gemini efficiency (fewer requests)
+  audio_max_chunk_size: 6000  # Increased for Gemini efficiency
 
 # =================================================================
 # PERFORMANCE SETTINGS
 # =================================================================
 performance:
   enable_async_audio: true
-  max_concurrent_tts_requests: 3
+  max_concurrent_tts_requests: 2  # Optimized for Gemini 10 RPM limits
   max_concurrent_requests: 4
 
 # =================================================================

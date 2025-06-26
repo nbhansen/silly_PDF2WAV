@@ -20,6 +20,11 @@ class ITextPipeline(ABC):
         pass
     
     @abstractmethod
+    async def clean_text_async(self, raw_text: str) -> str:
+        """Clean and prepare text for TTS asynchronously with rate limiting"""
+        pass
+    
+    @abstractmethod
     def enhance_with_ssml(self, text: str) -> str:
         """Add SSML enhancements to text"""
         pass
@@ -80,6 +85,34 @@ class TextPipeline(ITextPipeline):
             
         except Exception as e:
             print(f"TextPipeline: LLM cleaning failed: {e}")
+            return self._basic_text_cleanup(raw_text)
+    
+    async def clean_text_async(self, raw_text: str) -> str:
+        """Clean and prepare text for TTS processing asynchronously"""
+        if not self.enable_cleaning or not self.llm_provider:
+            return self._basic_text_cleanup(raw_text)
+        
+        # Check if async method is available
+        if not hasattr(self.llm_provider, 'generate_content_async'):
+            print("TextPipeline: Async cleaning not available, using sync method")
+            return self.clean_text(raw_text)
+        
+        try:
+            # Use async LLM for advanced cleaning with rate limiting
+            cleaning_prompt = self._generate_cleaning_prompt(raw_text)
+            result = await self.llm_provider.generate_content_async(cleaning_prompt)
+            
+            if result.is_success:
+                cleaned = result.value
+                # Basic validation of LLM output
+                if cleaned and len(cleaned) > len(raw_text) * 0.3:  # At least 30% of original length
+                    return self._basic_text_cleanup(cleaned)
+            
+            # Fallback to basic cleaning if LLM fails
+            return self._basic_text_cleanup(raw_text)
+            
+        except Exception as e:
+            print(f"TextPipeline: Async LLM cleaning failed: {e}")
             return self._basic_text_cleanup(raw_text)
     
     def enhance_with_ssml(self, text: str) -> str:

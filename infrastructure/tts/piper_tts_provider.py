@@ -137,6 +137,24 @@ if PIPER_AVAILABLE:
                 print(f"PiperTTSProvider ERROR: {error_msg}")
                 return Result.failure(tts_engine_error(error_msg))
 
+        async def generate_audio_data_async(self, text_to_speak: str) -> Result[bytes]:
+            """
+            Async wrapper for Piper TTS - calls sync method in thread pool.
+            Piper is a local engine and doesn't have native async support.
+            """
+            import asyncio
+            import concurrent.futures
+            
+            # Run the sync method in a thread pool to avoid blocking
+            loop = asyncio.get_event_loop()
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                result = await loop.run_in_executor(
+                    executor,
+                    self.generate_audio_data,
+                    text_to_speak
+                )
+            return result
+
         def get_output_format(self) -> str:
             return self.output_format
 
@@ -320,6 +338,10 @@ else:
             print("Install with: pip install piper-tts")
 
         def generate_audio_data(self, text_to_speak: str) -> Result[bytes]:
+            return Result.failure(tts_engine_error("PiperTTSProvider: Piper TTS not available"))
+
+        async def generate_audio_data_async(self, text_to_speak: str) -> Result[bytes]:
+            """Async version of generate_audio_data - same failure result"""
             return Result.failure(tts_engine_error("PiperTTSProvider: Piper TTS not available"))
 
         def get_output_format(self) -> str:

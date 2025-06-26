@@ -1,27 +1,22 @@
-# app.py - Lean main entry point (refactored from 739 lines)
+# app.py - Lean main entry point
 import os
 import signal
 import sys
 import atexit
 from typing import Optional
-from dotenv import load_dotenv
 
 from app_factory import create_app
 from domain.factories.service_factory import create_pdf_service_from_env
 from application.config.system_config import SystemConfig
 from infrastructure.file.cleanup_scheduler import FileCleanupScheduler
 
-# Load environment variables as fallback
-load_dotenv()
 
 # Initialize configuration - prefer YAML, fallback to env vars
 try:
     app_config = SystemConfig.from_yaml()
     print("✅ Loaded configuration from config.yaml")
 except FileNotFoundError:
-    print("⚠️  config.yaml not found, falling back to environment variables")
-    print("   Copy config.example.yaml to config.yaml for better configuration management")
-    app_config = SystemConfig.from_env()
+    print("⚠️  config.yaml not found, copy config.example.yaml to config.yaml and edit that")
 
 # Create Flask app with our config
 app = create_app(app_config)

@@ -69,13 +69,8 @@ def _get_user_friendly_error_message(error: 'ApplicationError') -> str:
         return error.message
 
 
-def _get_retry_suggestion(error: 'ApplicationError', config: 'SystemConfig' = None) -> str:
+def _get_retry_suggestion(error: 'ApplicationError', config: 'SystemConfig') -> str:
     """Get retry suggestion based on error type"""
-    if config is None:
-        # Fallback - should be avoided in production
-        from application.config.system_config import SystemConfig
-        config = SystemConfig.from_env()
-    
     if error.retryable:
         if error.code in [ErrorCode.TTS_ENGINE_ERROR, ErrorCode.AUDIO_GENERATION_FAILED]:
             return "Please try again in a few moments. If the problem persists, the text-to-speech service might be temporarily unavailable."
@@ -92,7 +87,7 @@ def _get_retry_suggestion(error: 'ApplicationError', config: 'SystemConfig' = No
         if error.code == ErrorCode.TEXT_EXTRACTION_FAILED:
             return "Try a different PDF file, or ensure the PDF is not password-protected or image-only."
         elif error.code == ErrorCode.FILE_SIZE_ERROR:
-            return f"Please use a smaller PDF file (maximum {app_config.max_file_size_mb}MB)."
+            return f"Please use a smaller PDF file (maximum {config.max_file_size_mb}MB)."
         elif error.code == ErrorCode.INVALID_PAGE_RANGE:
             return "Please check the page numbers and try again."
 

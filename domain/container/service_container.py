@@ -148,8 +148,6 @@ class ServiceContainer(IServiceContainer):
             )
 
 
-def create_service_container(config: SystemConfig = None) -> ServiceContainer:
+def create_service_container(config: SystemConfig) -> ServiceContainer:
     """Factory function to create configured service container"""
-    if config is None:
-        config = SystemConfig.from_env()
     return ServiceContainer(config)

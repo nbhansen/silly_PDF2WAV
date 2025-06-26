@@ -2,6 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Overriding objective
+NEVER EVER FOR THE LOVE OF GOD FUCKING INSERT HARDCODES ANYWHERE, NOT EVEN AS FALLBACKS, IT GETS THE INFO FROM THE YAML CONFIG FILE ONLY.
+
 ## Project Overview
 
 A Flask web application that converts PDF documents to audio files using multiple TTS engines (Text-to-Speech). The application extracts text from PDFs, cleans it using LLM services, applies academic SSML enhancements, and generates synchronized audio with optional read-along functionality.
@@ -42,16 +45,16 @@ The project uses a **hybrid testing approach** combining comprehensive TDD cover
 #### Quick Commands (Most Common)
 ```bash
 # TDD Development Workflow
-./test-tdd.sh                    # All 201 TDD tests
+./test-tdd.sh                    # All 160 TDD tests
 ./test-tdd.sh fast               # TDD tests with fast failure
 ./test-commit.sh                 # Pre-commit validation
 
 # Enhanced Test Runner
-python run_tests.py tdd          # All TDD tests (201 tests)
+python run_tests.py tdd          # All TDD tests (160 tests)
 python run_tests.py commit       # Pre-commit validation
 python run_tests.py models       # Domain models (47 tests)
 python run_tests.py pipeline     # Text processing (47 tests)
-python run_tests.py config       # Configuration (63 tests)
+python run_tests.py config       # Configuration (21 tests)
 python run_tests.py errors       # Error handling (44 tests)
 ```
 
@@ -75,10 +78,10 @@ python run_tests.py coverage     # Full coverage report
 - **Component work**: `python run_tests.py models|pipeline|config|errors`
 - **Integration testing**: `python run_tests.py integration`
 
-#### TDD Test Coverage (201 Tests)
+#### TDD Test Coverage (160 Tests)
 - **Domain Models**: 47 tests - Data integrity and immutability
 - **Text Processing Pipeline**: 47 tests - Pure text processing logic  
-- **System Configuration**: 63 tests - YAML and environment parsing, validation
+- **System Configuration**: 21 tests - YAML parsing and validation only
 - **Error Handling System**: 44 tests - Structured error management
 
 ### Environment Setup
@@ -93,7 +96,7 @@ pip install -r requirements.txt
 
 ## Configuration System
 
-All configuration is managed through `application/config/system_config.py` using YAML configuration files or environment variables:
+All configuration is managed through `application/config/system_config.py` using YAML configuration files ONLY
 
 ### Configuration Methods
 
@@ -104,10 +107,6 @@ All configuration is managed through `application/config/system_config.py` using
    python app.py  # Automatically loads from config.yaml
    ```
 
-2. **Environment Variables (Fallback)**
-   - Used when `config.yaml` is not present
-   - Useful for containerized deployments
-   - All settings can still be configured via env vars
 
 ### Core Settings
 - `tts.engine`: `piper` (local) or `gemini` (cloud)
@@ -128,9 +127,8 @@ All configuration is managed through `application/config/system_config.py` using
 - `files.cleanup.max_disk_usage_mb`: Disk usage limit (default: 500)
 
 ### Configuration Loading
-- `SystemConfig.from_yaml()`: Loads from YAML file with type validation
-- `SystemConfig.from_env()`: Loads from environment variables
-- Both methods validate configuration and fail fast with clear error messages
+- `SystemConfig.from_yaml()`: Loads from YAML file with type validation and validation
+- Configuration fails fast with clear error messages if invalid or missing
 
 See `config.example.yaml` for a complete configuration template with all available options.
 

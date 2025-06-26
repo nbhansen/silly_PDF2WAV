@@ -4,13 +4,9 @@ from flask import Flask
 from application.config.system_config import SystemConfig
 
 
-def create_app(app_config: SystemConfig = None):
+def create_app(app_config: SystemConfig):
     """Create and configure Flask application"""
     app = Flask(__name__)
-    
-    # Load configuration if not provided
-    if app_config is None:
-        app_config = SystemConfig.from_env()
     
     # Configure Flask app
     app.config['UPLOAD_FOLDER'] = app_config.upload_folder
