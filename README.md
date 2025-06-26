@@ -29,7 +29,9 @@ The application follows **Clean Architecture** principles with clear separation 
 - **Service Orchestration**: High-level application workflows
 
 ### Infrastructure Layer (`infrastructure/`)
-- **External Services**: TTS engines, LLM providers, OCR, file management
+- **TTS Engines**: Gemini TTS (cloud), Piper TTS (local) with shared TextSegmenter utilities
+- **LLM Providers**: Gemini for text cleaning and enhancement
+- **External Services**: OCR (Tesseract), file management, cleanup scheduling
 - **Service Adapters**: Clean interfaces to external dependencies
 
 ### Web Layer
@@ -69,7 +71,7 @@ Key settings in `config.yaml`:
 tts:
   engine: "gemini"              # or "piper" for local TTS
   gemini:
-    voice_name: "Kore"          # Options: Kore, Charon, Aoede, Leda
+    voice_name: "Kore"          # Single voice: Kore, Charon, Aoede, Leda
     model_name: "gemini-2.5-pro-preview-tts"  # Gemini TTS model
 
 llm:
@@ -79,9 +81,8 @@ secrets:
   google_ai_api_key: ""         # Your API key here (required for Gemini)
 
 text_processing:
-  document_type: "research_paper"  # or "literature_review", "general"
-  enable_text_cleaning: true
-  enable_ssml: true
+  enable_text_cleaning: true    # LLM-based text enhancement
+  enable_ssml: true             # Academic SSML improvements
   
 audio:
   target_chunk_size: 2000       # Characters per audio chunk
@@ -94,17 +95,48 @@ python app.py
 ```
 Access at http://127.0.0.1:5000
 
+## 🎯 Recent Architecture Improvements
+
+### TTS Engine Simplification (v2.0)
+- **Removed over-engineered persona switching**: Eliminated artificial voice style changes for more natural speech
+- **Simplified to single voice delivery**: Consistent voice throughout entire document
+- **Minimal shared services architecture**: TextSegmenter provides universal text processing while keeping engine-specific logic separate
+- **Reduced complexity**: Gemini TTS provider simplified from 529 → 352 lines (-33%)
+- **Improved maintainability**: Clear separation between shared utilities and engine-specific features
+- **Future-ready**: Easy to add new TTS engines (ElevenLabs) using the same TextSegmenter foundation
+
 ## 🎯 TTS Engines
 
 | Engine | Speed | Cost | API Required | Voice Configuration |
 |--------|-------|------|--------------|--------------------|
 | **Piper** | Fast | Free | No | Model-based (e.g., en_US-lessac-high) |
-| **Gemini** | Slower | Paid | Yes | Single voice with content-aware styling |
+| **Gemini** | Slower | Paid | Yes | Single consistent voice (e.g., Kore, Charon) |
 
 ### Engine Selection
 - **Development/Testing**: Use Piper for fast, free processing
-- **Production/Quality**: Use Gemini for superior voice quality and SSML support
+- **Production/Quality**: Use Gemini for superior voice quality and natural speech
 - **Hybrid**: Configure both and switch based on requirements
+
+### TTS Architecture - Minimal Shared Services
+
+The TTS system uses a **minimal shared services** approach optimized for different engine capabilities:
+
+#### Universal Components
+- **TextSegmenter** (`infrastructure/tts/text_segmenter.py`): Shared text processing utilities
+  - Sentence splitting with abbreviation handling
+  - Duration calculation with punctuation timing
+  - Text cleaning and chunking
+  - Works with all TTS engines (Piper, Gemini, future ElevenLabs)
+
+#### Engine-Specific Components
+- **Gemini TTS**: Cloud API with rate limiting, PCM→WAV conversion, async processing
+- **Piper TTS**: Local processing, direct WAV output, synchronous operation
+- **Future engines**: Can reuse TextSegmenter + add engine-specific logic
+
+#### Benefits
+- **Shared utilities** prevent code duplication for universal text processing
+- **Engine-specific logic** stays separate (SSML support, rate limiting, audio formats)
+- **Easy to extend** - new engines just need TextSegmenter + their specific requirements
 
 ## ⚙️ Configuration Architecture
 
@@ -120,7 +152,7 @@ The application uses a robust YAML-based configuration system with validation:
 - `secrets.google_ai_api_key`: For Gemini features
 - `llm.model_name`: Separate LLM model for text cleaning
 - `tts.gemini.model_name`: Dedicated TTS model (distinct from LLM)
-- `text_processing.document_type`: Content-aware styling
+- `tts.gemini.voice_name`: Single consistent voice for entire document
 - `audio.target_chunk_size`: Optimal chunk size for processing
 
 ## 🧪 Testing
@@ -192,6 +224,9 @@ domain/
 - **Clean Dependencies**: No circular imports, proper TYPE_CHECKING
 - **Robust Validation**: Domain models validate themselves
 - **Separation of Concerns**: Clear distinction between TTS and LLM models
+- **Simplified TTS**: Removed over-engineered persona switching for natural speech
+- **Shared Utilities**: TextSegmenter provides universal text processing for all TTS engines
+- **Minimal Shared Services**: Balance between code reuse and engine-specific flexibility
 
 ## Admin Endpoints
 

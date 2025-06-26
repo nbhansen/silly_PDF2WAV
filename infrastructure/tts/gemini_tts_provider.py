@@ -1,11 +1,9 @@
 # infrastructure/tts/gemini_tts_provider.py
 """
-Enhanced Gemini TTS provider with audiobook-quality features
+Simplified Gemini TTS provider with consistent voice delivery
 """
 from typing import List, Tuple, Optional, Dict
 import re
-import json
-import os
 import time
 import wave
 import struct
@@ -17,44 +15,19 @@ from google.genai import types
 from domain.interfaces import ITTSEngine, ITimestampedTTSEngine
 from domain.models import TextSegment
 from domain.errors import Result, tts_engine_error
+from .text_segmenter import TextSegmenter
 
 
 class GeminiTTSProvider(ITimestampedTTSEngine):
     """
-    Enhanced Gemini 2.5 TTS with audiobook features:
-    - Multiple voice personas for different content types
-    - Advanced timing estimation
-    - Natural language style control
+    Simplified Gemini 2.5 TTS provider with consistent voice delivery
     """
-
-    # Content-aware styling for different document types
-    DOCUMENT_STYLES = {
-        "research_paper": {
-            "narrator": "clearly and informatively",
-            "technical": "precisely and methodically", 
-            "emphasis": "with clear emphasis",
-            "dialogue": "naturally"
-        },
-        "literature_review": {
-            "narrator": "thoughtfully and analytically",
-            "technical": "carefully and systematically",
-            "emphasis": "with scholarly emphasis", 
-            "dialogue": "conversationally"
-        },
-        "general": {
-            "narrator": "naturally and clearly",
-            "technical": "clearly and slowly",
-            "emphasis": "with emphasis",
-            "dialogue": "conversationally"
-        }
-    }
 
     def __init__(
         self, 
         model_name: str, 
         api_key: str,
         voice_name: str,
-        document_type: str,
         min_request_interval: float,
         max_concurrent_requests: int,
         requests_per_minute: int
@@ -64,35 +37,21 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
 
         self.client = genai.Client(api_key=api_key)
         self.model_name = model_name
-        self.configured_voice = voice_name  # Voice from environment config
-        self.document_type = document_type  # Content type for styling
-        
-        # Content-aware style mappings (single voice, different styles)
-        self.content_styles = self._get_content_styles_for_document_type(document_type)
+        self.configured_voice = voice_name
 
-        # Advanced timing estimation parameters
-        self.base_wpm = 155  # Audiobook standard
-        self.punctuation_pauses = {
-            '.': 0.4, '!': 0.4, '?': 0.4,
-            ',': 0.2, ';': 0.3, ':': 0.3,
-            '—': 0.3, '...': 0.6
-        }
+        # Shared text processing utilities
+        self.text_segmenter = TextSegmenter(base_wpm=155)
         
-        # Optimized rate limiting parameters
-        self.min_request_interval = min_request_interval  # Config-driven rate limiting
-        self.max_concurrent_segments = max_concurrent_requests  # Config-driven concurrency
-        self.requests_per_minute = requests_per_minute  # Official rate limit
+        # Gemini-specific rate limiting parameters
+        self.min_request_interval = min_request_interval
+        self.max_concurrent_segments = max_concurrent_requests
+        self.requests_per_minute = requests_per_minute
         self.segment_semaphore = asyncio.Semaphore(self.max_concurrent_segments)
-
-    def _get_content_styles_for_document_type(self, document_type: str) -> Dict[str, str]:
-        """Get content styles based on document type"""
-        styles = self.DOCUMENT_STYLES.get(document_type, self.DOCUMENT_STYLES["general"])
-        return styles
 
     def generate_audio_data(self, text_to_speak: str) -> Result[bytes]:
         """Generate standard audio"""
         try:
-            audio_data = self._generate_with_content_style(text_to_speak, "narrator")
+            audio_data = self._generate_audio(text_to_speak)
             if not audio_data:
                 return Result.failure(tts_engine_error("No audio data generated"))
             return Result.success(audio_data)
@@ -100,24 +59,18 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
             return Result.failure(tts_engine_error(f"Audio generation failed: {str(e)}"))
 
     async def generate_audio_data_async(self, text_to_speak: str) -> Result[bytes]:
-        """Generate audio data asynchronously using internal async infrastructure"""
+        """Generate audio data asynchronously"""
         try:
-            # Use the async segment processing for a single chunk
-            # This leverages our existing async infrastructure 
-            segments = [{'text': text_to_speak, 'content_type': 'narrator', 'type': 'narrative'}]
-            
-            # Create a single async task for this text
             async with self.segment_semaphore:
                 loop = asyncio.get_event_loop()
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     audio_data = await loop.run_in_executor(
                         executor,
-                        self._generate_with_content_style,
-                        text_to_speak,
-                        "narrator"
+                        self._generate_audio,
+                        text_to_speak
                     )
                 
-                # Add rate limiting delay based on configuration
+                # Add rate limiting delay
                 await asyncio.sleep(self.min_request_interval)
                 
                 if not audio_data:
@@ -129,11 +82,11 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
 
     def generate_audio_with_timestamps(self, text_to_speak: str) -> Result[Tuple[bytes, List[TextSegment]]]:
         """
-        Generate audio with intelligent content-aware processing using async segment processing
+        Generate audio with simple sentence-based segmentation
         """
         try:
-            # Analyze content and split into segments with appropriate personas
-            segments = self._analyze_and_segment_content(text_to_speak)
+            # Simple sentence segmentation - no persona switching
+            segments = self._split_into_segments(text_to_speak)
 
             # Generate audio for segments concurrently using asyncio
             loop = asyncio.new_event_loop()
@@ -183,18 +136,15 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
             if not audio_data:
                 raise Exception(f"Failed to generate audio for segment: {seg_data['text'][:50]}...")
             
-            duration = self._calculate_precise_duration(
-                seg_data['text'],
-                seg_data['content_type']
-            )
+            duration = self.text_segmenter.calculate_duration(seg_data['text'])
             
             audio_chunks.append(audio_data)
             
             timing_segments.append(TextSegment(
-                text=self._clean_for_display(seg_data['text']),
+                text=seg_data['text'],
                 start_time=current_time,
                 duration=duration,
-                segment_type=seg_data['type'],
+                segment_type='narrative',
                 chunk_index=0,
                 sentence_index=i
             ))
@@ -213,9 +163,8 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 audio_data = await loop.run_in_executor(
                     executor,
-                    self._generate_with_content_style,
-                    seg_data['text'],
-                    seg_data['content_type']
+                    self._generate_audio,
+                    seg_data['text']
                 )
             
             # Add rate limiting delay based on configuration  
@@ -223,23 +172,11 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
             
             return audio_data, seg_data
 
-    def _generate_with_content_style(self, text: str, content_type: str) -> bytes:
-        """Generate audio with content-aware styling using single voice"""
-        style = self.content_styles.get(content_type, self.content_styles["narrator"])
-        
-        # Enhance text with natural language style using configured voice
-        styled_text = f"Say {style}: {text}"
-        
-        # Use configured voice for all content
-        voice_config = {
-            "voice": self.configured_voice,
-            "style": style,
-            "rate": "medium"  # Consistent rate for single voice
-        }
+    def _generate_audio(self, text: str) -> bytes:
+        """Generate audio with consistent voice - no style switching"""
+        return self._generate_with_retry(text)
 
-        return self._generate_with_retry(styled_text, voice_config)
-
-    def _generate_with_retry(self, styled_text: str, voice_config: dict, max_retries: int = 3) -> bytes:
+    def _generate_with_retry(self, text: str, max_retries: int = 3) -> bytes:
         """Generate audio with exponential backoff retry logic"""
         import time
         
@@ -247,13 +184,13 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
             try:
                 response = self.client.models.generate_content(
                     model=self.model_name,
-                    contents=styled_text,
+                    contents=text,
                     config=types.GenerateContentConfig(
                         response_modalities=["AUDIO"],
                         speech_config=types.SpeechConfig(
                             voice_config=types.VoiceConfig(
                                 prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                                    voice_name=voice_config['voice']
+                                    voice_name=self.configured_voice
                                 )
                             )
                         )
@@ -296,132 +233,19 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
         return None
 
 
-    def _analyze_and_segment_content(self, text: str) -> List[Dict]:
-        """
-        Intelligently segment content and assign voice personas
-        """
+    def _split_into_segments(self, text: str) -> List[Dict]:
+        """Simple sentence-based segmentation using shared utilities"""
         segments = []
-
-        # Split into sentences first
-        sentences = self._split_into_sentences(text)
-
+        sentences = self.text_segmenter.split_into_sentences(text)
+        
         for sentence in sentences:
-            # Determine content type and appropriate persona
-            if self._is_technical_content(sentence):
-                content_type = "technical"
-                seg_type = "technical"
-            elif self._is_emphasis_needed(sentence):
-                content_type = "emphasis"
-                seg_type = "emphasis"
-            elif self._is_dialogue(sentence):
-                content_type = "dialogue"
-                seg_type = "dialogue"
-            else:
-                content_type = "narrator"
-                seg_type = "narrative"
-
             segments.append({
                 'text': sentence,
-                'content_type': content_type,
-                'type': seg_type
+                'content_type': 'narrative',
+                'type': 'narrative'
             })
-
+        
         return segments
-
-    def _calculate_precise_duration(self, text: str, content_type: str) -> float:
-        """
-        Calculate duration with content-type adjustments using single voice
-        """
-        # Clean text for word counting
-        clean_text = re.sub(r'<[^>]+>', '', text)
-        words = clean_text.split()
-        word_count = len(words)
-
-        # Consistent rate for single voice with slight content adjustments
-        rate_adjustment = {
-            "technical": 1.1,    # Slightly slower for technical content
-            "emphasis": 1.05,    # Slightly slower for emphasis
-            "dialogue": 1.0,     # Normal rate for dialogue
-            "narrator": 1.0      # Normal rate for narrative
-        }.get(content_type, 1.0)
-
-        # Calculate base duration
-        base_duration = (word_count / self.base_wpm) * 60 * rate_adjustment
-
-        # Add punctuation pauses
-        pause_time = 0.0
-        for punct, pause in self.punctuation_pauses.items():
-            pause_time += text.count(punct) * pause
-
-        # Add complexity adjustments
-        complexity_bonus = 0.0
-
-        # Technical terms (words with numbers, capitals, long words)
-        technical_pattern = r'\b(?:[A-Z]{2,}|\w*\d\w*|\w{10,})\b'
-        technical_matches = re.findall(technical_pattern, clean_text)
-        complexity_bonus += len(technical_matches) * 0.2
-
-        # Parenthetical content
-        paren_content = re.findall(r'\([^)]+\)', text)
-        complexity_bonus += len(paren_content) * 0.3
-
-        total_duration = base_duration + pause_time + complexity_bonus
-
-        # Ensure minimum duration
-        return max(total_duration, 0.5)
-
-    def _is_technical_content(self, text: str) -> bool:
-        """Detect technical content requiring slower, clearer delivery"""
-        technical_indicators = [
-            r'\b(?:equation|formula|algorithm|theorem|proof)\b',
-            r'\b[A-Z]{3,}\b',  # Acronyms
-            r'\b\d+\.?\d*\s*(?:percent|%|Hz|kHz|MHz|GB|MB)\b',
-            r'(?:=|<|>|≤|≥|±)',  # Mathematical operators
-            r'\bF\(\d+,\s*\d+\)',  # Statistics
-        ]
-
-        for pattern in technical_indicators:
-            if re.search(pattern, text, re.IGNORECASE):
-                return True
-        return False
-
-    def _is_emphasis_needed(self, text: str) -> bool:
-        """Detect content needing emphasis"""
-        emphasis_indicators = [
-            r'\b(?:significant|important|crucial|essential|key|primary)\b',
-            r'\b(?:however|therefore|consequently|nevertheless)\b',
-            r'\b(?:conclusion|summary|finding|result)\b',
-        ]
-
-        for pattern in emphasis_indicators:
-            if re.search(pattern, text, re.IGNORECASE):
-                return True
-        return False
-
-    def _is_dialogue(self, text: str) -> bool:
-        """Detect dialogue or quoted content"""
-        return bool(re.search(r'[""].*[""]', text))
-
-    def _split_into_sentences(self, text: str) -> List[str]:
-        """Smart sentence splitting preserving context"""
-        # Don't split on abbreviations
-        text = re.sub(r'\b(?:Dr|Mr|Mrs|Ms|Prof|Sr|Jr)\.\s*', r'\g<0>@@@', text)
-
-        # Split on sentence boundaries
-        sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
-
-        # Restore abbreviations
-        sentences = [s.replace('@@@', '') for s in sentences]
-
-        return [s.strip() for s in sentences if s.strip()]
-
-    def _clean_for_display(self, text: str) -> str:
-        """Clean text for display"""
-        # Remove SSML tags
-        text = re.sub(r'<[^>]+>', '', text)
-        # Remove style instructions
-        text = re.sub(r'^Say \w+:\s*', '', text)
-        return text.strip()
 
     def _convert_to_wav(self, raw_audio_data: bytes) -> bytes:
         """Convert raw audio data from Gemini to proper WAV format"""

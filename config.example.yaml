@@ -42,7 +42,7 @@ tts:
   gemini:
     # TTS-specific model (has -tts suffix, different from LLM model)
     model_name: "gemini-2.5-pro-preview-tts"
-    voice_name: "Kore"  # Options: Kore, Charon, Aoede, Leda
+    voice_name: "Kore"  # Single consistent voice: Kore, Charon, Aoede, Leda
     
     # Rate limiting optimized for Gemini TTS limits (10 RPM)
     min_request_interval: 6.5  # Seconds between requests (optimized for 10 RPM)
@@ -66,7 +66,7 @@ llm:
 # TEXT PROCESSING
 # =================================================================
 text_processing:
-  # Document type affects speech styling and emphasis
+  # Document type (used by text processing pipeline, ignored by TTS for natural speech)
   document_type: "research_paper"  # research_paper, literature_review, general
   
   # Enable LLM-powered text cleaning (requires google_ai_api_key)
@@ -157,4 +157,9 @@ rate_limits:
 #
 # TTS ENGINE COMPARISON:
 # - Piper: Fast, local, no API costs, basic SSML
-# - Gemini: Slower, cloud, API costs, full SSML with timing
+# - Gemini: Slower, cloud, API costs, natural single voice delivery
+#
+# SIMPLIFIED ARCHITECTURE:
+# - Single consistent voice throughout document (no persona switching)
+# - Shared TextSegmenter utilities for universal text processing
+# - Engine-specific optimizations (rate limiting, audio formats)

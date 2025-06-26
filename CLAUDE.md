@@ -35,7 +35,10 @@ pdf_to_audio_app/
 │   ├── models.py        # Domain models with robust validation
 │   └── errors.py        # Structured error handling system
 ├── infrastructure/       # External service implementations
-│   ├── tts/             # Gemini and Piper TTS providers
+│   ├── tts/             # TTS providers with shared utilities
+│   │   ├── text_segmenter.py      # Shared text processing (152 lines)
+│   │   ├── gemini_tts_provider.py # Gemini TTS implementation (352 lines)
+│   │   └── piper_tts_provider.py  # Piper TTS implementation
 │   ├── llm/             # Gemini LLM provider for text cleaning
 │   ├── ocr/             # Tesseract OCR provider
 │   └── file/            # File management and cleanup scheduling
@@ -185,16 +188,64 @@ The modular factory system in `domain/factories/` handles all dependency injecti
 - Configuration: Uses `tts.piper.model_name` (e.g., en_US-lessac-high)
 - Voice: Determined by selected model
 
-### Gemini TTS (Cloud) - Simplified Single Voice System
-- Full SSML support with precise timestamps
-- Requires Google AI API key
-- Rate limiting with intelligent retry logic
-- **Single Voice Configuration**: `tts.gemini.voice_name` used for all content
-- **Content-Aware Styling**: `text_processing.document_type` drives speech patterns
-  - `research_paper`: "precisely and methodically" for technical content
-  - `literature_review`: "thoughtfully and analytically" for narrative
-  - `general`: Natural, conversational styles
-- **No Multi-Voice Complexity**: Removed voice personas JSON system
+### Gemini TTS (Cloud) - Simplified Architecture
+- **Consistent Voice Delivery**: Single voice throughout entire document
+- **Natural Speech**: Removed artificial persona switching for more natural audio
+- **Shared Text Processing**: Uses `TextSegmenter` utility for universal text operations
+- **Rate Limiting**: Intelligent retry logic with exponential backoff
+- **Format Conversion**: Raw PCM data → WAV format conversion
+- **Configuration**: 
+  - `tts.gemini.voice_name`: Single voice for all content (e.g., "Kore", "Charon")
+  - `tts.gemini.model_name`: Gemini TTS model
+  - Rate limiting parameters configurable via YAML
+
+### TTS Architecture - Minimal Shared Services Model
+
+The TTS system uses a **minimal shared services** approach that balances code reuse with engine-specific needs:
+
+#### Shared Components (`infrastructure/tts/text_segmenter.py`)
+Universal text processing that works for all TTS engines:
+- ✅ **Sentence splitting**: Smart boundary detection with abbreviation handling
+- ✅ **Duration calculation**: Word-based timing estimation with punctuation pauses  
+- ✅ **Text cleaning**: Removes problematic characters safely
+- ✅ **Text chunking**: Splits long documents at natural boundaries
+
+#### Engine-Specific Components
+Each TTS engine handles its own specialized requirements:
+
+**Gemini TTS Provider** (`gemini_tts_provider.py` - 352 lines):
+- Gemini API integration and authentication
+- Rate limiting and retry logic (cloud API specific)
+- Raw PCM → WAV conversion (Gemini-specific format) 
+- Audio chunk combination (WAV file merging)
+- Async orchestration with semaphore control
+
+**Piper TTS Provider** (maintains separate implementation):
+- Direct WAV output (no conversion needed)
+- Local processing (no rate limiting needed)
+- Synchronous operation
+- Simple model-based voice selection
+
+#### Benefits of This Architecture
+- **Shared utilities** prevent code duplication for universal text processing
+- **Engine-specific logic** stays separate (SSML, rate limiting, audio formats)
+- **Easy to extend** - new engines like ElevenLabs just need `TextSegmenter` + engine logic
+- **Clean dependencies** - engines depend on `TextSegmenter`, not each other
+- **Testable** - can mock `TextSegmenter` for all engine tests
+
+### Adding New TTS Engines
+When adding engines like ElevenLabs:
+
+```python
+class ElevenLabsTTSProvider(ITimestampedTTSEngine):
+    def __init__(self, ...):
+        self.text_segmenter = TextSegmenter(base_wpm=155)  # Reuse shared utilities
+        # ElevenLabs-specific: API key, voice cloning, emotion controls
+    
+    def _generate_audio(self, text: str) -> bytes:
+        # ElevenLabs-specific: Rich SSML, voice switching, emotions
+        return self._call_elevenlabs_api(text)
+```
 
 ## Text Processing Architecture
 
@@ -309,3 +360,86 @@ Required external tools:
 - **Large Documents**: Automatically chunked and processed concurrently
 - **Memory**: Scales with document size and concurrent processing
 - **Storage**: Temporary files auto-cleaned based on configuration
+
+## 🚀 Next Steps - Phase 2 Architecture Cleanup
+
+### Phase 1 Complete ✅
+**TTS Engine Simplification (Completed)**
+- ✅ Removed over-engineered persona switching from Gemini TTS provider
+- ✅ Simplified from 529 → 352 lines (-33% complexity reduction)
+- ✅ Implemented minimal shared services architecture with TextSegmenter
+- ✅ Single consistent voice delivery throughout documents
+- ✅ Maintained engine-specific optimizations (rate limiting, audio formats)
+- ✅ Updated documentation (README.md, CLAUDE.md) and YAML configurations
+
+### Phase 2 - System-Wide Complexity Removal (Planned)
+
+**Objective**: Complete the architectural simplification by removing document_type complexity throughout the entire system.
+
+#### Files Requiring Cleanup:
+
+**1. Configuration System**
+- `application/config/system_config.py` 
+  - Remove document_type validation logic (lines 273-274)
+  - Remove document_type from TextProcessingConfig (line 32)
+  - Simplify configuration creation (line 162)
+
+**2. Text Processing Pipeline**
+- `domain/text/text_pipeline.py`
+  - Remove document-type-specific logic (lines 138, 142, 268)
+  - Simplify to universal academic text processing approach
+  - Make current "research_paper" logic the default behavior
+
+**3. Service Factories**
+- `domain/factories/text_factory.py` - Remove document_type parameter passing (line 35)
+- `domain/factories/tts_factory.py` - Remove document_type parameter (line 26) ✅ *Already done*
+- `domain/container/service_container.py` - Remove document_type passing (lines 93, 144)
+
+**4. Configuration Files**
+- `config.yaml` & `config.example.yaml` - Remove document_type setting
+- Update validation and documentation
+
+#### Implementation Strategy:
+
+**Safe Incremental Approach**
+1. **Pre-cleanup testing**: Run full test suite to establish baseline
+   ```bash
+   ./test-tdd.sh              # All 160 TDD tests  
+   python run_tests.py all    # Full coverage (205 tests)
+   ```
+
+2. **File-by-file cleanup**: One component at a time
+   - Start with configuration system (least risky)
+   - Move to text processing pipeline (moderate risk)
+   - Finish with service factories (interconnected)
+
+3. **Default behavior preservation**: Make current "research_paper" logic universal
+   - Ensures existing functionality is preserved
+   - No behavioral changes for end users
+   - Backward compatibility during transition
+
+4. **Test-driven cleanup**: Run tests after each file modification
+   ```bash
+   ./test-tdd.sh fast         # Quick validation during development
+   ```
+
+#### Benefits of Phase 2:
+
+- **Consistent Simplification**: Uniform architecture across entire system (not just TTS)
+- **Reduced Cognitive Load**: Fewer configuration options and code paths to understand
+- **Lower Maintenance**: Fewer conditional branches to test and debug
+- **Cleaner Dependencies**: Simplified service creation and injection
+- **Universal Text Processing**: Single approach that works well for all document types
+
+#### Timeline:
+- **Recommended**: 1-2 days after Phase 1 has been validated in production
+- **Duration**: 2-3 hours of focused refactoring
+- **Risk Level**: Low (incremental approach with comprehensive testing)
+
+#### Success Criteria:
+- ✅ All tests continue to pass (205/205)
+- ✅ Configuration simplified (no document_type references)
+- ✅ Text processing uses universal academic approach
+- ✅ Service creation simplified (fewer parameters)
+- ✅ Backward compatibility maintained during transition
+- ✅ Documentation updated to reflect simplified architecture
