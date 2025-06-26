@@ -66,9 +66,6 @@ llm:
 # TEXT PROCESSING
 # =================================================================
 text_processing:
-  # Document type (used by text processing pipeline, ignored by TTS for natural speech)
-  document_type: "research_paper"  # research_paper, literature_review, general
-  
   # Enable LLM-powered text cleaning (requires google_ai_api_key)
   enable_text_cleaning: true
   

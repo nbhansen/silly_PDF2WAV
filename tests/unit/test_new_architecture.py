@@ -179,14 +179,12 @@ class TestTextPipeline:
         """TextPipeline should be creatable with minimal configuration"""
         pipeline = TextPipeline(
             enable_cleaning=True,
-            enable_ssml=True,
-            document_type="research_paper"
+            enable_ssml=True
         )
         
         assert isinstance(pipeline, ITextPipeline)
         assert pipeline.enable_cleaning is True
         assert pipeline.enable_ssml is True
-        assert pipeline.document_type == "research_paper"
     
     def test_text_pipeline_basic_cleaning(self):
         """TextPipeline should perform basic text cleanup"""
@@ -228,7 +226,7 @@ class TestTextPipeline:
     
     def test_text_pipeline_ssml_enhancement(self):
         """TextPipeline should add SSML enhancements when enabled"""
-        pipeline = TextPipeline(enable_ssml=True, document_type="research_paper")
+        pipeline = TextPipeline(enable_ssml=True)
         
         text = "Abstract This is important research. The algorithm performs well."
         enhanced = pipeline.enhance_with_ssml(text)

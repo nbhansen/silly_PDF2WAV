@@ -57,7 +57,6 @@ class TestSystemConfigYAMLLoading:
             'text_processing': {
                 'enable_text_cleaning': False,
                 'enable_ssml': False,
-                'document_type': 'literature_review',
                 'chunk_size': 5000
             },
             'files': {
@@ -87,7 +86,6 @@ class TestSystemConfigYAMLLoading:
             # Text processing
             assert config.enable_text_cleaning is False
             assert config.enable_ssml is False
-            assert config.document_type == 'literature_review'
             assert config.chunk_size == 5000
             
             # File settings

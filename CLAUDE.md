@@ -372,74 +372,158 @@ Required external tools:
 - ✅ Maintained engine-specific optimizations (rate limiting, audio formats)
 - ✅ Updated documentation (README.md, CLAUDE.md) and YAML configurations
 
-### Phase 2 - System-Wide Complexity Removal (Planned)
+### Phase 2 - System-Wide Complexity Removal ✅ **COMPLETED**
 
 **Objective**: Complete the architectural simplification by removing document_type complexity throughout the entire system.
 
-#### Files Requiring Cleanup:
+#### ✅ **All Files Successfully Cleaned:**
 
-**1. Configuration System**
-- `application/config/system_config.py` 
-  - Remove document_type validation logic (lines 273-274)
-  - Remove document_type from TextProcessingConfig (line 32)
-  - Simplify configuration creation (line 162)
+**1. Configuration System** ✅
+- `application/config/system_config.py` - Removed document_type validation logic, field, and print statements
+- Simplified configuration creation and validation
+- Removed document_type from TextProcessingConfig class
 
-**2. Text Processing Pipeline**
-- `domain/text/text_pipeline.py`
-  - Remove document-type-specific logic (lines 138, 142, 268)
-  - Simplify to universal academic text processing approach
-  - Make current "research_paper" logic the default behavior
+**2. Text Processing Pipeline** ✅
+- `domain/text/text_pipeline.py` - Made "research_paper" logic universal (no behavioral changes)
+- Universal academic text processing approach now applies to ALL document types
+- Simplified constructor - removed document_type parameter
+- Updated LLM prompt generation to use "universal academic text processing approach"
 
-**3. Service Factories**
-- `domain/factories/text_factory.py` - Remove document_type parameter passing (line 35)
-- `domain/factories/tts_factory.py` - Remove document_type parameter (line 26) ✅ *Already done*
-- `domain/container/service_container.py` - Remove document_type passing (lines 93, 144)
+**3. Service Factories** ✅
+- `domain/factories/text_factory.py` - Removed document_type parameter passing ✅ 
+- `domain/factories/tts_factory.py` - Already completed ✅ 
+- `domain/container/service_container.py` - Removed document_type passing from TextPipeline and GeminiTTSProvider creation
 
-**4. Configuration Files**
-- `config.yaml` & `config.example.yaml` - Remove document_type setting
-- Update validation and documentation
+**4. Configuration Files** ✅
+- `config.yaml` & `config.example.yaml` - Removed document_type setting and comments
+- Cleaned up YAML structure 
 
-#### Implementation Strategy:
+**5. Test Updates** ✅
+- Updated all 204 tests to reflect document_type removal
+- Fixed configuration tests, text pipeline tests, integration tests, and YAML loading tests
+- All tests passing: **204/204** ✅
 
-**Safe Incremental Approach**
-1. **Pre-cleanup testing**: Run full test suite to establish baseline
-   ```bash
-   ./test-tdd.sh              # All 160 TDD tests  
-   python run_tests.py all    # Full coverage (205 tests)
-   ```
+#### ✅ **Implementation Results:**
 
-2. **File-by-file cleanup**: One component at a time
-   - Start with configuration system (least risky)
-   - Move to text processing pipeline (moderate risk)
-   - Finish with service factories (interconnected)
+**Safe Incremental Approach** ✅
+- ✅ Pre-cleanup testing: All 160 TDD tests + 204 total tests passed
+- ✅ File-by-file cleanup: Completed configuration → text pipeline → service factories → config files
+- ✅ Default behavior preservation: Current "research_paper" logic is now universal
+- ✅ Test-driven cleanup: Validated after each component modification
 
-3. **Default behavior preservation**: Make current "research_paper" logic universal
-   - Ensures existing functionality is preserved
-   - No behavioral changes for end users
-   - Backward compatibility during transition
-
-4. **Test-driven cleanup**: Run tests after each file modification
-   ```bash
-   ./test-tdd.sh fast         # Quick validation during development
-   ```
-
-#### Benefits of Phase 2:
-
-- **Consistent Simplification**: Uniform architecture across entire system (not just TTS)
-- **Reduced Cognitive Load**: Fewer configuration options and code paths to understand
-- **Lower Maintenance**: Fewer conditional branches to test and debug
-- **Cleaner Dependencies**: Simplified service creation and injection
-- **Universal Text Processing**: Single approach that works well for all document types
-
-#### Timeline:
-- **Recommended**: 1-2 days after Phase 1 has been validated in production
-- **Duration**: 2-3 hours of focused refactoring
-- **Risk Level**: Low (incremental approach with comprehensive testing)
-
-#### Success Criteria:
-- ✅ All tests continue to pass (205/205)
+#### ✅ **Success Criteria Met:**
+- ✅ All tests continue to pass (204/204) 
 - ✅ Configuration simplified (no document_type references)
 - ✅ Text processing uses universal academic approach
 - ✅ Service creation simplified (fewer parameters)
 - ✅ Backward compatibility maintained during transition
 - ✅ Documentation updated to reflect simplified architecture
+
+### ✅ **Phase 2 Benefits Achieved:**
+
+- **Consistent Simplification**: Uniform architecture across entire system (not just TTS)
+- **Reduced Cognitive Load**: Fewer configuration options and code paths to understand  
+- **Lower Maintenance**: Fewer conditional branches to test and debug
+- **Cleaner Dependencies**: Simplified service creation and injection
+- **Universal Text Processing**: Single approach that works well for all document types
+
+**Timeline**: Completed in ~2 hours with comprehensive testing
+**Risk Level**: Low (incremental approach with comprehensive testing validated)
+**Test Coverage**: 204/204 tests passing (100% success rate)
+
+## 🧹 Phase 3 - Codebase Cleanup and Dead Code Removal
+
+### Objective
+Remove accumulated legacy code, duplicate files, and unused infrastructure to reduce maintenance burden and improve developer experience.
+
+### Priority 1: Remove Legacy/Duplicate Test Files ⭐ **HIGH IMPACT, LOW EFFORT**
+
+**Immediate Actions:**
+1. **Remove `tests/unit/test_domain_models.py`** (183 lines)
+   - Keep `tests/unit/test_domain_models_tdd.py` (615 lines) - comprehensive TDD version
+   - Legacy file contains basic tests that are fully covered by TDD version
+   - **Benefits**: Reduces test maintenance overhead, eliminates confusion about which tests to update
+
+2. **Remove `test_piper.py`** (root-level standalone test file)
+   - Move any unique functionality into proper test structure under `tests/`
+   - **Benefits**: Cleaner root directory, proper test organization
+
+**Validation Steps:**
+- ✅ Verify TDD test file covers all functionality from legacy file
+- ✅ Update test runners/documentation that reference removed files
+- ✅ Run full test suite to ensure no functionality lost
+
+### Priority 2: Remove Dead Code and Infrastructure ⭐ **MEDIUM IMPACT, LOW EFFORT**
+
+**Target Files for Removal:**
+1. **`infrastructure/tts/architecture_example.py`**
+   - Documentation/example code not used in production
+   - Remove to reduce codebase clutter
+
+2. **Review and clean `app_factory.py`**
+   - Check if still needed after architectural simplification
+   - May be redundant with current service factory structure
+
+**Process:**
+- ✅ Confirm files are not referenced in production code
+- ✅ Check for any imports or dependencies
+- ✅ Remove and test full application functionality
+
+### Priority 3: File Structure Optimization ⭐ **MEDIUM IMPACT, MEDIUM EFFORT**
+
+**Consolidation Opportunities:**
+1. **Remove empty `__init__.py` files** where not needed for package structure
+2. **Review configuration redundancy:**
+   - `config/academic_terms_en.json` - verify usage
+   - `config/rate_limits.json` - check if all parameters are used
+3. **Clean up any remaining configuration artifacts** from document_type removal
+
+**Documentation Updates:**
+- Update file structure diagrams in README.md and CLAUDE.md
+- Remove references to deleted files
+- Simplify development setup instructions
+
+### Priority 4: Code Quality Improvements ⭐ **LOW IMPACT, HIGH EFFORT**
+
+**Advanced Cleanup (Future):**
+1. **Remove commented-out code** throughout codebase
+2. **Simplify over-complex abstractions** where Phase 2 revealed opportunities
+3. **Optimize imports and dependencies** - remove unused imports
+4. **Consider consolidating similar utility functions**
+
+### Expected Outcomes
+
+**Immediate Benefits (Priority 1-2):**
+- **Faster test execution**: Eliminate duplicate test coverage
+- **Reduced cognitive load**: Fewer files to understand and maintain
+- **Cleaner development experience**: Clear separation between production and legacy code
+- **Lower maintenance burden**: Single source of truth for domain model tests
+
+**Medium-term Benefits (Priority 3-4):**
+- **Simplified onboarding**: New developers see only relevant, active code
+- **Reduced build/test times**: Fewer files to process
+- **Better code organization**: Clear structure without legacy artifacts
+- **Improved code quality metrics**: Higher signal-to-noise ratio in codebase
+
+### Implementation Strategy
+
+**Phase 3A: Quick Wins (Priority 1-2)**
+- Target completion: 1-2 hours
+- Focus on file removal and immediate cleanup
+- Validate with full test suite after each removal
+
+**Phase 3B: Structural Cleanup (Priority 3)**  
+- Target completion: 2-4 hours
+- Systematic review of file structure and configuration
+- Update documentation to reflect changes
+
+**Phase 3C: Code Quality (Priority 4)**
+- Target completion: As time permits
+- Lower priority, higher effort items
+- Can be done incrementally over time
+
+### Risk Assessment
+- **Low Risk**: File removal with proper validation
+- **Medium Risk**: Structural changes require careful testing
+- **Validation Strategy**: Comprehensive test suite (204 tests) provides safety net
+- **Rollback Plan**: Git history allows easy reversion if issues discovered

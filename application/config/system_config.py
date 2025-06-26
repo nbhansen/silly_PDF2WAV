@@ -29,7 +29,6 @@ class SystemConfig:
     # Processing settings
     enable_text_cleaning: bool = True
     enable_ssml: bool = True
-    document_type: str = "research_paper"  # research_paper, literature_review, general
     enable_async_audio: bool = True
     max_concurrent_requests: int = 4
     chunk_size: int = 20000
@@ -159,7 +158,6 @@ class SystemConfig:
             # Text processing
             enable_text_cleaning=cls._parse_bool_value(get_config('text_processing.enable_text_cleaning', True), True),
             enable_ssml=cls._parse_bool_value(get_config('text_processing.enable_ssml', True), True),
-            document_type=get_config('text_processing.document_type', 'research_paper'),
             chunk_size=cls._parse_int_value(get_config('text_processing.chunk_size', 4000), 4000, min_val=1000, max_val=100000),
             llm_max_chunk_size=cls._parse_int_value(get_config('text_processing.llm_max_chunk_size', 100000), 100000, min_val=1000, max_val=500000),
             audio_target_chunk_size=cls._parse_int_value(get_config('text_processing.audio_target_chunk_size', 2000), 2000, min_val=500, max_val=10000),
@@ -268,11 +266,6 @@ class SystemConfig:
             if not folder_path or folder_path.isspace():
                 raise ValueError(f"{folder_name} cannot be empty or whitespace")
 
-        # Validate document type
-        valid_doc_types = ['research_paper', 'literature_review', 'general']
-        if self.document_type not in valid_doc_types:
-            raise ValueError(f"DOCUMENT_TYPE must be one of: {valid_doc_types}, got: {self.document_type}")
-
         # Validate file management settings
         if self.enable_file_cleanup:
             if self.max_file_age_hours <= 0:
@@ -378,7 +371,6 @@ class SystemConfig:
         print(f"TTS Engine: {self.tts_engine.value}")
         print(f"Text Cleaning: {'Enabled' if self.enable_text_cleaning else 'Disabled'}")
         print(f"SSML Enhancement: {'Enabled' if self.enable_ssml else 'Disabled'}")
-        print(f"Document Type: {self.document_type}")
         print(f"Async Audio: {'Enabled' if self.enable_async_audio else 'Disabled'}")
         print(f"Max Concurrent: {self.max_concurrent_requests}")
         print(f"Upload Folder: {self.upload_folder}")

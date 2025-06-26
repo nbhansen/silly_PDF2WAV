@@ -20,7 +20,6 @@ class TestTextPipelineBasicFunctionality:
         assert pipeline.llm_provider is None
         assert pipeline.enable_cleaning is True
         assert pipeline.enable_ssml is True
-        assert pipeline.document_type == "research_paper"
     
     def test_text_pipeline_creation_with_custom_settings(self):
         """Should create text pipeline with custom configuration"""
@@ -28,14 +27,12 @@ class TestTextPipelineBasicFunctionality:
         pipeline = TextPipeline(
             llm_provider=mock_llm,
             enable_cleaning=False,
-            enable_ssml=False,
-            document_type="literature_review"
+            enable_ssml=False
         )
         
         assert pipeline.llm_provider == mock_llm
         assert pipeline.enable_cleaning is False
         assert pipeline.enable_ssml is False
-        assert pipeline.document_type == "literature_review"
     
     def test_text_pipeline_implements_interface(self):
         """Should properly implement ITextPipeline interface"""
@@ -171,7 +168,7 @@ class TestSSMLEnhancementTDD:
     
     def test_ssml_enhancement_adds_academic_pauses(self):
         """Should add pauses for academic document structure"""
-        pipeline = TextPipeline(enable_ssml=True, document_type="research_paper")
+        pipeline = TextPipeline(enable_ssml=True)
         
         text = "Abstract This is the abstract. Introduction This is the intro."
         result = pipeline.enhance_with_ssml(text)
@@ -182,7 +179,7 @@ class TestSSMLEnhancementTDD:
     
     def test_ssml_enhancement_adds_numbered_section_pauses(self):
         """Should add pauses after numbered sections"""
-        pipeline = TextPipeline(enable_ssml=True, document_type="research_paper")
+        pipeline = TextPipeline(enable_ssml=True)
         
         text = "1. First section content here. 2. Second section follows."
         result = pipeline.enhance_with_ssml(text)
@@ -191,7 +188,7 @@ class TestSSMLEnhancementTDD:
     
     def test_ssml_enhancement_emphasizes_technical_terms(self):
         """Should add emphasis to important technical terms"""
-        pipeline = TextPipeline(enable_ssml=True, document_type="research_paper")
+        pipeline = TextPipeline(enable_ssml=True)
         
         text = "The algorithm shows significant results. However, the method needs improvement."
         result = pipeline.enhance_with_ssml(text)
@@ -228,17 +225,17 @@ class TestSSMLEnhancementTDD:
         assert pipeline.enhance_with_ssml("") == ""
         assert pipeline.enhance_with_ssml("   ") == "   "
     
-    def test_ssml_enhancement_non_research_paper_type(self):
-        """Should handle different document types appropriately"""
-        pipeline = TextPipeline(enable_ssml=True, document_type="general")
+    def test_ssml_enhancement_universal_academic_approach(self):
+        """Should apply universal academic enhancements to all content"""
+        pipeline = TextPipeline(enable_ssml=True)
         
         text = "Abstract This is general content."
         result = pipeline.enhance_with_ssml(text)
         
-        # Should still add basic enhancements but not academic-specific ones
+        # Should add academic enhancements universally 
         assert "Abstract" in result
-        # Should not add academic pauses for general documents
-        # (This might need adjustment based on implementation)
+        # Should add academic pauses for all documents (universal approach)
+        assert '<break time="1s"/>' in result
 
 
 class TestSentenceSplittingTDD:
@@ -410,8 +407,7 @@ class TestTextPipelineIntegrationTDD:
         pipeline = TextPipeline(
             llm_provider=mock_llm,
             enable_cleaning=True,
-            enable_ssml=True,
-            document_type="research_paper"
+            enable_ssml=True
         )
         
         raw_text = "Raw   academic   text about algorithms."
@@ -497,14 +493,14 @@ class TestTextPipelineIntegrationTDD:
 class TestTextPipelinePromptGenerationTDD:
     """TDD tests for LLM prompt generation logic"""
     
-    def test_cleaning_prompt_generation_includes_document_type(self):
-        """Should include document type in cleaning prompts"""
-        pipeline = TextPipeline(document_type="literature_review")
+    def test_cleaning_prompt_generation_uses_universal_approach(self):
+        """Should use universal academic text processing approach in prompts"""
+        pipeline = TextPipeline()
         
         text = "Sample text for cleaning."
         prompt = pipeline._generate_cleaning_prompt(text)
         
-        assert "literature_review" in prompt
+        assert "universal academic text processing approach" in prompt
         assert "Sample text for cleaning." in prompt
     
     def test_cleaning_prompt_generation_limits_text_size(self):
@@ -580,7 +576,7 @@ class TestTextPipelineEdgeCasesTDD:
     
     def test_handles_mixed_case_section_headers(self):
         """Should handle section headers in various cases"""
-        pipeline = TextPipeline(enable_ssml=True, document_type="research_paper")
+        pipeline = TextPipeline(enable_ssml=True)
         
         text = "ABSTRACT This is content. abstract This too. Abstract: Also this."
         result = pipeline.enhance_with_ssml(text)

@@ -52,7 +52,6 @@ class TestSystemConfigCreation:
         assert config.audio_folder == "audio_outputs"
         assert config.enable_text_cleaning is True
         assert config.enable_ssml is True
-        assert config.document_type == "research_paper"
     
     def test_system_config_with_custom_values(self):
         """Should create SystemConfig with custom values"""
@@ -63,8 +62,7 @@ class TestSystemConfigCreation:
             upload_folder="custom_uploads",
             audio_folder="custom_audio",
             enable_text_cleaning=False,
-            enable_ssml=False,
-            document_type="general"
+            enable_ssml=False
         )
         
         assert config.tts_engine == TTSEngine.GEMINI
@@ -72,7 +70,6 @@ class TestSystemConfigCreation:
         assert config.audio_folder == "custom_audio"
         assert config.enable_text_cleaning is False
         assert config.enable_ssml is False
-        assert config.document_type == "general"
     
     def test_system_config_post_init_sets_default_extensions(self):
         """Should set default file extensions in __post_init__"""
@@ -207,33 +204,6 @@ class TestSystemConfigValidationTDD:
             
             assert "cannot be empty or whitespace" in str(exc_info.value)
     
-    def test_validate_document_type_must_be_valid(self):
-        """Should validate document type is one of allowed values"""
-        # Test valid document types
-        valid_types = ['research_paper', 'literature_review', 'general']
-        for doc_type in valid_types:
-            config = SystemConfig(
-                tts_engine=TTSEngine.PIPER,
-            llm_model_name="gemini-1.5-flash",
-            gemini_model_name="gemini-1.5-flash",
-                document_type=doc_type
-            )
-            config.validate()  # Should not raise
-        
-        # Test invalid document type
-        config = SystemConfig(
-            tts_engine=TTSEngine.PIPER,
-            llm_model_name="gemini-1.5-flash",
-            gemini_model_name="gemini-1.5-flash",
-            document_type="invalid_type"
-        )
-        
-        with pytest.raises(ValueError) as exc_info:
-            config.validate()
-        
-        assert "DOCUMENT_TYPE must be one of" in str(exc_info.value)
-        assert "invalid_type" in str(exc_info.value)
-    
     def test_validate_file_cleanup_settings_when_enabled(self):
         """Should validate file cleanup settings when cleanup is enabled"""
         # Test valid file cleanup settings
@@ -337,7 +307,6 @@ class TestSystemConfigHelperMethodsTDD:
             gemini_model_name="gemini-1.5-flash",
             enable_text_cleaning=True,
             enable_ssml=False,
-            document_type="literature_review",
             enable_async_audio=True,
             max_concurrent_requests=8,
             upload_folder="test_uploads",
@@ -360,7 +329,6 @@ class TestSystemConfigHelperMethodsTDD:
             assert "TTS Engine: gemini" in printed_text
             assert "Text Cleaning: Enabled" in printed_text
             assert "SSML Enhancement: Disabled" in printed_text
-            assert "Document Type: literature_review" in printed_text
             assert "Async Audio: Enabled" in printed_text
             assert "Max Concurrent: 8" in printed_text
             assert "Upload Folder: test_uploads" in printed_text

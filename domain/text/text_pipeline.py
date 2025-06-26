@@ -54,13 +54,11 @@ class TextPipeline(ITextPipeline):
         llm_provider: Optional['ILLMProvider'] = None,
         enable_cleaning: bool = True,
         enable_ssml: bool = True,
-        document_type: str = "research_paper",
         tts_supports_ssml: bool = True
     ):
         self.llm_provider = llm_provider
         self.enable_cleaning = enable_cleaning
         self.enable_ssml = enable_ssml
-        self.document_type = document_type
         self.tts_supports_ssml = tts_supports_ssml
         
         # If TTS doesn't support SSML, disable SSML enhancement
@@ -134,13 +132,11 @@ class TextPipeline(ITextPipeline):
         # 1. Add emphasis for quotes first (won't interfere with other patterns)
         enhanced = self._add_emphasis_markup(enhanced)
         
-        # 2. Add technical term emphasis (works on remaining text)
-        if self.document_type == "research_paper":
-            enhanced = self._enhance_technical_terms(enhanced)
+        # 2. Add technical term emphasis (universal academic approach)
+        enhanced = self._enhance_technical_terms(enhanced)
         
-        # 3. Add structural breaks and pauses (work on any text)
-        if self.document_type == "research_paper":
-            enhanced = self._add_academic_pauses(enhanced)
+        # 3. Add structural breaks and pauses (universal academic approach)
+        enhanced = self._add_academic_pauses(enhanced)
         
         enhanced = self._add_punctuation_breaks(enhanced)
         
@@ -204,7 +200,7 @@ class TextPipeline(ITextPipeline):
 Remove headers, footers, page numbers, and artifacts. 
 {pause_instruction}
 Preserve the main content and structure.
-Document type: {self.document_type}
+Use universal academic text processing approach.
 
 Text to clean:
 {text[:5000]}"""  # Limit prompt size
@@ -264,9 +260,8 @@ Text to clean:
         # 1. Add natural emphasis (order matters)
         enhanced = self._add_natural_emphasis(enhanced)
         
-        # 2. Add academic formatting for research papers
-        if self.document_type == "research_paper":
-            enhanced = self._add_natural_academic_formatting(enhanced)
+        # 2. Add academic formatting (universal approach)
+        enhanced = self._add_natural_academic_formatting(enhanced)
         
         # 3. Enhance punctuation for better rhythm
         enhanced = self._enhance_punctuation_for_natural_speech(enhanced)

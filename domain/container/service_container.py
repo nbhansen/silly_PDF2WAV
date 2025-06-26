@@ -89,8 +89,7 @@ class ServiceContainer(IServiceContainer):
             lambda: TextPipeline(
                 llm_provider=self.get(GeminiLLMProvider) if self.config.gemini_api_key else None,
                 enable_cleaning=self.config.enable_text_cleaning,
-                enable_ssml=self.config.enable_ssml,
-                document_type=self.config.document_type
+                enable_ssml=self.config.enable_ssml
             )
         )
         
@@ -140,8 +139,7 @@ class ServiceContainer(IServiceContainer):
             return GeminiTTSProvider(
                 model_name=self.config.gemini_model_name,
                 api_key=self.config.gemini_api_key,
-                voice_name=self.config.gemini_voice_name,
-                document_type=self.config.document_type
+                voice_name=self.config.gemini_voice_name
             )
         else:
             return PiperTTSProvider(

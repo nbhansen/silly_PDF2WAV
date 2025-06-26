@@ -32,6 +32,5 @@ def create_text_pipeline(config: 'SystemConfig', tts_supports_ssml: bool = True)
         llm_provider=llm_provider,  # This is for text processing, not audio generation
         enable_cleaning=config.enable_text_cleaning,
         enable_ssml=config.enable_ssml,
-        document_type=config.document_type,
         tts_supports_ssml=tts_supports_ssml
     )
