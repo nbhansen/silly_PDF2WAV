@@ -76,10 +76,6 @@ class SystemConfig:
     timing_file_suffix: str = "_timing.json"
     combined_file_suffix: str = "_combined"
     
-    # Configuration file paths
-    academic_terms_config: str = "config/academic_terms_en.json"
-    rate_limits_config: str = "config/rate_limits.json"
-    
     # Model repository settings
     piper_model_repository_url: str = "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0"
     model_cache_dir: str = "model_cache"
@@ -211,10 +207,6 @@ class SystemConfig:
             flask_debug=cls._parse_bool_value(get_config('app.debug', True), True),
             flask_host=get_config('app.host', '0.0.0.0'),
             flask_port=cls._parse_int_value(get_config('app.port', 5000), 5000, min_val=1000, max_val=65535),
-            
-            # Configuration file paths
-            academic_terms_config=get_config('academic_terms_config', 'config/academic_terms_en.json'),
-            rate_limits_config=get_config('rate_limits_config', 'config/rate_limits.json'),
             
             # Model repository settings
             piper_model_repository_url=get_config('tts.piper.model_repository_url', 'https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0'),
