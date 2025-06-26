@@ -6,6 +6,7 @@ from typing import List, Tuple, Optional, Dict
 import re
 import json
 import os
+import time
 import wave
 import struct
 import asyncio
@@ -82,13 +83,10 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
         self.max_concurrent_segments = max_concurrent_requests  # Config-driven concurrency
         self.requests_per_minute = requests_per_minute  # Official rate limit
         self.segment_semaphore = asyncio.Semaphore(self.max_concurrent_segments)
-        
-        print(f"🚀 GeminiTTSProvider: Optimized rate limiting - {requests_per_minute} RPM, {min_request_interval}s intervals, {max_concurrent_requests} concurrent")
 
     def _get_content_styles_for_document_type(self, document_type: str) -> Dict[str, str]:
         """Get content styles based on document type"""
         styles = self.DOCUMENT_STYLES.get(document_type, self.DOCUMENT_STYLES["general"])
-        print(f"✅ Using {document_type} content styles with voice '{self.configured_voice}'")
         return styles
 
     def generate_audio_data(self, text_to_speak: str) -> Result[bytes]:
@@ -265,8 +263,6 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
                 if response.candidates and response.candidates[0].content.parts:
                     raw_audio_data = response.candidates[0].content.parts[0].inline_data.data
                     # Convert raw audio to proper WAV format
-                    if attempt > 0:
-                        print(f"✅ Retry successful after {attempt} attempts")
                     return self._convert_to_wav(raw_audio_data)
 
             except Exception as e:
@@ -281,14 +277,10 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
                             # Exponential backoff: 5s, 15s, 45s
                             retry_delay = 5 * (3 ** attempt)
                         
-                        print(f"🚀 Rate limited (attempt {attempt + 1}/{max_retries + 1}). Retrying in {retry_delay}s...")
                         time.sleep(retry_delay)
                         continue
-                    else:
-                        print(f"❌ Max retries ({max_retries}) exceeded. Rate limit persists.")
                         
                 # For non-rate-limit errors, don't retry
-                print(f"Error generating audio: {e}")
                 break
 
         return b""
@@ -468,7 +460,6 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
             return wav_header + raw_audio_data
             
         except Exception as e:
-            print(f"Warning: Failed to convert audio to WAV format: {e}")
             # Return raw data as fallback
             return raw_audio_data
 
@@ -513,10 +504,7 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
                                 w.getframerate() == framerate):
                                 combined_data += w.readframes(w.getnframes())
                                 total_frames += w.getnframes()
-                            else:
-                                print(f"Warning: Audio chunk format mismatch, skipping chunk")
-                    except Exception as e:
-                        print(f"Warning: Failed to read audio chunk: {e}")
+                    except Exception:
                         continue
                 
                 # Create combined WAV file
@@ -530,9 +518,7 @@ class GeminiTTSProvider(ITimestampedTTSEngine):
                 return output_buffer.getvalue()
                 
         except Exception as e:
-            print(f"Error combining audio chunks: {e}")
             # Fallback: try simple concatenation for emergency cases
-            print("Falling back to simple concatenation")
             return b''.join(chunks)
 
     def get_output_format(self) -> str:

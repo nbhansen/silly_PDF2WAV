@@ -1,4 +1,8 @@
-# infrastructure/llm/gemini_llm_provider.py - Updated for unified google-genai SDK
+# infrastructure/llm/gemini_llm_provider.py
+"""
+Gemini LLM provider implementation for text processing and content generation.
+Uses the unified Google Gen AI SDK for language model operations.
+"""
 import asyncio
 import concurrent.futures
 from google import genai
@@ -8,7 +12,7 @@ from domain.errors import Result, llm_provider_error
 
 
 class GeminiLLMProvider(ILLMProvider):
-    """Implementation of ILLMProvider using the unified Google Gen AI SDK"""
+    """Gemini LLM provider for text processing and content generation."""
 
     def __init__(
         self, 
@@ -22,36 +26,30 @@ class GeminiLLMProvider(ILLMProvider):
         self.model_name = model_name
         self.client = self._init_client()
         
-        # Rate limiting parameters for text cleaning
+        # Rate limiting configuration
         self.min_request_interval = min_request_interval
         self.max_concurrent_requests = max_concurrent_requests 
         self.requests_per_minute = requests_per_minute
         self.request_semaphore = asyncio.Semaphore(self.max_concurrent_requests)
-        
-        print(f"🚀 GeminiLLMProvider: Optimized text cleaning - {requests_per_minute} RPM, {min_request_interval}s intervals, {max_concurrent_requests} concurrent")
 
     def _init_client(self):
-        """Initialize the unified Gemini client"""
+        """Initialize the Gemini client with API key validation."""
         if not self.api_key or self.api_key == "YOUR_GOOGLE_AI_API_KEY":
-            print("GeminiLLMProvider: No valid API key provided - LLM functionality will be limited.")
             return None
 
         try:
-            client = genai.Client(api_key=self.api_key)
-            print("GeminiLLMProvider: Unified Gemini client initialized successfully.")
-            return client
-        except Exception as e:
-            print(f"GeminiLLMProvider: Failed to initialize unified client: {e}")
+            return genai.Client(api_key=self.api_key)
+        except Exception:
             return None
 
     def process_text(self, text: str) -> Result[str]:
-        """Processes and enhances text - required by ILLMProvider interface"""
+        """Process and enhance text using the language model."""
         return self.generate_content(text)
 
     def generate_content(self, prompt: str) -> Result[str]:
-        """Generates content based on a prompt using the unified Gemini SDK"""
+        """Generate content based on a prompt."""
         if not self.client:
-            return Result.failure(llm_provider_error("Client not available - missing API key or initialization error"))
+            return Result.failure(llm_provider_error("Client not available"))
 
         try:
             response = self.client.models.generate_content(
@@ -66,20 +64,19 @@ class GeminiLLMProvider(ILLMProvider):
             if response and response.text:
                 return Result.success(response.text)
             else:
-                return Result.failure(llm_provider_error("LLM response was empty"))
+                return Result.failure(llm_provider_error("Empty response from LLM"))
 
         except Exception as e:
             return Result.failure(llm_provider_error(f"Content generation failed: {str(e)}"))
 
     async def generate_content_async(self, prompt: str) -> Result[str]:
-        """Asynchronously generates content with rate limiting"""
+        """Generate content asynchronously with rate limiting."""
         if not self.client:
-            return Result.failure(llm_provider_error("Client not available - missing API key or initialization error"))
+            return Result.failure(llm_provider_error("Client not available"))
 
         try:
-            # Apply rate limiting with semaphore
             async with self.request_semaphore:
-                # Use thread pool for blocking API call
+                # Execute in thread pool to avoid blocking
                 loop = asyncio.get_event_loop()
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     result = await loop.run_in_executor(
@@ -88,9 +85,8 @@ class GeminiLLMProvider(ILLMProvider):
                         prompt
                     )
                 
-                # Add rate limiting delay
+                # Rate limiting delay
                 await asyncio.sleep(self.min_request_interval)
-                
                 return result
         
         except Exception as e:

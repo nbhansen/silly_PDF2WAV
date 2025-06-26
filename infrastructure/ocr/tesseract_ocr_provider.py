@@ -1,3 +1,7 @@
+"""
+Tesseract OCR provider implementation for optical character recognition and PDF processing.
+Combines direct text extraction with OCR fallback for reliable text extraction.
+"""
 import pytesseract
 from pdf2image import convert_from_path
 import pdfplumber
@@ -9,27 +13,28 @@ from domain.errors import Result, text_extraction_error
 
 
 class TesseractOCRProvider(IOCRProvider):
-    """Direct implementation of TextExtractor and PageRangeValidator using Tesseract OCR and pdfplumber."""
+    """OCR provider using Tesseract with PDF text extraction and validation capabilities."""
 
     def __init__(self, tesseract_cmd=None, poppler_path_custom=None, config=None):
         if tesseract_cmd:
             pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
         self.poppler_path_custom = poppler_path_custom
 
-        # Use config values if provided, otherwise use defaults
+        # Configure OCR settings
         if config:
             self.ocr_dpi = config.ocr_dpi
             self.ocr_threshold = config.ocr_threshold
+            self.ocr_language = config.ocr_language if hasattr(config, 'ocr_language') else 'eng'
         else:
-            # Fallback defaults for backward compatibility
+            # Default settings
             self.ocr_dpi = 300
             self.ocr_threshold = 180
+            self.ocr_language = 'eng'
 
     def perform_ocr(self, image_path: str) -> Result[str]:
-        """Performs OCR on a single image file and returns the extracted text."""
+        """Perform OCR on a single image file."""
         try:
-            # Simple OCR on single image - this is what the interface expects
-            text = pytesseract.image_to_string(image_path, lang=self.config.ocr_language)
+            text = pytesseract.image_to_string(image_path, lang=self.ocr_language)
             if not text.strip():
                 return Result.failure(text_extraction_error("OCR process yielded no text"))
             return Result.success(text)
@@ -37,53 +42,39 @@ class TesseractOCRProvider(IOCRProvider):
             return Result.failure(text_extraction_error(f"OCR failed on {image_path}: {str(e)}"))
 
     def extract_text(self, pdf_path: str, page_range: PageRange) -> str:
-        """Extract text from PDF with optional page range"""
-        print(f"TesseractOCRProvider: Starting extraction for {pdf_path}")
-
+        """Extract text from PDF with optional page range."""
         if not page_range.is_full_document():
-            print(
-                f"TesseractOCRProvider: Using page range {page_range.start_page or 1} to {page_range.end_page or 'end'}")
             return self._extract_with_page_range(pdf_path, page_range.start_page, page_range.end_page)
         else:
-            print("TesseractOCRProvider: Processing entire PDF")
             return self._extract_full_pdf(pdf_path)
 
     def _extract_with_page_range(self, pdf_path: str, start_page: int = None, end_page: int = None) -> str:
-        """Extract from specified page range"""
+        """Extract from specified page range."""
         try:
-            # Try direct extraction from page range first
+            # Try direct extraction first
             direct_text = self._extract_direct_with_range(pdf_path, start_page, end_page)
             if direct_text and len(direct_text) > 100:
-                print(f"TesseractOCRProvider: Using direct extraction from page range ({len(direct_text)} chars)")
                 return direct_text
 
-            # Fall back to OCR on page range
-            print("TesseractOCRProvider: Falling back to OCR on page range")
-            ocr_text = self._extract_ocr_with_range(pdf_path, start_page, end_page)
-            print(f"TesseractOCRProvider: OCR extracted {len(ocr_text)} chars from page range")
-            return ocr_text
+            # Fall back to OCR
+            return self._extract_ocr_with_range(pdf_path, start_page, end_page)
 
-        except Exception as e:
-            print(f"TesseractOCRProvider: Page range extraction failed: {e}")
-            # Fall back to full PDF
+        except Exception:
+            # Fall back to full PDF extraction
             return self._extract_full_pdf(pdf_path)
 
     def _extract_full_pdf(self, pdf_path: str) -> str:
-        """Extract from entire PDF (original behavior)"""
+        """Extract from entire PDF."""
         # Try direct extraction first
         direct_text = self._extract_direct(pdf_path)
         if direct_text and len(direct_text) > 100:
-            print(f"TesseractOCRProvider: Using direct extraction ({len(direct_text)} chars)")
             return direct_text
 
         # Fall back to OCR
-        print("TesseractOCRProvider: Falling back to OCR")
-        ocr_text = self._extract_ocr(pdf_path)
-        print(f"TesseractOCRProvider: OCR extracted {len(ocr_text)} chars")
-        return ocr_text
+        return self._extract_ocr(pdf_path)
 
     def _extract_direct_with_range(self, pdf_path: str, start_page: int = None, end_page: int = None) -> Optional[str]:
-        """Extract text directly from specified page range"""
+        """Extract text directly from specified page range."""
         try:
             text_content = ""
 
@@ -100,10 +91,7 @@ class TesseractOCRProvider(IOCRProvider):
                 if actual_end > total_pages:
                     actual_end = total_pages
                 if actual_start >= actual_end:
-                    print(f"TesseractOCRProvider: Invalid page range {start_page}-{end_page}")
                     return None
-
-                print(f"TesseractOCRProvider: Processing pages {actual_start + 1} to {actual_end} of {total_pages}")
 
                 for page_num in range(actual_start, actual_end):
                     page = pdf.pages[page_num]
@@ -112,12 +100,11 @@ class TesseractOCRProvider(IOCRProvider):
                         text_content += page_text + f"\n\n--- Page {page_num + 1} End ---\n\n"
 
             return text_content.strip() if text_content.strip() else None
-        except Exception as e:
-            print(f"TesseractOCRProvider: Direct range extraction failed: {e}")
+        except Exception:
             return None
 
     def _extract_direct(self, pdf_path: str) -> Optional[str]:
-        """Extract text directly using pdfplumber (full PDF)"""
+        """Extract text directly using pdfplumber."""
         try:
             text_content = ""
             with pdfplumber.open(pdf_path) as pdf:
@@ -126,14 +113,13 @@ class TesseractOCRProvider(IOCRProvider):
                     if page_text:
                         text_content += page_text + f"\n\n--- Page {page_num + 1} End ---\n\n"
             return text_content.strip() if text_content.strip() else None
-        except Exception as e:
-            print(f"TesseractOCRProvider: Direct extraction failed: {e}")
+        except Exception:
             return None
 
     def _extract_ocr_with_range(self, pdf_path: str, start_page: int = None, end_page: int = None) -> str:
-        """OCR extraction from specified page range"""
+        """OCR extraction from specified page range."""
         try:
-            # Get total pages first for validation
+            # Get total pages for validation
             with pdfplumber.open(pdf_path) as pdf:
                 total_pages = len(pdf.pages)
 
@@ -146,12 +132,9 @@ class TesseractOCRProvider(IOCRProvider):
             if actual_end > total_pages:
                 actual_end = total_pages
             if actual_start > actual_end:
-                print(f"TesseractOCRProvider: Invalid OCR page range {start_page}-{end_page}")
                 return "Error: Invalid page range for OCR"
 
-            print(f"TesseractOCRProvider: OCR processing pages {actual_start} to {actual_end}")
-
-            # Convert specified page range
+            # Convert specified page range to images
             images = convert_from_path(
                 pdf_path,
                 dpi=self.ocr_dpi,
@@ -162,22 +145,20 @@ class TesseractOCRProvider(IOCRProvider):
             )
 
             full_text = ""
-
             for i, image in enumerate(images):
                 processed_image = image.convert('L')
                 processed_image = processed_image.point(lambda p: 0 if p < self.ocr_threshold else 255)
-                page_text = pytesseract.image_to_string(processed_image, lang='eng')
+                page_text = pytesseract.image_to_string(processed_image, lang=self.ocr_language)
                 actual_page_num = actual_start + i
                 full_text += page_text + f"\n\n--- Page {actual_page_num} End (OCR) ---\n\n"
 
             return full_text if full_text.strip() else "OCR process yielded no text."
 
         except Exception as e:
-            print(f"TesseractOCRProvider: Range OCR failed: {e}")
             return f"Error during range OCR: {str(e)}"
 
     def _extract_ocr(self, pdf_path: str) -> str:
-        """Extract text using OCR (full PDF)"""
+        """Extract text using OCR from entire PDF."""
         try:
             images = convert_from_path(pdf_path, dpi=self.ocr_dpi, grayscale=True,
                                        poppler_path=self.poppler_path_custom)
@@ -186,17 +167,16 @@ class TesseractOCRProvider(IOCRProvider):
             for i, image in enumerate(images):
                 processed_image = image.convert('L')
                 processed_image = processed_image.point(lambda p: 0 if p < self.ocr_threshold else 255)
-                page_text = pytesseract.image_to_string(processed_image, lang='eng')
+                page_text = pytesseract.image_to_string(processed_image, lang=self.ocr_language)
                 full_text += page_text + f"\n\n--- Page {i + 1} End (OCR) ---\n\n"
 
             return full_text if full_text.strip() else "OCR process yielded no text."
 
         except Exception as e:
-            print(f"TesseractOCRProvider: OCR failed: {e}")
             return f"Error during OCR: {str(e)}"
 
     def get_pdf_info(self, pdf_path: str) -> PDFInfo:
-        """Get basic PDF information for user interface"""
+        """Get basic PDF information."""
         try:
             with pdfplumber.open(pdf_path) as pdf:
                 return PDFInfo(
@@ -204,8 +184,7 @@ class TesseractOCRProvider(IOCRProvider):
                     title=pdf.metadata.get('Title', 'Unknown') if pdf.metadata else 'Unknown',
                     author=pdf.metadata.get('Author', 'Unknown') if pdf.metadata else 'Unknown'
                 )
-        except Exception as e:
-            print(f"TesseractOCRProvider: Failed to get PDF info: {e}")
+        except Exception:
             return PDFInfo(
                 total_pages=0,
                 title='Unknown',
