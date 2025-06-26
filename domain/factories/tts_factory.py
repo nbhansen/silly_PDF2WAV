@@ -23,7 +23,6 @@ def create_tts_engine(config: 'SystemConfig') -> 'ITTSEngine':
             model_name=config.gemini_model_name,  # TTS model name, not LLM model
             api_key=config.gemini_api_key,
             voice_name=config.gemini_voice_name,
-            document_type=config.document_type,
             min_request_interval=config.gemini_min_request_interval,
             max_concurrent_requests=config.gemini_max_concurrent_requests,
             requests_per_minute=config.gemini_requests_per_minute
