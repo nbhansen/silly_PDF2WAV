@@ -1,6 +1,6 @@
 # tests/test_helpers.py
 from domain.interfaces import (
-    ITTSEngine, ILLMProvider, ITextExtractor, IPageRangeValidator,
+    ITTSEngine, ILLMProvider, IDocumentProcessor,
     IAudioProcessor, IEngineCapabilityDetector, SSMLCapability
 )
 from domain.audio.timing_engine import ITimingEngine
@@ -39,24 +39,18 @@ class FakeLLMProvider(ILLMProvider):
     def process_text(self, text: str) -> Result[str]:
         return self.generate_content(text)
 
-class FakeTextExtractor(ITextExtractor, IPageRangeValidator):
+class FakeDocumentProcessor(IDocumentProcessor):
     def __init__(self, text_to_return="Default extracted text", pdf_info=None):
         self.text_to_return = text_to_return
         self.pdf_info = pdf_info or PDFInfo(total_pages=1, title="Test PDF", author="Test Author")
         self.extraction_calls = []
         
-    def extract_text(self, pdf_path: str, page_range: PageRange) -> str:
-        self.extraction_calls.append((pdf_path, page_range))
-        return self.text_to_return
+    def extract_text(self, filepath: str, pages: List[int] = None) -> List[str]:
+        self.extraction_calls.append((filepath, pages))
+        return [self.text_to_return]
     
-    def get_pdf_info(self, pdf_path: str) -> PDFInfo:
-        return self.pdf_info
-        
-    def validate_range(self, pdf_path: str, page_range: PageRange) -> Dict[str, Any]:
+    def validate_page_range(self, filepath: str, start: int = None, end: int = None) -> Dict[str, Any]:
         return {'valid': True, 'total_pages': self.pdf_info.total_pages}
-    
-    def validate(self, pdf_path: str, page_range: PageRange) -> Dict[str, Any]:
-        return self.validate_range(pdf_path, page_range)
 
 def create_test_request(pdf_path="test.pdf", output_name="test_output", page_range=None):
     return ProcessingRequest(

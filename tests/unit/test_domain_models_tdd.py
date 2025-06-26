@@ -56,13 +56,12 @@ class TestPageRange:
     
     def test_page_range_validation_edge_cases(self):
         """Should handle edge cases in page ranges"""
-        # Zero pages
-        zero_range = PageRange(start_page=0, end_page=0)
-        assert zero_range.is_full_document() is False
+        # Zero and negative pages should raise validation errors
+        with pytest.raises(ValueError, match="start_page must be 1 or greater"):
+            PageRange(start_page=0, end_page=0)
         
-        # Negative pages (invalid but should not crash)
-        negative_range = PageRange(start_page=-1, end_page=5)
-        assert negative_range.is_full_document() is False
+        with pytest.raises(ValueError, match="start_page must be 1 or greater"):
+            PageRange(start_page=-1, end_page=5)
 
 
 class TestProcessingRequest:
@@ -96,16 +95,16 @@ class TestProcessingRequest:
         assert request.page_range.end_page == 3
     
     def test_processing_request_with_empty_strings(self):
-        """Should handle empty string values gracefully"""
+        """Should validate empty paths"""
         page_range = PageRange()
-        request = ProcessingRequest(
-            pdf_path="",
-            output_name="",
-            page_range=page_range
-        )
         
-        assert request.pdf_path == ""
-        assert request.output_name == ""
+        # Empty pdf_path should raise validation error
+        with pytest.raises(ValueError, match="pdf_path cannot be empty"):
+            ProcessingRequest(
+                pdf_path="",
+                output_name="output",
+                page_range=page_range
+            )
     
     def test_processing_request_equality(self):
         """Should support equality comparison for requests"""
@@ -435,18 +434,19 @@ class TestTextSegment:
         assert segment.end_time == 1.0
     
     def test_text_segment_with_zero_duration(self):
-        """Should handle zero duration segments"""
+        """Should handle very short duration segments"""
         segment = TextSegment(
-            text="",
+            text="[pause]",  # Non-empty text for pause segments
             start_time=5.0,
-            duration=0.0,
-            segment_type="pause",
+            duration=0.001,  # Very small positive duration
+            segment_type="sentence",  # Use valid segment type
             chunk_index=1,
             sentence_index=0
         )
         
-        assert segment.end_time == 5.0
-        assert segment.duration == 0.0
+        assert segment.end_time == 5.001
+        assert segment.duration == 0.001
+        assert segment.text == "[pause]"
     
     def test_text_segment_types(self):
         """Should support different segment types"""

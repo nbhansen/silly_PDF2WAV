@@ -81,6 +81,15 @@ def text_extraction_error(details: str) -> ApplicationError:
     )
 
 
+def audio_generation_error(details: str = None) -> ApplicationError:
+    return ApplicationError(
+        code=ErrorCode.AUDIO_GENERATION_FAILED,
+        message="Audio generation failed",
+        details=details,
+        retryable=True  # TTS errors might be transient
+    )
+
+
 def tts_engine_error(details: str = None) -> ApplicationError:
     return ApplicationError(
         code=ErrorCode.TTS_ENGINE_ERROR,

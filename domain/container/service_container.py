@@ -9,6 +9,8 @@ from abc import ABC, abstractmethod
 
 if TYPE_CHECKING:
     from application.config.system_config import SystemConfig
+else:
+    from application.config.system_config import SystemConfig
 
 T = TypeVar('T')
 

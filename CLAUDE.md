@@ -25,10 +25,15 @@ pdf_to_audio_app/
 │   ├── config/           # SystemConfig - single source of truth for configuration
 │   └── services/         # PDF processing coordination service
 ├── domain/               # Core business logic (no external dependencies)
-│   ├── services/         # Text cleaning, audio generation, SSML enhancement
-│   ├── interfaces.py     # Abstract interfaces for all external dependencies
-│   ├── models.py         # Domain models and data structures
-│   └── errors.py         # Structured error handling system
+│   ├── audio/           # Audio processing engines (generation & timing)
+│   ├── config/          # TTS and domain configuration models
+│   ├── container/       # Service container for dependency injection
+│   ├── document/        # Document processing engine
+│   ├── factories/       # Modular service factories (audio, text, TTS)
+│   ├── text/            # Text processing pipeline and chunking strategies
+│   ├── interfaces.py    # Abstract interfaces for all external dependencies
+│   ├── models.py        # Domain models with robust validation
+│   └── errors.py        # Structured error handling system
 ├── infrastructure/       # External service implementations
 │   ├── tts/             # Gemini and Piper TTS providers
 │   ├── llm/             # Gemini LLM provider for text cleaning
@@ -58,10 +63,11 @@ The project uses a **hybrid testing approach** combining comprehensive TDD cover
 # Enhanced Test Runner
 python run_tests.py tdd          # All TDD tests (160 tests)
 python run_tests.py commit       # Pre-commit validation
-python run_tests.py models       # Domain models (47 tests)
+python run_tests.py models       # Domain models (57 tests)
 python run_tests.py pipeline     # Text processing (47 tests)
-python run_tests.py config       # Configuration (21 tests)
+python run_tests.py config       # Configuration (35 tests)
 python run_tests.py errors       # Error handling (44 tests)
+python run_tests.py architecture # New architecture validation tests (16 tests)
 ```
 
 #### Comprehensive Testing
@@ -85,10 +91,16 @@ python run_tests.py coverage     # Full coverage report
 - **Integration testing**: `python run_tests.py integration`
 
 #### TDD Test Coverage (160 Tests)
-- **Domain Models**: 47 tests - Data integrity and immutability
-- **Text Processing Pipeline**: 47 tests - Pure text processing logic  
-- **System Configuration**: 21 tests - YAML parsing and validation only
+- **Domain Models**: 57 tests - Data integrity, validation, and immutability
+- **Text Processing Pipeline**: 47 tests - Pure text processing logic with chunking strategies
+- **System Configuration**: 35 tests - YAML parsing and validation
 - **Error Handling System**: 44 tests - Structured error management
+- **Architecture Validation**: 16 tests - Modular factories and service integration
+
+#### Total Test Coverage (205 Tests)
+- **Unit Tests**: 201 tests - All TDD tests plus legacy unit tests
+- **Integration Tests**: 4 tests - End-to-end workflow validation
+- **Coverage**: 51% total coverage with focus on domain logic
 
 ### Environment Setup
 ```bash
@@ -140,19 +152,29 @@ See `config.example.yaml` for a complete configuration template with all availab
 
 ## Dependency Injection
 
-The `domain/factories/service_factory.py` handles all dependency injection:
-- Creates and wires all services based on configuration
-- Manages the object graph and lifecycle
-- Entry point: `create_pdf_service_from_env()` accepts SystemConfig and returns fully configured service
+The modular factory system in `domain/factories/` handles all dependency injection:
+
+### Modular Factory Architecture
+- **`service_factory.py`**: Main orchestrator, creates complete PDF processing service
+- **`audio_factory.py`**: Creates audio engines (AudioEngine, TimingEngine) and timing strategies
+- **`text_factory.py`**: Creates text processing services including chunking strategies
+- **`tts_factory.py`**: Creates TTS engines with clear separation of Gemini TTS vs Gemini LLM
+
+### Key Features
+- **Clear Separation**: TTS and LLM factories prevent confusion between Gemini services
+- **Strategy Pattern**: Text chunking uses configurable strategies (sentence-based, word-based)
+- **Validation**: All factories validate configuration before creating services
+- **Entry Point**: `create_pdf_service_from_env()` accepts SystemConfig and returns fully configured service
 
 ## Core Processing Flow
 
 1. **PDF Upload** → Flask routes (`/upload` or `/upload-with-timing`)
-2. **Text Extraction** → OCR provider (Tesseract) with PDF info validation
-3. **Text Cleaning** → LLM provider (Gemini) removes headers/footers, adds pauses
-4. **SSML Enhancement** → Academic SSML service improves pronunciation
-5. **Audio Generation** → TTS engine (Piper/Gemini) with timing strategies
-6. **File Management** → Cleanup scheduler manages temporary files
+2. **Text Extraction** → Document engine with OCR provider (Tesseract) and PDF info validation
+3. **Text Cleaning** → Text pipeline with LLM provider (Gemini) removes headers/footers, adds pauses
+4. **Text Chunking** → Strategy-based chunking (sentence or word-based) for optimal processing
+5. **SSML Enhancement** → Academic SSML service improves pronunciation
+6. **Audio Generation** → Audio engine with TTS provider (Piper/Gemini) and timing strategies
+7. **File Management** → Cleanup scheduler manages temporary files
 
 ## TTS Engine Support
 
@@ -174,14 +196,41 @@ The `domain/factories/service_factory.py` handles all dependency injection:
   - `general`: Natural, conversational styles
 - **No Multi-Voice Complexity**: Removed voice personas JSON system
 
-## Timing Strategies
+## Text Processing Architecture
 
+### Chunking Strategies
+The application uses the Strategy pattern for text chunking:
+
+- **`ChunkingService`**: Main service that delegates to strategies
+- **`SentenceBasedChunking`**: Splits text by sentences (ideal for natural speech)
+- **`WordBasedChunking`**: Splits text by word count (useful for length control)
+- **Configurable**: Easy to add new chunking strategies
+
+### Text Pipeline
+- **Input Validation**: Robust validation of text segments and processing requests
+- **Cleaning**: LLM-based text enhancement with academic focus
+- **SSML Enhancement**: Pronunciation and pacing improvements
+- **Chunking**: Strategy-based text segmentation for optimal processing
+
+## Audio Processing Architecture
+
+### Audio Engines
+- **`AudioEngine`**: Main audio processing service with chunking integration
+- **`TimingEngine`**: Handles audio timing with multiple strategies
+
+### Timing Strategies
 The application uses different timing strategies based on TTS engine:
 
 - **GeminiTimestampStrategy**: Uses engine-provided timestamps (ideal)
 - **SentenceMeasurementStrategy**: Measures timing manually (fallback)
 
 Both implement `ITimingStrategy` interface and return `TimedAudioResult` objects.
+
+### Audio Generation Flow
+1. Text is chunked using configurable strategies
+2. Each chunk is processed through TTS engine
+3. Audio segments are combined with timing information
+4. Final audio file is generated with optional timing data
 
 ## Error Handling
 
@@ -210,27 +259,40 @@ Automatic cleanup system:
 ### When Adding New TTS Engines
 1. Implement `ITTSEngine` interface in `infrastructure/tts/`
 2. Add configuration to `SystemConfig`
-3. Update `service_factory.create_tts_engine()`
+3. Update `tts_factory.py` to create the new engine (NOT service_factory directly)
 4. Consider implementing `ITimestampedTTSEngine` for timing support
 5. **Voice Configuration**: Decide if engine uses single voice or model-based voices
+6. **Factory Separation**: Ensure TTS engines are separate from LLM services
 
 ### Voice System Architecture
 - **Simplified Design**: Single voice per session, content-aware styling
 - **No Voice Personas**: Removed complex multi-voice JSON configuration
 - **Domain Separation**: Content processing vs voice selection are independent
 - **Engine Flexibility**: Each TTS engine handles voice configuration differently
+- **Clear Boundaries**: TTS and LLM services are never confused in factory creation
 
 ### When Adding New Text Processing
 1. Define interface in `domain/interfaces.py`
-2. Implement service in `domain/services/`
+2. Implement service in `domain/text/` for text processing
 3. Add infrastructure provider in `infrastructure/`
-4. Wire in `CompositionRoot`
+4. Wire in appropriate factory (`text_factory.py` for text services)
+5. **Chunking Strategies**: Consider if new chunking strategy is needed
+
+### When Adding New Chunking Strategies
+1. Implement `ChunkingStrategy` interface in `domain/text/chunking_strategy.py`
+2. Register strategy in `ChunkingService`
+3. Add configuration option for strategy selection
+4. Write comprehensive TDD tests for strategy behavior
 
 ### Testing Strategy
-- Unit tests for domain services (no external dependencies)
-- Integration tests for complete workflows
-- Test configuration in `pytest.ini`
-- Coverage reports in `htmlcov/`
+- **TDD Coverage**: Comprehensive 205+ tests with domain-driven development
+- **Unit Tests**: Domain services with no external dependencies
+- **Integration Tests**: Complete workflows and factory integration
+- **Architecture Tests**: Validate modular factory structure and separation of concerns
+- **Strategy Tests**: Comprehensive coverage of chunking strategies
+- **Validation Tests**: Robust model validation with edge cases
+- **Test Configuration**: Managed in `pytest.ini`
+- **Coverage Reports**: Generated in `htmlcov/`
 
 ## System Dependencies
 

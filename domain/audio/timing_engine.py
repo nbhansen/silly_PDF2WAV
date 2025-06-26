@@ -44,7 +44,7 @@ class TimingEngine(ITimingEngine):
         self,
         tts_engine: ITTSEngine,
         file_manager: IFileManager,
-        text_pipeline: Optional[ITextPipeline] = None,
+        text_pipeline: Optional['ITextPipeline'] = None,
         mode: TimingMode = TimingMode.ESTIMATION,
         measurement_interval: float = 0.8
     ):

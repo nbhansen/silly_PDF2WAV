@@ -324,7 +324,9 @@ class TestArchitectureIntegration:
         result = audio_engine.generate_with_timing(['test'], 'output')
         
         assert isinstance(result, TimedAudioResult)
-        assert result.audio_files == ['output_combined.mp3']
+        # The audio engine now processes in chunks, so we expect chunk-based naming
+        assert len(result.audio_files) > 0
+        assert result.audio_files[0].startswith('output_chunk_')
     
     def test_text_pipeline_integration(self):
         """TextPipeline should integrate with other components"""
