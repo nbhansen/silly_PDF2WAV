@@ -6,14 +6,16 @@ Replaces: GeminiTimestampStrategy, SentenceMeasurementStrategy, EnhancedTimingSt
 
 import os
 import time
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 from abc import ABC, abstractmethod
 from enum import Enum
 
 from ..interfaces import ITTSEngine, ITimestampedTTSEngine, IFileManager
-from ..text.text_pipeline import ITextPipeline
 from ..models import TimedAudioResult, TextSegment, TimingMetadata
 from ..errors import Result
+
+if TYPE_CHECKING:
+    from ..text.text_pipeline import ITextPipeline
 
 
 class TimingMode(Enum):

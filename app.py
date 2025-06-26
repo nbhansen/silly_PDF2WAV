@@ -87,7 +87,11 @@ if __name__ == '__main__':
         print(f"File Cleanup: {'Enabled' if app_config.enable_file_cleanup else 'Disabled'}")
 
     try:
-        app.run(debug=True, host='0.0.0.0', port=5000)
+        app.run(
+            debug=app_config.flask_debug,
+            host=app_config.flask_host,
+            port=app_config.flask_port
+        )
     finally:
         # Only cleanup in main process
         if not is_flask_reloader():

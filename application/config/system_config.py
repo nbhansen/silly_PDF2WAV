@@ -90,6 +90,11 @@ class SystemConfig:
     ocr_threshold: int = 180
     ocr_language: str = "eng"  # Tesseract language code
 
+    # Flask application settings
+    flask_debug: bool = True
+    flask_host: str = "0.0.0.0"
+    flask_port: int = 5000
+
     # Text processing
     llm_max_chunk_size: int = 100000
     audio_target_chunk_size: int = 3000
@@ -203,6 +208,11 @@ class SystemConfig:
             ocr_dpi=cls._parse_int_value(get_config('ocr.dpi', 300), 300, min_val=150, max_val=600),
             ocr_threshold=cls._parse_int_value(get_config('ocr.threshold', 180), 180, min_val=100, max_val=240),
             ocr_language=get_config('ocr.language', 'eng'),
+            
+            # Flask application settings
+            flask_debug=cls._parse_bool_value(get_config('app.debug', True), True),
+            flask_host=get_config('app.host', '0.0.0.0'),
+            flask_port=cls._parse_int_value(get_config('app.port', 5000), 5000, min_val=1000, max_val=65535),
             
             # Configuration file paths
             academic_terms_config=get_config('academic_terms_config', 'config/academic_terms_en.json'),

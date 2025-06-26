@@ -6,7 +6,7 @@ implementations, facilitating testing and modularity.
 
 from abc import ABC, abstractmethod
 from enum import Enum, auto
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict, Any
 
 from .models import TimedAudioResult, TextSegment
 from .errors import Result
@@ -22,19 +22,41 @@ class SSMLCapability(Enum):
 
 # --- Core Service Interfaces ---
 
-class IPageRangeValidator(ABC):
-    """Interface for validating page ranges."""
+class IDocumentProcessor(ABC):
+    """Consolidated interface for document text processing operations"""
+    
     @abstractmethod
-    def validate(self, pages_str: str, max_pages: int) -> List[int]:
-        """Validates a string of page numbers/ranges."""
+    def extract_text(self, filepath: str, pages: Optional[List[int]] = None) -> List[str]:
+        """Extract text from document with optional page filtering"""
+        pass
+    
+    @abstractmethod
+    def validate_page_range(self, filepath: str, start: Optional[int], end: Optional[int]) -> Dict[str, Any]:
+        """Validate page range against document"""
         pass
 
 
-class ITextExtractor(ABC):
-    """Interface for a service that extracts text from a source."""
+class ITextProcessor(ABC):
+    """Consolidated interface for text cleaning and preparation"""
+    
     @abstractmethod
-    def extract_text(self, filepath: str) -> List[str]:
-        """Extracts and returns text chunks from a file."""
+    def clean_text(self, raw_text: str) -> str:
+        """Clean and prepare text for TTS"""
+        pass
+    
+    @abstractmethod
+    def enhance_with_ssml(self, text: str) -> str:
+        """Add SSML enhancements to text"""
+        pass
+    
+    @abstractmethod
+    def split_into_sentences(self, text: str) -> List[str]:
+        """Split text into sentences for processing"""
+        pass
+    
+    @abstractmethod
+    def strip_ssml(self, text: str) -> str:
+        """Remove SSML tags from text"""
         pass
 
 
@@ -59,20 +81,6 @@ class IFileManager(ABC):
     @abstractmethod
     def get_output_dir(self) -> str:
         """Returns the path to the output directory."""
-        pass
-
-
-class ITextCleaner(ABC):
-    """Interface for a text cleaning and preparation service."""
-
-    @abstractmethod
-    def strip_ssml(self, ssml_text: str) -> str:
-        """Removes all SSML tags from a string."""
-        pass
-
-    @abstractmethod
-    def split_into_sentences(self, text: str) -> List[str]:
-        """Splits a block of text into a list of sentences."""
         pass
 
 
@@ -130,7 +138,46 @@ class ITTSEngine(ABC):
         pass
 
 
-# --- New Specialised TTS Interface ---
+# --- Enhanced TTS Interface ---
+
+class IEnhancedTTSEngine(ITTSEngine):
+    """
+    Enhanced TTS interface that consolidates audio processing capabilities.
+    Replaces separate IAudioProcessor and IEngineCapabilityDetector interfaces.
+    """
+
+    @abstractmethod
+    def supports_ssml(self) -> bool:
+        """Check if engine supports SSML"""
+        pass
+
+    @abstractmethod
+    def get_ssml_capability(self) -> SSMLCapability:
+        """Get SSML capability level"""
+        pass
+
+    @abstractmethod
+    def supports_timestamps(self) -> bool:
+        """Check if engine supports native timestamp generation"""
+        pass
+
+    @abstractmethod
+    def get_audio_format(self) -> str:
+        """Get preferred audio output format"""
+        pass
+
+    @abstractmethod
+    def requires_rate_limiting(self) -> bool:
+        """Check if engine requires rate limiting"""
+        pass
+
+    @abstractmethod
+    def get_recommended_delay(self) -> float:
+        """Get recommended delay between requests"""
+        pass
+
+
+# --- Specialized TTS Interface ---
 
 class ITimestampedTTSEngine(ITTSEngine):
     """

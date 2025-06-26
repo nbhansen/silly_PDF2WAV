@@ -1,1 +1,1 @@
-# Domain Audio Aggregate
+# Audio domain aggregates

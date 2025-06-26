@@ -5,15 +5,18 @@ Replaces: AudioGenerationService, AudioGenerationCoordinator, AudioProcessor, Au
 """
 
 import os
-import time
 import asyncio
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, TYPE_CHECKING
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 
 from ..interfaces import ITTSEngine, IFileManager
 from ..models import TimedAudioResult, TextSegment, TimingMetadata
 from ..errors import Result, audio_generation_error
+from ..text.chunking_strategy import ChunkingService, create_chunking_service, ChunkingMode
+
+if TYPE_CHECKING:
+    from .timing_engine import ITimingEngine
 
 
 class IAudioEngine(ABC):
@@ -59,7 +62,8 @@ class AudioEngine(IAudioEngine):
         timing_engine: 'ITimingEngine',
         max_concurrent: int = 4,
         audio_target_chunk_size: int = 2000,
-        audio_max_chunk_size: int = 3000
+        audio_max_chunk_size: int = 3000,
+        chunking_service: ChunkingService = None
     ):
         self.tts_engine = tts_engine
         self.file_manager = file_manager
@@ -67,6 +71,7 @@ class AudioEngine(IAudioEngine):
         self.max_concurrent = max_concurrent
         self.audio_target_chunk_size = audio_target_chunk_size
         self.audio_max_chunk_size = audio_max_chunk_size
+        self.chunking_service = chunking_service or create_chunking_service(ChunkingMode.SENTENCE_BASED)
         self.base_delay = self._get_base_delay_for_engine()
         
         print(f"🔍 AudioEngine: Initialized with chunk sizes:")
@@ -91,44 +96,11 @@ class AudioEngine(IAudioEngine):
         if not text_chunks:
             return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
         
-        # Check if we need to rechunk based on configuration
+        # Use chunking service for optimal text splitting
         max_chunk_size = self.audio_target_chunk_size
         print(f"🔍 AudioEngine: Using max_chunk_size = {max_chunk_size} (from self.audio_target_chunk_size)")
         
-        # Split chunks if any are too large
-        processed_chunks = []
-        for chunk in text_chunks:
-            if len(chunk) > max_chunk_size:
-                print(f"AudioEngine: Chunk too large ({len(chunk)} chars), splitting...")
-                # Split on sentences first, then words if needed
-                sentences = chunk.replace('. ', '.|').replace('! ', '!|').replace('? ', '?|').split('|')
-                current_subchunk = ""
-                for sentence in sentences:
-                    # If single sentence is too large, split by words
-                    if len(sentence) > max_chunk_size:
-                        words = sentence.split()
-                        temp_chunk = ""
-                        for word in words:
-                            if len(temp_chunk) + len(word) + 1 > max_chunk_size and temp_chunk:
-                                if current_subchunk:
-                                    processed_chunks.append(current_subchunk.strip())
-                                    current_subchunk = ""
-                                processed_chunks.append(temp_chunk.strip())
-                                temp_chunk = word
-                            else:
-                                temp_chunk += (" " + word if temp_chunk else word)
-                        if temp_chunk.strip():
-                            current_subchunk = temp_chunk.strip()
-                    elif len(current_subchunk) + len(sentence) > max_chunk_size and current_subchunk:
-                        processed_chunks.append(current_subchunk.strip())
-                        current_subchunk = sentence
-                    else:
-                        current_subchunk += (" " + sentence if current_subchunk else sentence)
-                if current_subchunk.strip():
-                    processed_chunks.append(current_subchunk.strip())
-            else:
-                processed_chunks.append(chunk)
-        
+        processed_chunks = self.chunking_service.process_chunks(text_chunks, max_chunk_size)
         print(f"AudioEngine: Processing {len(processed_chunks)} chunks (max size: {max_chunk_size} chars)")
         print(f"🔍 AudioEngine: After rechunking, chunk sizes: {[len(chunk) for chunk in processed_chunks]}")
         

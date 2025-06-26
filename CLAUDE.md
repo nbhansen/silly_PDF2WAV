@@ -5,6 +5,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Overriding objective
 NEVER EVER FOR THE LOVE OF GOD FUCKING INSERT HARDCODES ANYWHERE, NOT EVEN AS FALLBACKS, IT GETS THE INFO FROM THE YAML CONFIG FILE ONLY.
 
+**CRUD REMOVAL COMPLETED**: 
+- ✅ Removed unused `config/voice_personas.json` file (legacy multi-voice system)
+- ✅ Moved Flask server settings (debug, host, port) to YAML configuration  
+- ✅ All hardcoded values now properly configurable via YAML
+- ✅ YAML config file is the ONLY place with hardcoded values
+
 ## Project Overview
 
 A Flask web application that converts PDF documents to audio files using multiple TTS engines (Text-to-Speech). The application extracts text from PDFs, cleans it using LLM services, applies academic SSML enhancements, and generates synchronized audio with optional read-along functionality.

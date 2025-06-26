@@ -72,28 +72,12 @@ class Result(Generic[T]):
 
 # Helper functions for common error types
 
-
-# file_not_found_error removed - unused
-
-
 def text_extraction_error(details: str) -> ApplicationError:
     return ApplicationError(
         code=ErrorCode.TEXT_EXTRACTION_FAILED,
         message="Failed to extract text from PDF",
         details=details,
         retryable=True  # Text extraction errors are often transient (OCR, file access)
-    )
-
-
-# text_cleaning_error removed - unused
-
-
-def audio_generation_error(details: str = None) -> ApplicationError:
-    return ApplicationError(
-        code=ErrorCode.AUDIO_GENERATION_FAILED,
-        message="Audio generation failed",
-        details=details,
-        retryable=True  # TTS errors might be transient
     )
 
 

@@ -5,10 +5,13 @@ Replaces: TextCleaningService, AcademicSSMLService (as separate concerns)
 """
 
 import re
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 from abc import ABC, abstractmethod
 
 from ..errors import Result
+
+if TYPE_CHECKING:
+    from ..interfaces import ILLMProvider
 
 
 class ITextPipeline(ABC):

@@ -1,1 +1,1 @@
-# Domain Document Aggregate
+# Document processing aggregates

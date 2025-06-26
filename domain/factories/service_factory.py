@@ -1,80 +1,25 @@
 # domain/factories/service_factory.py - Simple Service Factory
 """
-Clean, minimal factory functions that replace the complex CompositionRoot.
-Focuses on creating consolidated services with clear dependencies.
+Simplified service factory that delegates to focused factories.
+Main orchestration point for service creation.
 """
 
-
 from application.config.system_config import SystemConfig
-from domain.audio.audio_engine import AudioEngine, IAudioEngine
-from domain.audio.timing_engine import TimingEngine, ITimingEngine, TimingMode
-from domain.text.text_pipeline import TextPipeline, ITextPipeline
+from domain.audio.audio_engine import IAudioEngine
+from domain.text.text_pipeline import ITextPipeline
 from domain.document.document_engine import DocumentEngine, IDocumentEngine
 from domain.container.service_container import ServiceContainer
 
 from infrastructure.file.file_manager import FileManager
-from infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
 from infrastructure.ocr.tesseract_ocr_provider import TesseractOCRProvider
-from infrastructure.tts.gemini_tts_provider import GeminiTTSProvider
-from infrastructure.tts.piper_tts_provider import PiperTTSProvider
 
+from .audio_factory import create_audio_engine, create_timing_engine
+from .text_factory import create_text_pipeline
+from .tts_factory import create_tts_engine
 
-def create_text_pipeline(config: SystemConfig, tts_supports_ssml: bool = True) -> ITextPipeline:
-    """Create text pipeline with optional LLM provider"""
-    llm_provider = None
-    if config.gemini_api_key:
-        llm_provider = GeminiLLMProvider(
-            api_key=config.gemini_api_key, 
-            model_name=config.llm_model_name,
-            min_request_interval=config.llm_min_request_interval,
-            max_concurrent_requests=config.llm_max_concurrent_requests,
-            requests_per_minute=config.llm_requests_per_minute
-        )
-    
-    return TextPipeline(
-        llm_provider=llm_provider,
-        enable_cleaning=config.enable_text_cleaning,
-        enable_ssml=config.enable_ssml,
-        document_type=config.document_type,
-        tts_supports_ssml=tts_supports_ssml
-    )
-
-
-def create_tts_engine(config: SystemConfig):
-    """Create TTS engine based on configuration"""
-    if config.tts_engine.value == 'gemini':
-        return GeminiTTSProvider(
-            model_name=config.gemini_model_name,
-            api_key=config.gemini_api_key,
-            voice_name=config.gemini_voice_name,
-            document_type=config.document_type,
-            min_request_interval=config.gemini_min_request_interval,
-            max_concurrent_requests=config.gemini_max_concurrent_requests,
-            requests_per_minute=config.gemini_requests_per_minute
-        )
-    else:
-        return PiperTTSProvider(
-            config.get_piper_config(),
-            repository_url=config.piper_model_repository_url
-        )
-
-
-def create_timing_engine(config: SystemConfig, tts_engine, file_manager: FileManager, text_pipeline: ITextPipeline) -> ITimingEngine:
-    """Create timing engine with appropriate mode"""
-    mode = TimingMode.MEASUREMENT if config.gemini_use_measurement_mode else TimingMode.ESTIMATION
-    
-    return TimingEngine(
-        tts_engine=tts_engine,
-        file_manager=file_manager,
-        text_pipeline=text_pipeline,
-        mode=mode,
-        measurement_interval=config.gemini_measurement_mode_interval
-    )
-
-
-def create_audio_engine(config: SystemConfig) -> IAudioEngine:
-    """Create audio engine with all dependencies"""
-    # Create dependencies
+def create_complete_audio_engine(config: SystemConfig) -> IAudioEngine:
+    """Create audio engine with all dependencies using focused factories"""
+    # Create dependencies in order
     file_manager = FileManager(
         upload_folder=config.upload_folder,
         output_folder=config.audio_folder
@@ -89,18 +34,8 @@ def create_audio_engine(config: SystemConfig) -> IAudioEngine:
     # Create timing engine with all dependencies
     timing_engine = create_timing_engine(config, tts_engine, file_manager, text_pipeline)
     
-    print(f"🔍 ServiceFactory: Creating AudioEngine with chunk sizes:")
-    print(f"  - audio_target_chunk_size: {config.audio_target_chunk_size}")
-    print(f"  - audio_max_chunk_size: {config.audio_max_chunk_size}")
-    
-    return AudioEngine(
-        tts_engine=tts_engine,
-        file_manager=file_manager,
-        timing_engine=timing_engine,
-        max_concurrent=config.max_concurrent_requests,
-        audio_target_chunk_size=config.audio_target_chunk_size,
-        audio_max_chunk_size=config.audio_max_chunk_size
-    )
+    # Create final audio engine
+    return create_audio_engine(config, tts_engine, file_manager, timing_engine)
 
 
 def create_document_engine(config: SystemConfig) -> IDocumentEngine:
@@ -119,18 +54,24 @@ def create_document_engine(config: SystemConfig) -> IDocumentEngine:
 
 
 def create_complete_service_set(config: SystemConfig):
-    """Create complete set of consolidated services"""
+    """Create complete set of consolidated services using focused factories"""
     # Create shared file manager
     file_manager = FileManager(
         upload_folder=config.upload_folder,
         output_folder=config.audio_folder
     )
     
-    # Create audio engine first (it will create TTS engine and text pipeline with correct SSML support)
-    audio_engine = create_audio_engine(config)
+    # Create TTS engine first to determine SSML support
+    tts_engine = create_tts_engine(config)
     
-    # Extract text pipeline from audio engine for other services
-    text_pipeline = audio_engine.timing_engine.text_pipeline
+    # Create text pipeline with TTS engine's SSML support status
+    text_pipeline = create_text_pipeline(config, tts_supports_ssml=tts_engine.supports_ssml())
+    
+    # Create timing engine with all dependencies
+    timing_engine = create_timing_engine(config, tts_engine, file_manager, text_pipeline)
+    
+    # Create audio engine with all dependencies
+    audio_engine = create_audio_engine(config, tts_engine, file_manager, timing_engine)
     
     # Create document engine
     document_engine = create_document_engine(config)
@@ -140,7 +81,9 @@ def create_complete_service_set(config: SystemConfig):
         'file_manager': file_manager,
         'text_pipeline': text_pipeline,
         'audio_engine': audio_engine,
-        'document_engine': document_engine
+        'document_engine': document_engine,
+        'tts_engine': tts_engine,
+        'timing_engine': timing_engine
     }
 
 

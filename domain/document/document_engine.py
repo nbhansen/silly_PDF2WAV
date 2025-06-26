@@ -6,14 +6,18 @@ Replaces: PDFProcessingService, complex text extraction logic
 
 import io
 import os
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, TYPE_CHECKING
 from abc import ABC, abstractmethod
 
 import pdfplumber
 
 from ..interfaces import IOCRProvider, IFileManager
-from ..models import TimedAudioResult, ProcessingRequest, ProcessingResult, PDFInfo, PageRange
+from ..models import ProcessingRequest, ProcessingResult, PDFInfo, PageRange
 from ..errors import ApplicationError, text_extraction_error, audio_generation_error
+
+if TYPE_CHECKING:
+    from ..audio.audio_engine import IAudioEngine
+    from ..text.text_pipeline import ITextPipeline
 
 
 class IDocumentEngine(ABC):

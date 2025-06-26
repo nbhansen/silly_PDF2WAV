@@ -1,1 +1,1 @@
-# Domain Text Aggregate
+# Text processing aggregates

@@ -4,10 +4,11 @@ Clean, minimal service container that replaces the complex CompositionRoot.
 Focuses on dependency injection without over-engineering.
 """
 
-from typing import Dict, Type, TypeVar, Callable, Any
+from typing import Dict, Type, TypeVar, Callable, Any, TYPE_CHECKING
 from abc import ABC, abstractmethod
 
-from application.config.system_config import SystemConfig
+if TYPE_CHECKING:
+    from application.config.system_config import SystemConfig
 
 T = TypeVar('T')
 
@@ -33,7 +34,7 @@ class ServiceContainer(IServiceContainer):
     Low coupling: Uses factories to avoid tight dependencies.
     """
     
-    def __init__(self, config: SystemConfig):
+    def __init__(self, config: 'SystemConfig'):
         self.config = config
         self._factories: Dict[Type, Callable] = {}
         self._singletons: Dict[Type, Any] = {}
@@ -103,8 +104,7 @@ class ServiceContainer(IServiceContainer):
             lambda: TimingEngine(
                 tts_engine=self.get('tts_engine'),
                 file_manager=self.get(FileManager),
-                ssml_service=None,  # Will be replaced by text pipeline
-                text_cleaning_service=None,  # Will be replaced by text pipeline
+                text_pipeline=self.get(ITextPipeline),
                 mode=TimingMode.MEASUREMENT if self.config.gemini_use_measurement_mode else TimingMode.ESTIMATION,
                 measurement_interval=self.config.gemini_measurement_mode_interval
             )

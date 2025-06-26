@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
-# Import error types
 from .errors import ApplicationError
 
 # --- Core Domain Models ---
@@ -14,8 +13,49 @@ class PageRange:
     start_page: Optional[int] = None
     end_page: Optional[int] = None
 
+    def __post_init__(self):
+        """Validate page range after initialization"""
+        if self.start_page is not None and self.start_page < 1:
+            raise ValueError("start_page must be 1 or greater")
+        
+        if self.end_page is not None and self.end_page < 1:
+            raise ValueError("end_page must be 1 or greater")
+        
+        if (self.start_page is not None and self.end_page is not None 
+            and self.start_page > self.end_page):
+            raise ValueError("start_page cannot be greater than end_page")
+
     def is_full_document(self) -> bool:
         return self.start_page is None and self.end_page is None
+    
+    def validate_against_document(self, total_pages: int) -> None:
+        """Validate page range against actual document"""
+        if total_pages < 1:
+            raise ValueError("Document must have at least 1 page")
+        
+        if self.start_page is not None and self.start_page > total_pages:
+            raise ValueError(f"start_page {self.start_page} exceeds document pages ({total_pages})")
+        
+        if self.end_page is not None and self.end_page > total_pages:
+            raise ValueError(f"end_page {self.end_page} exceeds document pages ({total_pages})")
+    
+    def validate(self) -> Optional[str]:
+        """Validate page range and return error message if invalid"""
+        if self.start_page is not None and self.start_page < 1:
+            return "Start page must be 1 or greater"
+        
+        if self.end_page is not None and self.end_page < 1:
+            return "End page must be 1 or greater"
+        
+        if (self.start_page is not None and self.end_page is not None 
+            and self.start_page > self.end_page):
+            return "Start page cannot be greater than end page"
+        
+        return None
+    
+    def is_valid(self) -> bool:
+        """Check if page range is valid"""
+        return self.validate() is None
 
 
 @dataclass
@@ -23,6 +63,43 @@ class ProcessingRequest:
     pdf_path: str
     output_name: str
     page_range: PageRange
+
+    def __post_init__(self):
+        """Validate processing request after initialization"""
+        if not self.pdf_path or not self.pdf_path.strip():
+            raise ValueError("pdf_path cannot be empty")
+        
+        if not self.output_name or not self.output_name.strip():
+            raise ValueError("output_name cannot be empty")
+        
+        # Validate output name doesn't contain problematic characters
+        import re
+        if not re.match(r'^[a-zA-Z0-9_\-\s]+$', self.output_name):
+            raise ValueError("output_name contains invalid characters")
+        
+        if self.page_range is None:
+            raise ValueError("page_range cannot be None")
+
+    def validate(self) -> Optional[str]:
+        """Validate processing request"""
+        if not self.pdf_path:
+            return "PDF path is required"
+        
+        if not self.output_name:
+            return "Output name is required"
+        
+        if not self.pdf_path.lower().endswith('.pdf'):
+            return "File must be a PDF"
+        
+        page_error = self.page_range.validate()
+        if page_error:
+            return f"Page range error: {page_error}"
+        
+        return None
+    
+    def is_valid(self) -> bool:
+        """Check if processing request is valid"""
+        return self.validate() is None
 
 
 @dataclass
@@ -97,6 +174,20 @@ class FileInfo:
     created_at: datetime
     last_accessed: Optional[datetime] = None
 
+    def __post_init__(self):
+        """Validate file info after initialization"""
+        if not self.filename or not self.filename.strip():
+            raise ValueError("filename cannot be empty")
+        
+        if not self.full_path or not self.full_path.strip():
+            raise ValueError("full_path cannot be empty")
+        
+        if self.size_bytes < 0:
+            raise ValueError("size_bytes cannot be negative")
+        
+        if self.last_accessed and self.last_accessed < self.created_at:
+            raise ValueError("last_accessed cannot be before created_at")
+
     @property
     def size_mb(self) -> float:
         return self.size_bytes / (1024 * 1024)
@@ -128,9 +219,54 @@ class TextSegment:
     chunk_index: int   # which audio chunk this belongs to
     sentence_index: int  # position within the chunk
 
+    def __post_init__(self):
+        """Validate text segment after initialization"""
+        if not self.text or not self.text.strip():
+            raise ValueError("text cannot be empty")
+        
+        if self.start_time < 0:
+            raise ValueError("start_time cannot be negative")
+        
+        if self.duration <= 0:
+            raise ValueError("duration must be positive")
+        
+        if self.chunk_index < 0:
+            raise ValueError("chunk_index cannot be negative")
+        
+        if self.sentence_index < 0:
+            raise ValueError("sentence_index cannot be negative")
+        
+        # Validate segment_type
+        valid_types = {"sentence", "paragraph", "heading", "technical", "emphasis"}
+        if self.segment_type not in valid_types:
+            raise ValueError(f"segment_type must be one of {valid_types}")
+
     @property
     def end_time(self) -> float:
         return self.start_time + self.duration
+    
+    def validate(self) -> Optional[str]:
+        """Validate text segment timing data"""
+        if not self.text or not self.text.strip():
+            return "Text segment cannot be empty"
+        
+        if self.start_time < 0:
+            return "Start time cannot be negative"
+        
+        if self.duration <= 0:
+            return "Duration must be positive"
+        
+        if self.chunk_index < 0:
+            return "Chunk index cannot be negative"
+        
+        if self.sentence_index < 0:
+            return "Sentence index cannot be negative"
+        
+        return None
+    
+    def is_valid(self) -> bool:
+        """Check if text segment is valid"""
+        return self.validate() is None
 
 
 @dataclass
