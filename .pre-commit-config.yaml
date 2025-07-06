@@ -1,0 +1,92 @@
+# Pre-commit hooks for automated code quality enforcement
+# Install with: pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # Ruff - Fast comprehensive Python linting and auto-fixing
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.9
+    hooks:
+      - id: ruff
+        name: ruff-linting
+        args: [--fix, --exit-non-zero-on-fix]
+        description: "Run Ruff linter with auto-fix"
+      - id: ruff-format
+        name: ruff-formatting
+        description: "Run Ruff formatter"
+
+  # Black - Code formatting (backup to Ruff formatter)
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        name: black-formatting
+        language_version: python3.9
+        description: "Format Python code with Black"
+
+  # MyPy - Type checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        name: mypy-type-checking
+        additional_dependencies: [types-PyYAML, types-requests]
+        args: [--config-file=pyproject.toml]
+        description: "Static type checking with MyPy"
+
+  # Bandit - Security vulnerability scanning
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        name: bandit-security
+        args: [-c, pyproject.toml]
+        description: "Security vulnerability scanning"
+
+  # General file quality checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        name: trim-trailing-whitespace
+        description: "Remove trailing whitespace"
+      - id: end-of-file-fixer
+        name: fix-end-of-file
+        description: "Ensure files end with newline"
+      - id: check-yaml
+        name: check-yaml-syntax
+        description: "Validate YAML syntax"
+      - id: check-json
+        name: check-json-syntax
+        description: "Validate JSON syntax"
+      - id: check-merge-conflict
+        name: check-merge-conflicts
+        description: "Check for merge conflict markers"
+      - id: check-added-large-files
+        name: check-large-files
+        args: ['--maxkb=1000']
+        description: "Prevent large files from being committed"
+
+  # Python-specific checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-ast
+        name: python-ast-check
+        description: "Check Python AST syntax"
+      - id: debug-statements
+        name: python-debug-check
+        description: "Check for debugger imports and breakpoints"
+
+# Configuration
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit.com hooks
+
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: []
+  submodules: false

@@ -1,0 +1,224 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pdf2wav"
+version = "1.0.0"
+description = "Convert PDF documents to audio files with TTS engines"
+authors = [{name = "PDF2WAV Team"}]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+[tool.ruff]
+# Fast, comprehensive Python linting
+line-length = 120
+target-version = "py39"
+extend-exclude = [
+    "venv",
+    "uploads",
+    "audio_outputs",
+    "__pycache__",
+]
+
+[tool.ruff.lint]
+# Enable comprehensive rule sets for high code quality
+select = [
+    # Pycodestyle
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    
+    # Pyflakes
+    "F",     # pyflakes
+    
+    # Code quality and bug prevention
+    "B",     # flake8-bugbear (common bugs and design problems)
+    "C4",    # flake8-comprehensions (better list/dict/set comprehensions)
+    "PIE",   # flake8-pie (unnecessary code patterns)
+    "SIM",   # flake8-simplify (code simplification suggestions)
+    "RUF",   # Ruff-specific rules
+    
+    # Security
+    "S",     # flake8-bandit (security testing)
+    
+    # Complexity
+    "C90",   # mccabe complexity
+    
+    # Modern Python
+    "UP",    # pyupgrade (modern Python idioms)
+    "PTH",   # flake8-use-pathlib (prefer pathlib over os.path)
+    
+    # Import sorting and organization  
+    "I",     # isort (import sorting)
+    
+    # Documentation
+    "D",     # pydocstyle (docstring conventions)
+    
+    # Type annotations
+    "ANN",   # flake8-annotations (missing type annotations)
+    
+    # Async best practices
+    "ASYNC", # flake8-async (async/await best practices)
+    
+    # Testing
+    "PT",    # flake8-pytest-style (pytest best practices)
+]
+
+ignore = [
+    # Documentation - allow missing docstrings in some cases
+    "D100",  # Missing docstring in public module
+    "D104",  # Missing docstring in public package
+    "D107",  # Missing docstring in __init__
+    
+    # Type annotations - gradual adoption
+    "ANN101", # Missing type annotation for self
+    "ANN102", # Missing type annotation for cls
+    "ANN204", # Missing return type annotation for special method
+    
+    # Security - false positives for our use case
+    "S101",   # Use of assert (OK in tests)
+    "S603",   # subprocess call (we use subprocess intentionally)
+    "S607",   # Starting a process with a partial executable path
+    
+    # Complexity - allow some complexity in domain logic
+    "C901",   # Complex function (we'll monitor separately)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Test files can have additional flexibility
+"tests/**/*.py" = [
+    "S101",   # Assert statements are expected in tests
+    "D103",   # Missing docstring in public function (test functions)
+    "ANN001", # Missing type annotation for function argument
+    "ANN201", # Missing return type annotation for public function
+]
+
+# Config files and scripts
+"*.py" = ["D100"]  # Module docstrings optional for scripts
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10  # Target: average <5, but allow up to 10
+
+[tool.ruff.lint.isort]
+known-first-party = ["application", "domain", "infrastructure"]
+force-sort-within-sections = true
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"  # Google-style docstrings
+
+[tool.black]
+# Consistent code formatting
+line-length = 120
+target-version = ['py39', 'py310', 'py311', 'py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  venv
+  | uploads
+  | audio_outputs
+  | __pycache__
+)/
+'''
+
+[tool.mypy]
+# Strict type checking for better code quality
+python_version = "3.9"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+implicit_reexport = false
+strict_equality = true
+
+# Allow some flexibility for external dependencies
+ignore_missing_imports = true
+
+# Module-specific overrides
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+[tool.bandit]
+# Security vulnerability scanning
+exclude_dirs = ["tests", "venv"]
+skips = [
+    "B101",  # assert_used (OK in tests and development)
+    "B603",  # subprocess_without_shell_equals_true (we use subprocess intentionally)
+]
+
+[tool.pytest.ini_options]
+# Enhanced test configuration
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = [
+    "--verbose",
+    "--tb=short", 
+    "--strict-markers",
+    "--strict-config",
+    "--durations=10",
+]
+
+markers = [
+    "unit: Fast unit tests with no external dependencies",
+    "integration: Integration tests with mocked external services", 
+    "external: Tests requiring real external services (manual)",
+    "slow: Tests taking more than 5 seconds",
+    "benchmark: Performance benchmark tests",
+]
+
+filterwarnings = [
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning", 
+    "ignore::pytest.PytestUnraisableExceptionWarning",
+]
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "venv/*",
+    "tests/*", 
+    "*/test_*.py",
+    "uploads/*",
+    "audio_outputs/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.radon]
+# Complexity analysis configuration
+cc_min = "B"  # Only show complexity B and above
+mi_min = "B"  # Only show maintainability index B and above

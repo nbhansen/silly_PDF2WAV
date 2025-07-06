@@ -1,14 +1,34 @@
+# Core application dependencies
 Flask==3.1.1
 numpy==2.2.6
 pdf2image==1.17.0
 pdfplumber==0.11.6
 pydub==0.25.1
 pytesseract==0.3.13
-pytest==8.4.0
-pytest-cov==6.1.1
 python-dotenv==1.1.0
 google-genai>=1.21.0
 aiofiles==24.1.0
 nest-asyncio==1.6.0
 PyYAML==6.0.1
+
+# Testing and development
+pytest==8.4.0
+pytest-cov==6.1.1
+pytest-benchmark==5.1.0
+
+# Code quality and formatting tools
+ruff>=0.1.9
+black>=23.12.1
+mypy>=1.8.0
+bandit>=1.7.5
+pre-commit>=3.6.0
+
+# Code analysis and metrics
+radon>=6.0.1
+vulture>=2.10
+
+# Type stubs for better type checking
+types-PyYAML>=6.0.12
+types-requests>=2.31.0
+
 # piper-tts might need binary install on some platforms like Fedora

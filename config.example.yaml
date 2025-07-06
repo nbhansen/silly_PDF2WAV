@@ -10,7 +10,7 @@
 app:
   name: "PDF to Audio Converter"
   debug: true
-  host: "0.0.0.0"
+  host: "127.0.0.1"  # Secure default: localhost only. Use "0.0.0.0" for network access (development only!)
   port: 5000
 
 # =================================================================

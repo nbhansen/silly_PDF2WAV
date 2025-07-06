@@ -5,7 +5,8 @@ from typing import Optional
 
 @dataclass
 class GeminiConfig:
-    """Configuration for Gemini TTS engine"""
+    """Configuration for Gemini TTS engine."""
+
     voice_name: str = "Kore"
     style_prompt: Optional[str] = None
     api_key: Optional[str] = None
@@ -16,7 +17,8 @@ class GeminiConfig:
 
 @dataclass
 class PiperConfig:
-    """Configuration for Piper TTS engine"""
+    """Configuration for Piper TTS engine."""
+
     model_name: str = "en_US-lessac-medium"
     model_path: Optional[str] = None
     config_path: Optional[str] = None

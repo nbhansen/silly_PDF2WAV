@@ -1,29 +1,20 @@
-"""
-Background service for managing cleanup of old files.
+"""Background service for managing cleanup of old files.
 Runs in a separate thread to periodically remove expired files.
 """
-import os
-import time
+
 import threading
-from typing import Dict
+import time
 
 from domain.interfaces import IFileManager
 
 
 class FileCleanupScheduler:
-    """
-    Background thread service for periodic cleanup of expired files.
+    """Background thread service for periodic cleanup of expired files.
     Monitors registered files and removes them when they exceed max age.
     """
 
-    def __init__(
-        self,
-        file_manager: IFileManager,
-        max_file_age_seconds: int,
-        check_interval_seconds: int
-    ):
-        """
-        Initialize the cleanup scheduler (does not start automatically).
+    def __init__(self, file_manager: IFileManager, max_file_age_seconds: int, check_interval_seconds: int):
+        """Initialize the cleanup scheduler (does not start automatically).
 
         Args:
             file_manager: IFileManager implementation for file operations
@@ -36,7 +27,7 @@ class FileCleanupScheduler:
 
         # Thread-safe file tracking
         self._lock = threading.Lock()
-        self._scheduled_files: Dict[str, float] = {}  # {filepath: creation_timestamp}
+        self._scheduled_files: dict[str, float] = {}  # {filepath: creation_timestamp}
 
         self._stop_event = threading.Event()
         self._thread = threading.Thread(target=self._cleanup_job, daemon=True)
@@ -63,7 +54,7 @@ class FileCleanupScheduler:
         while not self._stop_event.is_set():
             try:
                 self._process_expired_files()
-            except Exception as e:
+            except Exception:
                 # Log error but continue running
                 pass
 

@@ -1,11 +1,12 @@
 # domain/errors.py
-from enum import Enum
 from dataclasses import dataclass
-from typing import Optional, Any, Generic, TypeVar
+from enum import Enum
+from typing import Generic, Optional, TypeVar
 
 
 class ErrorCode(Enum):
-    """Standard error codes for the application"""
+    """Standard error codes for the application."""
+
     FILE_NOT_FOUND = "file_not_found"
     TEXT_EXTRACTION_FAILED = "text_extraction_failed"
     TEXT_CLEANING_FAILED = "text_cleaning_failed"
@@ -22,7 +23,8 @@ class ErrorCode(Enum):
 
 @dataclass
 class ApplicationError:
-    """Structured error information"""
+    """Structured error information."""
+
     code: ErrorCode
     message: str
     details: Optional[str] = None
@@ -36,12 +38,13 @@ class ApplicationError:
 
 
 # Result type for better error handling
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 @dataclass
 class Result(Generic[T]):
-    """Result type that either contains a value or an error"""
+    """Result type that either contains a value or an error."""
+
     value: Optional[T] = None
     error: Optional[ApplicationError] = None
 
@@ -54,75 +57,70 @@ class Result(Generic[T]):
         return self.error is not None
 
     @classmethod
-    def success(cls, value: T) -> 'Result[T]':
+    def success(cls, value: T) -> "Result[T]":
         return cls(value=value)
 
     @classmethod
-    def failure(cls, error: ApplicationError) -> 'Result[T]':
+    def failure(cls, error: ApplicationError) -> "Result[T]":
         return cls(error=error)
 
     @classmethod
-    def from_exception(cls, ex: Exception, code: ErrorCode = ErrorCode.UNKNOWN_ERROR, retryable: bool = False) -> 'Result[T]':
-        return cls.failure(ApplicationError(
-            code=code,
-            message=str(ex),
-            details=ex.__class__.__name__,
-            retryable=retryable
-        ))
+    def from_exception(
+        cls, ex: Exception, code: ErrorCode = ErrorCode.UNKNOWN_ERROR, retryable: bool = False
+    ) -> "Result[T]":
+        return cls.failure(
+            ApplicationError(code=code, message=str(ex), details=ex.__class__.__name__, retryable=retryable)
+        )
+
 
 # Helper functions for common error types
+
 
 def text_extraction_error(details: str) -> ApplicationError:
     return ApplicationError(
         code=ErrorCode.TEXT_EXTRACTION_FAILED,
         message="Failed to extract text from PDF",
         details=details,
-        retryable=True  # Text extraction errors are often transient (OCR, file access)
+        retryable=True,  # Text extraction errors are often transient (OCR, file access)
     )
 
 
-def audio_generation_error(details: str = None) -> ApplicationError:
+def audio_generation_error(details: Optional[str] = None) -> ApplicationError:
     return ApplicationError(
         code=ErrorCode.AUDIO_GENERATION_FAILED,
         message="Audio generation failed",
         details=details,
-        retryable=True  # TTS errors might be transient
+        retryable=True,  # TTS errors might be transient
     )
 
 
-def tts_engine_error(details: str = None) -> ApplicationError:
+def tts_engine_error(details: Optional[str] = None) -> ApplicationError:
     return ApplicationError(
         code=ErrorCode.TTS_ENGINE_ERROR,
         message="TTS engine error",
         details=details,
-        retryable=True  # Rate limits, API issues, etc.
+        retryable=True,  # Rate limits, API issues, etc.
     )
 
 
-def llm_provider_error(details: str = None) -> ApplicationError:
+def llm_provider_error(details: Optional[str] = None) -> ApplicationError:
     return ApplicationError(
         code=ErrorCode.LLM_PROVIDER_ERROR,
         message="LLM provider error",
         details=details,
-        retryable=True  # API issues, rate limits, etc.
+        retryable=True,  # API issues, rate limits, etc.
     )
 
 
 def invalid_page_range_error(details: str) -> ApplicationError:
     return ApplicationError(
-        code=ErrorCode.INVALID_PAGE_RANGE,
-        message="Invalid page range",
-        details=details,
-        retryable=False
+        code=ErrorCode.INVALID_PAGE_RANGE, message="Invalid page range", details=details, retryable=False
     )
 
 
 def configuration_error(details: str) -> ApplicationError:
     return ApplicationError(
-        code=ErrorCode.CONFIGURATION_ERROR,
-        message="Configuration error",
-        details=details,
-        retryable=False
+        code=ErrorCode.CONFIGURATION_ERROR, message="Configuration error", details=details, retryable=False
     )
 
 
@@ -130,7 +128,7 @@ def file_size_error(size_mb: float, max_size_mb: int) -> ApplicationError:
     return ApplicationError(
         code=ErrorCode.FILE_SIZE_ERROR,
         message=f"File too large: {size_mb:.1f}MB exceeds maximum {max_size_mb}MB",
-        retryable=False
+        retryable=False,
     )
 
 
@@ -139,5 +137,5 @@ def unsupported_file_type_error(file_type: str) -> ApplicationError:
         code=ErrorCode.UNSUPPORTED_FILE_TYPE,
         message=f"Unsupported file type: {file_type}",
         details="Only PDF files are supported",
-        retryable=False
+        retryable=False,
     )
