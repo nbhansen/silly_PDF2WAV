@@ -79,6 +79,11 @@ def register_routes(app: Any) -> None:
         config = get_app_config()
         return render_template("index.html", tts_engine=config.tts_engine.value)
 
+    @app.route("/favicon.ico")  # type: ignore[misc]
+    def favicon() -> tuple[str, int]:
+        """Return a simple response for favicon requests to avoid 404 errors."""
+        return "", 204
+
     @app.route("/audio_outputs/<filename>")  # type: ignore[misc]
     def serve_audio(filename: str) -> Response:
         return send_from_directory(app.config["AUDIO_FOLDER"], filename)

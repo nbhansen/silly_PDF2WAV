@@ -86,6 +86,12 @@ def create_pdf_service_from_env(config: SystemConfig) -> ServiceContainer:
         create_service_container_builder(config)
         .register(IDocumentEngine, lambda: services["document_engine"])
         .register("IDocumentEngine", lambda: services["document_engine"])
+        .register(IAudioEngine, lambda: services["audio_engine"])
+        .register("IAudioEngine", lambda: services["audio_engine"])
+        .register("ITextPipeline", lambda: services["text_pipeline"])
+        .register("ITTSEngine", lambda: services["tts_engine"])
+        .register("ITimingEngine", lambda: services["timing_engine"])
+        .register("IFileManager", lambda: services["file_manager"])
         .build()
     )
 

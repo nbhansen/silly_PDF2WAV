@@ -95,6 +95,67 @@ python app.py
 ```
 Access at http://127.0.0.1:5000
 
+## 🚀 Getting Started
+
+### Quick Start (5 minutes)
+
+1. **Setup Configuration**
+   ```bash
+   cp config.example.yaml config.yaml
+   ```
+   
+   For **Piper TTS** (free, local):
+   ```yaml
+   tts:
+     engine: "piper"
+   ```
+   
+   For **Gemini TTS** (requires API key):
+   ```yaml
+   tts:
+     engine: "gemini"
+   secrets:
+     google_ai_api_key: "your-api-key-here"
+   ```
+
+2. **Start the Application**
+   ```bash
+   source venv/bin/activate
+   python app.py
+   ```
+
+3. **Upload and Convert**
+   - Open http://127.0.0.1:5000 in your browser
+   - Upload a PDF file (research papers work great!)
+   - Select pages (optional - leave blank for full document)
+   - Click "Convert to Audio"
+   - Download your MP3 when processing completes
+
+### First Time Setup Tips
+
+- **Test with a small PDF first** (1-2 pages) to verify everything works
+- **Piper TTS** downloads models automatically (~100MB) on first use
+- **Gemini TTS** requires a [Google AI API key](https://aistudio.google.com/app/apikey) but provides higher quality voices
+- Check the **console output** for processing status and any errors
+
+### Example Workflow
+
+```bash
+# 1. Quick setup for local processing
+cp config.example.yaml config.yaml
+# (Use default Piper settings)
+
+# 2. Start the server
+python app.py
+
+# 3. Upload a research paper PDF
+# 4. Select pages 1-10 (optional)
+# 5. Enable text cleaning for better quality
+# 6. Download the generated MP3
+
+# Processing typically takes 30 seconds - 2 minutes per page
+```
+
 ## 🎯 Recent Architecture Improvements
 
 ### TTS Engine Simplification (v2.0)
