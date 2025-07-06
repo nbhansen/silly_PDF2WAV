@@ -2,6 +2,7 @@
 """TDD tests for SystemConfig - comprehensive coverage following red-green-refactor cycle.
 Tests configuration loading, validation, and error handling without external dependencies.
 """
+
 from unittest.mock import patch
 
 import pytest

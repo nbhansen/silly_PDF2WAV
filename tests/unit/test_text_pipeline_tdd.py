@@ -2,6 +2,7 @@
 """TDD tests for TextPipeline - comprehensive coverage following red-green-refactor cycle.
 Tests pure text processing logic without external dependencies.
 """
+
 from unittest.mock import Mock
 
 from domain.errors import Result

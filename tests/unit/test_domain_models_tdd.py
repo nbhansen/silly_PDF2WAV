@@ -2,6 +2,7 @@
 """TDD tests for domain models - comprehensive coverage following red-green-refactor cycle.
 Tests written first to drive implementation and ensure all edge cases are covered.
 """
+
 from datetime import datetime, timedelta
 
 import pytest
@@ -237,7 +238,10 @@ class TestFileInfo:
         """Should create file info with proper metadata."""
         now = datetime.now()
         file_info = FileInfo(
-            filename="test.wav", full_path="/audio/test.wav", size_bytes=1048576, created_at=now  # 1MB
+            filename="test.wav",
+            full_path="/audio/test.wav",
+            size_bytes=1048576,
+            created_at=now,  # 1MB
         )
 
         assert file_info.filename == "test.wav"
@@ -249,7 +253,10 @@ class TestFileInfo:
     def test_file_info_size_conversion_to_mb(self):
         """Should correctly convert bytes to megabytes."""
         file_info = FileInfo(
-            filename="large.wav", full_path="/audio/large.wav", size_bytes=5242880, created_at=datetime.now()  # 5MB
+            filename="large.wav",
+            full_path="/audio/large.wav",
+            size_bytes=5242880,
+            created_at=datetime.now(),  # 5MB
         )
 
         assert file_info.size_mb == 5.0
@@ -257,7 +264,10 @@ class TestFileInfo:
     def test_file_info_size_conversion_with_fractional_mb(self):
         """Should handle fractional megabytes correctly."""
         file_info = FileInfo(
-            filename="small.wav", full_path="/audio/small.wav", size_bytes=1572864, created_at=datetime.now()  # 1.5MB
+            filename="small.wav",
+            full_path="/audio/small.wav",
+            size_bytes=1572864,
+            created_at=datetime.now(),  # 1.5MB
         )
 
         assert file_info.size_mb == 1.5

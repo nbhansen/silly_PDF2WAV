@@ -27,7 +27,7 @@ secrets:
 tts:
   # Choose: 'piper' (local, fast, no API key) or 'gemini' (cloud, high quality)
   engine: "piper"
-  
+
   # Piper TTS Settings (local engine)
   piper:
     # Available models:
@@ -37,20 +37,20 @@ tts:
     models_dir: "piper_models"
     length_scale: 1.0  # Speech speed (0.5-2.0)
     model_repository_url: "https://huggingface.co/rhasspy/piper-voices/resolve/main"
-  
+
   # Gemini TTS Settings (cloud engine)
   gemini:
     # TTS-specific model (has -tts suffix, different from LLM model)
     model_name: "gemini-2.5-pro-preview-tts"
     voice_name: "Kore"  # Single consistent voice: Kore, Charon, Aoede, Leda
-    
+
     # Rate limiting optimized for Gemini TTS limits (10 RPM)
     min_request_interval: 6.5  # Seconds between requests (optimized for 10 RPM)
     max_concurrent_requests: 2  # Optimal concurrency for rate limits
     requests_per_minute: 10  # Official Gemini TTS rate limit
     chunk_size_multiplier: 2.0  # Increase chunk sizes for efficiency
-    
-    # Advanced timing settings  
+
+    # Advanced timing settings
     use_measurement_mode: false  # Precise timing (slower)
     measurement_mode_interval: 0.8
 
@@ -68,10 +68,10 @@ llm:
 text_processing:
   # Enable LLM-powered text cleaning (requires google_ai_api_key)
   enable_text_cleaning: true
-  
+
   # Enable advanced SSML markup for better narration
   enable_ssml: true
-  
+
   # Text processing chunk sizes
   chunk_size: 4000
   llm_max_chunk_size: 100000
@@ -96,10 +96,10 @@ files:
   max_file_size_mb: 20  # Reduced for free service
   allowed_extensions: ["pdf"]
   audio_extensions: ["wav", "mp3"]
-  
+
   # Storage settings
   local_storage_dir: ".local"
-  
+
   # Automatic cleanup
   cleanup:
     enabled: true
@@ -142,14 +142,14 @@ rate_limits:
 # =================================================================
 # CONFIGURATION NOTES
 # =================================================================
-# 
+#
 # IMPORTANT MODEL SEPARATION:
 # - llm.model_name: For text cleaning (use regular Gemini models)
 # - tts.gemini.model_name: For audio generation (use -tts models)
-# 
+#
 # PIPER VOICE OPTIONS:
 # - en_US-ryan-high/medium: US Male voice
-# - en_GB-cori-high: GB Female voice  
+# - en_GB-cori-high: GB Female voice
 # - en_GB-alba-medium: GB Female voice
 #
 # TTS ENGINE COMPARISON:

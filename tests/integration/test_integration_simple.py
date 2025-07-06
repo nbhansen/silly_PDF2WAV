@@ -1,5 +1,6 @@
 # tests/test_integration_simple.py
 """Simple integration test - focused on core service factory functionality."""
+
 import tempfile
 from unittest.mock import patch
 
@@ -39,7 +40,6 @@ def test_service_factory_creation():
             patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True),
             patch("infrastructure.tts.piper_tts_provider.PiperTTSProvider"),
         ):
-
             config = create_test_config()
             container = create_pdf_service_from_env(config)
 

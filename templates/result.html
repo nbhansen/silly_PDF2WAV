@@ -30,7 +30,7 @@
                     <i class="fas fa-download"></i> Download MP3
                     <span class="size-info">Optimized for all devices</span>
                 </a>
-                
+
                 {% if has_timing_data and base_filename %}
                 <a href="{{ url_for('read_along_view', filename=combined_mp3_file) }}" class="btn btn-secondary read-along-btn">
                     <i class="fas fa-book-reader"></i> Read-Along Mode
@@ -52,7 +52,7 @@
                 <a href="{{ url_for('serve_audio', filename=audio_files[0]) }}" download="{{ audio_files[0] }}" class="btn btn-primary download-btn">
                     <i class="fas fa-download"></i> Download Audio
                 </a>
-                
+
                 {% if has_timing_data and base_filename %}
                 <a href="{{ url_for('read_along_view', filename=audio_files[0]) }}" class="btn btn-secondary read-along-btn">
                     <i class="fas fa-book-reader"></i> Read-Along Mode
@@ -183,50 +183,50 @@
         constructor() {
             this.init();
         }
-        
+
         init() {
             console.log('Audio conversion completed for:', '{{ original_filename }}');
-            
+
             {% if has_timing_data %}
             console.log('Read-along mode available');
             {% endif %}
-            
+
             // Auto-scroll to audio section
             this.scrollToAudio();
-            
+
             // Set up audio event listeners
             this.setupAudioListeners();
         }
-        
+
         scrollToAudio() {
             const audioSection = document.querySelector('.audio-player-section');
             if (audioSection) {
                 setTimeout(() => {
-                    audioSection.scrollIntoView({ 
-                        behavior: 'smooth', 
-                        block: 'center' 
+                    audioSection.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
                     });
                 }, 500);
             }
         }
-        
+
         setupAudioListeners() {
             document.querySelectorAll('audio').forEach(audio => {
                 audio.addEventListener('loadstart', () => {
                     console.log('Loading audio:', audio.src);
                 });
-                
+
                 audio.addEventListener('canplay', () => {
                     console.log('Audio ready to play:', audio.src);
                 });
-                
+
                 audio.addEventListener('error', (e) => {
                     console.error('Audio loading error:', audio.src, e);
                 });
             });
         }
     }
-    
+
     // Initialize when DOM is ready
     document.addEventListener('DOMContentLoaded', () => {
         new AudioResultHandler();

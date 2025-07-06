@@ -83,7 +83,7 @@ secrets:
 text_processing:
   enable_text_cleaning: true    # LLM-based text enhancement
   enable_ssml: true             # Academic SSML improvements
-  
+
 audio:
   target_chunk_size: 2000       # Characters per audio chunk
   max_chunk_size: 3000          # Maximum chunk size

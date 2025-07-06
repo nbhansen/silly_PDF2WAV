@@ -6,7 +6,7 @@
         <h1 class="site-title">PDF to Audio Converter</h1>
         <p class="site-subtitle">Transform your documents into high-quality audio files</p>
     </header>
-    
+
     <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data" novalidate>
         <div class="form-group">
             <label for="pdf_file">
@@ -20,12 +20,12 @@
                 <i class="fas fa-cog"></i>
                 <span>Advanced Options</span>
             </div>
-            
+
             <div class="checkbox-group">
                 <input type="checkbox" id="use_page_range" name="use_page_range">
                 <label for="use_page_range" class="checkbox-label">Specify custom page range</label>
             </div>
-            
+
             <div class="page-range-inputs" id="page_range_inputs">
                 <div class="page-input-group">
                     <span>From Page</span>
@@ -36,9 +36,9 @@
                     <input type="number" id="end_page" name="end_page" min="1" placeholder="Last page">
                 </div>
             </div>
-            
+
             <div class="error-message" id="page_error"></div>
-            
+
             <div class="checkbox-group">
                 <input type="checkbox" id="enable_read_along" name="enable_read_along" {{ 'disabled' if tts_engine == 'gemini' else '' }}>
                 <label for="enable_read_along" class="checkbox-label">
@@ -48,7 +48,7 @@
                     {% endif %}
                 </label>
             </div>
-            
+
             <div class="help-text">
                 <strong>Usage Tips:</strong><br>
                 • Leave page range unchecked to process the entire document<br>
@@ -60,7 +60,7 @@
 
         <div class="form-group">
             <input type="submit" id="submitBtn" value="Convert to Audio" class="btn btn-primary">
-            
+
             <div class="processing-indicator" id="processingIndicator">
                 <i class="fas fa-spinner fa-spin"></i> Processing your document...
             </div>
@@ -81,28 +81,28 @@
             this.readAlongCheckbox = document.getElementById('enable_read_along');
             this.errorDiv = document.getElementById('page_error');
             this.fileInput = document.getElementById('pdf_file');
-            
+
             this.isSubmitted = false;
             this.init();
         }
-        
+
         init() {
             // Event listeners
             this.pageRangeCheckbox.addEventListener('change', () => this.togglePageRange());
             this.readAlongCheckbox.addEventListener('change', () => this.updateFormAction());
             this.fileInput.addEventListener('change', () => this.handleFileSelection());
-            
+
             // Page range validation
             document.getElementById('start_page').addEventListener('input', () => this.validatePageRange());
             document.getElementById('end_page').addEventListener('input', () => this.validatePageRange());
-            
+
             // Form submission
             this.form.addEventListener('submit', (e) => this.handleSubmit(e));
-            
+
             // Initialize form action
             this.updateFormAction();
         }
-        
+
         togglePageRange() {
             if (this.pageRangeCheckbox.checked) {
                 this.pageRangeInputs.classList.add('active');
@@ -113,7 +113,7 @@
                 this.hideError();
             }
         }
-        
+
         updateFormAction() {
             if (this.readAlongCheckbox.checked) {
                 this.form.action = '/upload-with-timing';
@@ -123,43 +123,43 @@
                 this.submitBtn.value = 'Convert to Audio';
             }
         }
-        
+
         validatePageRange() {
             const startPage = parseInt(document.getElementById('start_page').value);
             const endPage = parseInt(document.getElementById('end_page').value);
-            
+
             this.hideError();
-            
+
             if (startPage && startPage < 1) {
                 this.showError('Start page must be 1 or greater');
                 return false;
             }
-            
+
             if (endPage && endPage < 1) {
                 this.showError('End page must be 1 or greater');
                 return false;
             }
-            
+
             if (startPage && endPage && startPage > endPage) {
                 this.showError('Start page cannot be greater than end page');
                 return false;
             }
-            
+
             return true;
         }
-        
+
         showError(message) {
             this.errorDiv.textContent = message;
             this.errorDiv.style.display = 'block';
         }
-        
+
         hideError() {
             this.errorDiv.style.display = 'none';
         }
-        
+
         handleFileSelection() {
             const file = this.fileInput.files[0];
-            
+
             if (file) {
                 const maxSize = 100 * 1024 * 1024; // 100MB
                 if (file.size > maxSize) {
@@ -167,29 +167,29 @@
                     this.fileInput.value = '';
                     return;
                 }
-                
+
                 console.log(`Selected: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
             }
         }
-        
+
         handleSubmit(e) {
             // Prevent double submission
             if (this.isSubmitted) {
                 e.preventDefault();
                 return false;
             }
-            
+
             // Validate page range if enabled
             if (this.pageRangeCheckbox.checked && !this.validatePageRange()) {
                 e.preventDefault();
                 return false;
             }
-            
+
             // Show processing state
             this.isSubmitted = true;
             this.submitBtn.disabled = true;
             this.processingIndicator.style.display = 'block';
-            
+
             // Reset on page unload (if user navigates away)
             window.addEventListener('beforeunload', () => {
                 this.isSubmitted = false;
@@ -199,7 +199,7 @@
             });
         }
     }
-    
+
     // Initialize when DOM is ready
     document.addEventListener('DOMContentLoaded', () => {
         new PDFConverter();

@@ -5,20 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Convert PDF documents to high-quality audio files using advanced text-to-speech technology.">
     <meta name="author" content="Nicolai Hansen">
-    
+
     <title>{% block title %}PDF to Audio Converter{% endblock %}</title>
-    
+
     <!-- Stylesheets -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+
     {% block head %}{% endblock %}
 </head>
 <body>
     <main class="container">
         {% block content %}{% endblock %}
     </main>
-    
+
     {% block scripts %}{% endblock %}
 </body>
 </html>

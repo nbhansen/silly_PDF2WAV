@@ -10,42 +10,42 @@ class EnhancedReadAlongPlayer {
         this.currentSegmentIndex = -1;
         this.autoScroll = true;
         this.isUserSeeking = false;
-        
+
         // Enhanced features
         this.readingSpeed = 1.0;
         this.highlightMode = 'smooth'; // 'smooth' or 'instant'
         this.lookaheadSegments = 2; // Pre-highlight upcoming segments
         this.scrollOffset = 0.3; // Scroll when text is 30% from bottom
-        
+
         // Performance optimization
         this.updateInterval = null;
         this.lastUpdateTime = 0;
         this.updateFrequency = 50; // ms
-        
+
         // Visual feedback
         this.confidenceThreshold = 0.7;
         this.wordHighlighting = false;
-        
+
         this.initializeElements();
         this.loadTimingData();
         this.setupEventListeners();
         this.startUpdateLoop();
     }
-    
+
     initializeElements() {
         this.textContainer = document.getElementById('textContainer');
         this.currentTimeDisplay = document.getElementById('currentTime');
         this.totalTimeDisplay = document.getElementById('totalTime');
         this.toggleAutoScrollBtn = document.getElementById('toggleAutoScroll');
         this.resumeTrackingBtn = document.getElementById('resumeTracking');
-        
+
         // Add new controls
         this.createEnhancedControls();
     }
-    
+
     createEnhancedControls() {
         const controlsContainer = document.querySelector('.sync-controls');
-        
+
         // Speed control
         const speedControl = document.createElement('select');
         speedControl.id = 'speedControl';
@@ -59,7 +59,7 @@ class EnhancedReadAlongPlayer {
         speedControl.addEventListener('change', (e) => {
             this.setPlaybackSpeed(parseFloat(e.target.value));
         });
-        
+
         // Highlight mode toggle
         const highlightToggle = document.createElement('button');
         highlightToggle.id = 'highlightMode';
@@ -68,36 +68,36 @@ class EnhancedReadAlongPlayer {
         highlightToggle.addEventListener('click', () => {
             this.toggleHighlightMode();
         });
-        
+
         controlsContainer.appendChild(speedControl);
         controlsContainer.appendChild(highlightToggle);
     }
-    
+
     async loadTimingData() {
         try {
             console.log('Loading timing data from:', this.timingApiUrl);
             const response = await fetch(this.timingApiUrl);
             console.log('Response status:', response.status);
-            
+
             if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            
+
             const timingData = await response.json();
             console.log('Timing data loaded:', timingData);
-            
+
             this.segments = this.processTimingData(timingData.text_segments || []);
             this.renderText();
-            
+
             console.log(`Enhanced player loaded ${this.segments.length} segments`);
-            
+
             // Analyze timing quality
             this.analyzeTimingQuality();
-            
+
         } catch (error) {
             console.error('Failed to load timing data:', error);
             this.showError(error.message);
         }
     }
-    
+
     processTimingData(segments) {
         // Enhance segments with additional metadata
         return segments.map((segment, index) => ({
@@ -105,63 +105,63 @@ class EnhancedReadAlongPlayer {
             index,
             confidence: this.estimateConfidence(segment),
             wordBoundaries: this.estimateWordBoundaries(segment),
-            nextSegmentGap: index < segments.length - 1 
+            nextSegmentGap: index < segments.length - 1
                 ? segments[index + 1].start_time - (segment.start_time + segment.duration)
                 : 0
         }));
     }
-    
+
     estimateConfidence(segment) {
         // Estimate timing confidence based on segment characteristics
         let confidence = 0.8; // Base confidence
-        
+
         // Adjust based on segment type
         if (segment.segment_type === 'technical') confidence -= 0.1;
         if (segment.segment_type === 'emphasis') confidence += 0.05;
-        
+
         // Adjust based on duration reasonableness
         const wordsPerSecond = segment.text.split(/\s+/).length / segment.duration;
         if (wordsPerSecond < 1 || wordsPerSecond > 4) confidence -= 0.2;
-        
+
         return Math.max(0.3, Math.min(1.0, confidence));
     }
-    
+
     estimateWordBoundaries(segment) {
         // Estimate word timings within segment
         const words = segment.text.split(/\s+/);
         const wordDuration = segment.duration / words.length;
-        
+
         return words.map((word, i) => ({
             word,
             start: segment.start_time + (i * wordDuration),
             end: segment.start_time + ((i + 1) * wordDuration)
         }));
     }
-    
+
     renderText() {
         if (this.segments.length === 0) {
             this.textContainer.innerHTML = '<p style="color: #FBFE65;">No text segments available.</p>';
             return;
         }
-        
+
         // Group segments by type for better visual organization
         const groupedHtml = this.segments.map((segment, index) => {
-            const confidenceClass = segment.confidence > this.confidenceThreshold 
-                ? 'high-confidence' 
+            const confidenceClass = segment.confidence > this.confidenceThreshold
+                ? 'high-confidence'
                 : 'low-confidence';
-            
+
             const typeClass = `segment-type-${segment.segment_type}`;
-            
+
             return `
-                <span class="text-segment ${confidenceClass} ${typeClass}" 
-                      data-index="${index}" 
+                <span class="text-segment ${confidenceClass} ${typeClass}"
+                      data-index="${index}"
                       data-start="${segment.start_time}"
                       data-confidence="${segment.confidence.toFixed(2)}">
                     ${this.escapeHtml(segment.text)}
                 </span>
             `;
         }).join(' ');
-        
+
         this.textContainer.innerHTML = `
             <div class="timing-quality-indicator">
                 <span id="timingQuality"></span>
@@ -170,14 +170,14 @@ class EnhancedReadAlongPlayer {
                 ${groupedHtml}
             </div>
         `;
-        
+
         // Add click listeners
         this.textContainer.querySelectorAll('.text-segment').forEach(segment => {
             segment.addEventListener('click', (e) => {
                 const startTime = parseFloat(e.target.dataset.start);
                 this.seekToTime(startTime);
             });
-            
+
             // Show confidence on hover
             segment.addEventListener('mouseenter', (e) => {
                 const confidence = e.target.dataset.confidence;
@@ -185,7 +185,7 @@ class EnhancedReadAlongPlayer {
             });
         });
     }
-    
+
     startUpdateLoop() {
         // High-frequency update loop for smooth highlighting
         this.updateInterval = setInterval(() => {
@@ -196,100 +196,100 @@ class EnhancedReadAlongPlayer {
             }
         }, 16); // 60fps
     }
-    
+
     updateHighlight() {
         if (this.isUserSeeking) return;
-        
+
         const currentTime = this.audio.currentTime;
         const playbackRate = this.audio.playbackRate;
-        
+
         // Find current and upcoming segments
         const activeSegments = this.findActiveSegments(currentTime, playbackRate);
-        
+
         // Update highlighting with smooth transitions
         this.textContainer.querySelectorAll('.text-segment').forEach((element, index) => {
             const segment = this.segments[index];
-            
+
             element.classList.remove('active', 'completed', 'upcoming', 'pre-active');
-            
+
             if (activeSegments.current === index) {
                 element.classList.add('active');
-                
+
                 // Smooth highlight progress
                 if (this.highlightMode === 'smooth') {
                     const progress = (currentTime - segment.start_time) / segment.duration;
                     element.style.setProperty('--highlight-progress', progress);
                 }
-                
+
             } else if (index < activeSegments.current) {
                 element.classList.add('completed');
-                
+
             } else if (activeSegments.upcoming.includes(index)) {
                 element.classList.add('upcoming');
                 const distance = index - activeSegments.current;
                 element.style.setProperty('--upcoming-distance', distance);
             }
-            
+
             // Pre-active state for smoother transitions
             if (activeSegments.preActive === index) {
                 element.classList.add('pre-active');
             }
         });
-        
+
         // Handle scrolling
         if (activeSegments.current !== this.currentSegmentIndex && this.autoScroll) {
             this.scrollToSegment(activeSegments.current);
         }
-        
+
         this.currentSegmentIndex = activeSegments.current;
         this.updateTimeDisplay();
     }
-    
+
     findActiveSegments(currentTime, playbackRate) {
         let current = -1;
         let preActive = -1;
         const upcoming = [];
-        
+
         // Account for playback rate in lookahead
         const lookaheadTime = this.lookaheadSegments * 0.5 / playbackRate;
-        
+
         for (let i = 0; i < this.segments.length; i++) {
             const segment = this.segments[i];
-            
-            if (currentTime >= segment.start_time && 
+
+            if (currentTime >= segment.start_time &&
                 currentTime < segment.start_time + segment.duration) {
                 current = i;
-                
+
                 // Check if we're near the end of current segment
                 const timeToEnd = (segment.start_time + segment.duration) - currentTime;
                 if (timeToEnd < 0.2 && i < this.segments.length - 1) {
                     preActive = i + 1;
                 }
-                
-            } else if (segment.start_time > currentTime && 
+
+            } else if (segment.start_time > currentTime &&
                        segment.start_time < currentTime + lookaheadTime) {
                 upcoming.push(i);
             }
         }
-        
+
         return { current, upcoming, preActive };
     }
-    
+
     scrollToSegment(index) {
         if (index < 0 || index >= this.segments.length) return;
-        
+
         const element = this.textContainer.querySelector(`[data-index="${index}"]`);
         if (!element) return;
-        
+
         const container = this.textContainer;
         const elementRect = element.getBoundingClientRect();
         const containerRect = container.getBoundingClientRect();
-        
+
         // Calculate if scrolling is needed
         const relativeTop = elementRect.top - containerRect.top;
         const relativeBottom = elementRect.bottom - containerRect.top;
         const containerHeight = containerRect.height;
-        
+
         // Scroll if element is in bottom 30% of container
         if (relativeBottom > containerHeight * (1 - this.scrollOffset)) {
             element.scrollIntoView({
@@ -298,34 +298,34 @@ class EnhancedReadAlongPlayer {
             });
         }
     }
-    
+
     setPlaybackSpeed(speed) {
         this.readingSpeed = speed;
         this.audio.playbackRate = speed;
-        
+
         // Adjust timing data for new speed
         this.updateFrequency = Math.max(16, 50 / speed);
-        
+
         console.log(`Playback speed set to ${speed}x`);
     }
-    
+
     toggleHighlightMode() {
         this.highlightMode = this.highlightMode === 'smooth' ? 'instant' : 'smooth';
         const btn = document.getElementById('highlightMode');
         btn.textContent = this.highlightMode === 'smooth' ? 'SMOOTH HIGHLIGHT' : 'INSTANT HIGHLIGHT';
-        
+
         // Update CSS class
         this.textContainer.classList.toggle('smooth-highlighting', this.highlightMode === 'smooth');
     }
-    
+
     analyzeTimingQuality() {
         // Analyze overall timing quality
         const avgConfidence = this.segments.reduce((sum, seg) => sum + seg.confidence, 0) / this.segments.length;
         const gapIssues = this.segments.filter(seg => Math.abs(seg.nextSegmentGap) > 0.5).length;
-        
+
         let quality = 'Good';
         let color = '#9BF04C';
-        
+
         if (avgConfidence < 0.6 || gapIssues > this.segments.length * 0.1) {
             quality = 'Fair';
             color = '#FBFE65';
@@ -334,32 +334,32 @@ class EnhancedReadAlongPlayer {
             quality = 'Poor';
             color = '#A31ACB';
         }
-        
+
         const qualityIndicator = document.getElementById('timingQuality');
         if (qualityIndicator) {
             qualityIndicator.textContent = `Sync Quality: ${quality}`;
             qualityIndicator.style.color = color;
         }
     }
-    
+
     showTooltip(element, text) {
         // Simple tooltip implementation
         const tooltip = document.createElement('div');
         tooltip.className = 'timing-tooltip';
         tooltip.textContent = text;
-        
+
         const rect = element.getBoundingClientRect();
         tooltip.style.position = 'fixed';
         tooltip.style.left = `${rect.left}px`;
         tooltip.style.top = `${rect.top - 30}px`;
-        
+
         document.body.appendChild(tooltip);
-        
+
         element.addEventListener('mouseleave', () => {
             tooltip.remove();
         }, { once: true });
     }
-    
+
     setupEventListeners() {
         // Audio element event listeners
         this.audio.addEventListener('timeupdate', () => {
@@ -409,7 +409,7 @@ class EnhancedReadAlongPlayer {
             const current = this.audio.currentTime || 0;
             this.currentTimeDisplay.textContent = this.formatTime(current);
         }
-        
+
         if (this.totalTimeDisplay && this.audio.duration) {
             this.totalTimeDisplay.textContent = this.formatTime(this.audio.duration);
         }
@@ -426,7 +426,7 @@ class EnhancedReadAlongPlayer {
         div.textContent = text;
         return div.innerHTML;
     }
-    
+
     showError(message) {
         console.error('Read-along error:', message);
         this.textContainer.innerHTML = `
@@ -438,7 +438,7 @@ class EnhancedReadAlongPlayer {
             </p>
         `;
     }
-    
+
     destroy() {
         // Cleanup
         if (this.updateInterval) {

@@ -1,5 +1,6 @@
 # infrastructure/tts/gemini_tts_provider.py
 """Simplified Gemini TTS provider with consistent voice delivery."""
+
 import asyncio
 import concurrent.futures
 import re

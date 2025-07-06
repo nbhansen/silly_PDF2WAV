@@ -6,7 +6,6 @@ Replaces: GeminiTimestampStrategy, SentenceMeasurementStrategy, EnhancedTimingSt
 from abc import ABC, abstractmethod
 import dataclasses
 from enum import Enum
-import os
 from pathlib import Path
 import time
 from typing import TYPE_CHECKING, Optional
@@ -21,6 +20,7 @@ if TYPE_CHECKING:
 @dataclasses.dataclass(frozen=True)
 class ChunkProcessingResult:
     """Result of processing a single text chunk."""
+
     temp_files: list[str]
     text_segments: list[TextSegment]
     final_cumulative_time: float
@@ -29,6 +29,7 @@ class ChunkProcessingResult:
 @dataclasses.dataclass(frozen=True)
 class BatchProcessingResult:
     """Result of processing a batch of sentences."""
+
     temp_file: Optional[str]
     text_segments: list[TextSegment]
     final_cumulative_time: float
@@ -330,7 +331,6 @@ class TimingEngine(ITimingEngine):
         output_filename: str,
     ) -> "TimedAudioResult":
         """Combine audio files and create final timing metadata."""
-        import os
         import shutil
 
         final_audio_files = []
@@ -407,7 +407,6 @@ class TimingEngine(ITimingEngine):
     def _measure_audio_duration(self, file_path: str) -> float:
         """Measure audio file duration."""
         try:
-            import os
             import subprocess
 
             # Validate file path for security

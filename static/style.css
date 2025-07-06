@@ -8,7 +8,7 @@
     --primary-text: #F6F2ED;
     --accent-color: #EACD00;
     --accent-hover: #86918A;
-    
+
     /* Status Colors */
     --success-bg: #98FB98;
     --success-border: #3CB371;
@@ -18,18 +18,18 @@
     --error-border: #c0392b;
     --note-bg: #eee;
     --note-border: #2980b9;
-    
+
     /* Typography */
     --font-heading: 'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
     --font-body: 'Lora', 'Times New Roman', serif;
-    
+
     /* Spacing */
     --spacing-xs: 0.5rem;
     --spacing-sm: 1rem;
     --spacing-md: 1.5rem;
     --spacing-lg: 2rem;
     --spacing-xl: 3rem;
-    
+
     /* Border Radius */
     --radius-sm: 4px;
     --radius-md: 8px;
@@ -522,22 +522,22 @@ audio {
     body {
         padding: var(--spacing-md);
     }
-    
+
     .container {
         padding: var(--spacing-lg);
     }
-    
+
     h1 { font-size: 1.875rem; }
     h2 { font-size: 1.5rem; }
-    
+
     .page-range-inputs {
         grid-template-columns: 1fr;
     }
-    
+
     .download-section {
         flex-direction: column;
     }
-    
+
     .btn {
         width: 100%;
         text-align: center;
@@ -548,13 +548,13 @@ audio {
     body {
         padding: var(--spacing-sm);
     }
-    
+
     .container {
         padding: var(--spacing-md);
     }
-    
+
     h1 { font-size: 1.5rem; }
-    
+
     .info-item {
         flex-direction: column;
         align-items: flex-start;

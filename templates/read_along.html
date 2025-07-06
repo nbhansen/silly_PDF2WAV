@@ -29,10 +29,10 @@
 }
 
 @keyframes pulse-highlight {
-    0%, 100% { 
+    0%, 100% {
         background-color: rgba(234, 205, 0, 0.1);
     }
-    50% { 
+    50% {
         background-color: rgba(234, 205, 0, 0.3);
     }
 }
@@ -120,7 +120,7 @@
                 <source src="{{ url_for('serve_audio', filename=audio_filename) }}" type="audio/mpeg">
                 Your browser does not support audio playback.
             </audio>
-            
+
             <div class="control-buttons">
                 <button id="playPauseBtn" class="btn btn-primary">
                     <i class="fas fa-play"></i> Play
@@ -132,7 +132,7 @@
                     <i class="fas fa-forward"></i> Skip Forward 10s
                 </button>
             </div>
-            
+
             <div class="speed-control">
                 <label for="speedSelect">
                     <i class="fas fa-tachometer-alt"></i> Playback Speed:
@@ -146,7 +146,7 @@
                     <option value="2">2×</option>
                 </select>
             </div>
-            
+
             <div class="progress-info">
                 <span id="progressText">Ready to play</span>
             </div>
@@ -155,8 +155,8 @@
 
     <div class="read-along-content" id="textContent">
         {% for segment in timing_data %}
-            <span class="text-segment" 
-                  data-start="{{ segment.start_time }}" 
+            <span class="text-segment"
+                  data-start="{{ segment.start_time }}"
                   data-duration="{{ segment.duration }}"
                   data-end="{{ segment.start_time + segment.duration }}">{{ segment.text }}</span>
         {% endfor %}
@@ -182,66 +182,66 @@
             this.speedSelect = document.getElementById('speedSelect');
             this.progressText = document.getElementById('progressText');
             this.textSegments = document.querySelectorAll('.text-segment');
-            
+
             this.currentSegmentIndex = -1;
             this.isPlaying = false;
-            
+
             this.init();
         }
-        
+
         init() {
             // Audio event listeners
             this.audio.addEventListener('play', () => this.onPlay());
             this.audio.addEventListener('pause', () => this.onPause());
             this.audio.addEventListener('timeupdate', () => this.onTimeUpdate());
             this.audio.addEventListener('loadedmetadata', () => this.onLoadedMetadata());
-            
+
             // Control button listeners
             this.playPauseBtn.addEventListener('click', () => this.togglePlayPause());
             this.skipBackBtn.addEventListener('click', () => this.skipBack());
             this.skipForwardBtn.addEventListener('click', () => this.skipForward());
             this.speedSelect.addEventListener('change', () => this.changeSpeed());
-            
+
             // Text segment click listeners
             this.textSegments.forEach((segment, index) => {
                 segment.addEventListener('click', () => this.jumpToSegment(index));
             });
-            
+
             console.log(`Read-along initialized with ${this.textSegments.length} segments`);
         }
-        
+
         onPlay() {
             this.isPlaying = true;
             this.playPauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
         }
-        
+
         onPause() {
             this.isPlaying = false;
             this.playPauseBtn.innerHTML = '<i class="fas fa-play"></i> Play';
         }
-        
+
         onTimeUpdate() {
             const currentTime = this.audio.currentTime;
             this.updateActiveSegment(currentTime);
             this.updateProgress(currentTime);
         }
-        
+
         onLoadedMetadata() {
             const duration = this.formatTime(this.audio.duration);
             console.log(`Audio loaded: ${duration} duration`);
         }
-        
+
         updateActiveSegment(currentTime) {
             // Find the active segment
             let activeIndex = -1;
-            
+
             this.textSegments.forEach((segment, index) => {
                 const startTime = parseFloat(segment.dataset.start);
                 const endTime = parseFloat(segment.dataset.end);
-                
+
                 // Clear previous classes
                 segment.classList.remove('active', 'upcoming', 'pre-active');
-                
+
                 if (currentTime >= startTime && currentTime < endTime) {
                     segment.classList.add('active');
                     activeIndex = index;
@@ -251,22 +251,22 @@
                     segment.classList.add('pre-active');
                 }
             });
-            
+
             // Auto-scroll to active segment
             if (activeIndex !== this.currentSegmentIndex && activeIndex !== -1) {
                 this.currentSegmentIndex = activeIndex;
                 this.scrollToActiveSegment();
             }
         }
-        
+
         updateProgress(currentTime) {
             const current = this.formatTime(currentTime);
             const total = this.formatTime(this.audio.duration);
             const percentage = this.audio.duration ? (currentTime / this.audio.duration * 100).toFixed(1) : 0;
-            
+
             this.progressText.textContent = `${current} / ${total} (${percentage}%)`;
         }
-        
+
         scrollToActiveSegment() {
             const activeSegment = document.querySelector('.text-segment.active');
             if (activeSegment) {
@@ -277,7 +277,7 @@
                 });
             }
         }
-        
+
         togglePlayPause() {
             if (this.isPlaying) {
                 this.audio.pause();
@@ -285,39 +285,39 @@
                 this.audio.play();
             }
         }
-        
+
         skipBack() {
             this.audio.currentTime = Math.max(0, this.audio.currentTime - 10);
         }
-        
+
         skipForward() {
             this.audio.currentTime = Math.min(this.audio.duration, this.audio.currentTime + 10);
         }
-        
+
         changeSpeed() {
             this.audio.playbackRate = parseFloat(this.speedSelect.value);
         }
-        
+
         jumpToSegment(index) {
             const segment = this.textSegments[index];
             const startTime = parseFloat(segment.dataset.start);
             this.audio.currentTime = startTime;
-            
+
             // Auto-play if not already playing
             if (!this.isPlaying) {
                 this.audio.play();
             }
         }
-        
+
         formatTime(seconds) {
             if (isNaN(seconds)) return '0:00';
-            
+
             const mins = Math.floor(seconds / 60);
             const secs = Math.floor(seconds % 60);
             return `${mins}:${secs.toString().padStart(2, '0')}`;
         }
     }
-    
+
     // Initialize when DOM is ready
     document.addEventListener('DOMContentLoaded', () => {
         new ReadAlongController();

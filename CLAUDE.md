@@ -14,7 +14,7 @@ Research → Plan → Implement
 NEVER JUMP STRAIGHT TO CODING! Always follow this sequence:
 
 - **Research**: Explore the codebase, understand existing patterns
-- **Plan**: Create a detailed implementation plan and verify it with me  
+- **Plan**: Create a detailed implementation plan and verify it with me
 - **Implement**: Execute the plan with validation checkpoints
 
 When asked to implement any feature, you'll first say: "Let me research the codebase and create a plan before implementing."

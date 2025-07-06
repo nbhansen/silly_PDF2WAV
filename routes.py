@@ -24,6 +24,7 @@ from utils import (
 @dataclass(frozen=True)
 class FileProcessingInfo:
     """Information about processed uploaded file."""
+
     original_filename: str
     base_filename: str
     pdf_path: str
@@ -34,6 +35,7 @@ class FileProcessingInfo:
 @dataclass(frozen=True)
 class ProcessingServices:
     """Collection of processing services."""
+
     service_container: Any
     document_engine: Any
     audio_engine: Any

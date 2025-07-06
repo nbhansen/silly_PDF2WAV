@@ -83,17 +83,17 @@ def process_user_data(user_data):
         raise ValueError("Email is required")
     if '@' not in user_data['email']:
         raise ValueError("Invalid email format")
-    
+
     # Processing (20+ lines)
     user_data['email'] = user_data['email'].lower()
     user_data['name'] = user_data['name'].strip()
     # ... more processing logic
-    
+
     # Database operations (10+ lines)
     connection = get_db_connection()
     cursor = connection.cursor()
     # ... database code
-    
+
     return formatted_response
 
 # Better approach: Separate concerns
@@ -113,7 +113,7 @@ class UserManager:
         self.users = []
         self.email_service = EmailService()
         self.payment_processor = PaymentProcessor()
-        
+
     def create_user(self, user_data): pass
     def delete_user(self, user_id): pass
     def send_welcome_email(self, user): pass
@@ -307,7 +307,7 @@ repos:
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
-  
+
   - repo: https://github.com/psf/black
     rev: 23.11.0
     hooks:

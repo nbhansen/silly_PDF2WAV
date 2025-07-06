@@ -38,39 +38,39 @@ select = [
     # Pycodestyle
     "E",     # pycodestyle errors
     "W",     # pycodestyle warnings
-    
+
     # Pyflakes
     "F",     # pyflakes
-    
+
     # Code quality and bug prevention
     "B",     # flake8-bugbear (common bugs and design problems)
     "C4",    # flake8-comprehensions (better list/dict/set comprehensions)
     "PIE",   # flake8-pie (unnecessary code patterns)
     "SIM",   # flake8-simplify (code simplification suggestions)
     "RUF",   # Ruff-specific rules
-    
+
     # Security
     "S",     # flake8-bandit (security testing)
-    
+
     # Complexity
     "C90",   # mccabe complexity
-    
+
     # Modern Python
     "UP",    # pyupgrade (modern Python idioms)
     "PTH",   # flake8-use-pathlib (prefer pathlib over os.path)
-    
-    # Import sorting and organization  
+
+    # Import sorting and organization
     "I",     # isort (import sorting)
-    
+
     # Documentation
     "D",     # pydocstyle (docstring conventions)
-    
+
     # Type annotations
     "ANN",   # flake8-annotations (missing type annotations)
-    
+
     # Async best practices
     "ASYNC", # flake8-async (async/await best practices)
-    
+
     # Testing
     "PT",    # flake8-pytest-style (pytest best practices)
 ]
@@ -80,17 +80,17 @@ ignore = [
     "D100",  # Missing docstring in public module
     "D104",  # Missing docstring in public package
     "D107",  # Missing docstring in __init__
-    
+
     # Type annotations - gradual adoption
     "ANN101", # Missing type annotation for self
     "ANN102", # Missing type annotation for cls
     "ANN204", # Missing return type annotation for special method
-    
+
     # Security - false positives for our use case
     "S101",   # Use of assert (OK in tests)
     "S603",   # subprocess call (we use subprocess intentionally)
     "S607",   # Starting a process with a partial executable path
-    
+
     # Complexity - allow some complexity in domain logic
     "C901",   # Complex function (we'll monitor separately)
 ]
@@ -174,7 +174,7 @@ python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = [
     "--verbose",
-    "--tb=short", 
+    "--tb=short",
     "--strict-markers",
     "--strict-config",
     "--durations=10",
@@ -182,7 +182,7 @@ addopts = [
 
 markers = [
     "unit: Fast unit tests with no external dependencies",
-    "integration: Integration tests with mocked external services", 
+    "integration: Integration tests with mocked external services",
     "external: Tests requiring real external services (manual)",
     "slow: Tests taking more than 5 seconds",
     "benchmark: Performance benchmark tests",
@@ -190,7 +190,7 @@ markers = [
 
 filterwarnings = [
     "ignore::UserWarning",
-    "ignore::DeprecationWarning", 
+    "ignore::DeprecationWarning",
     "ignore::pytest.PytestUnraisableExceptionWarning",
 ]
 
@@ -198,7 +198,7 @@ filterwarnings = [
 source = ["."]
 omit = [
     "venv/*",
-    "tests/*", 
+    "tests/*",
     "*/test_*.py",
     "uploads/*",
     "audio_outputs/*",

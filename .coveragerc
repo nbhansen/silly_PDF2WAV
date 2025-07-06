@@ -5,7 +5,7 @@
 source = domain, application
 
 # Exclude these paths from coverage
-omit = 
+omit =
     */tests/*
     */test_*
     */venv/*
@@ -37,7 +37,7 @@ exclude_lines =
     if __name__ == .__main__.:
     class .*\bProtocol\):
     @(abc\.)?abstractmethod
-    
+
     # Our specific exclusions
     print\(.*\)  # Ignore print statements
     pass

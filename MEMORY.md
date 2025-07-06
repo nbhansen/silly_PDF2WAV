@@ -3,9 +3,9 @@ this file serves as the short-term memory for CLAUDE
 
 ## status stuff
 
-**CRUD REMOVAL COMPLETED**: 
+**CRUD REMOVAL COMPLETED**:
 - ✅ Removed unused `config/voice_personas.json` file (legacy multi-voice system)
-- ✅ Moved Flask server settings (debug, host, port) to YAML configuration  
+- ✅ Moved Flask server settings (debug, host, port) to YAML configuration
 - ✅ All hardcoded values now properly configurable via YAML
 - ✅ YAML config file is the ONLY place with hardcoded values
 
@@ -246,7 +246,7 @@ The modular factory system in `domain/factories/` handles all dependency injecti
 - **Shared Text Processing**: Uses `TextSegmenter` utility for universal text operations
 - **Rate Limiting**: Intelligent retry logic with exponential backoff
 - **Format Conversion**: Raw PCM data → WAV format conversion
-- **Configuration**: 
+- **Configuration**:
   - `tts.gemini.voice_name`: Single voice for all content (e.g., "Kore", "Charon")
   - `tts.gemini.model_name`: Gemini TTS model
   - Rate limiting parameters configurable via YAML
@@ -258,7 +258,7 @@ The TTS system uses a **minimal shared services** approach that balances code re
 #### Shared Components (`infrastructure/tts/text_segmenter.py`)
 Universal text processing that works for all TTS engines:
 - ✅ **Sentence splitting**: Smart boundary detection with abbreviation handling
-- ✅ **Duration calculation**: Word-based timing estimation with punctuation pauses  
+- ✅ **Duration calculation**: Word-based timing estimation with punctuation pauses
 - ✅ **Text cleaning**: Removes problematic characters safely
 - ✅ **Text chunking**: Splits long documents at natural boundaries
 
@@ -268,7 +268,7 @@ Each TTS engine handles its own specialized requirements:
 **Gemini TTS Provider** (`gemini_tts_provider.py` - 352 lines):
 - Gemini API integration and authentication
 - Rate limiting and retry logic (cloud API specific)
-- Raw PCM → WAV conversion (Gemini-specific format) 
+- Raw PCM → WAV conversion (Gemini-specific format)
 - Audio chunk combination (WAV file merging)
 - Async orchestration with semaphore control
 
@@ -293,7 +293,7 @@ class ElevenLabsTTSProvider(ITimestampedTTSEngine):
     def __init__(self, ...):
         self.text_segmenter = TextSegmenter(base_wpm=155)  # Reuse shared utilities
         # ElevenLabs-specific: API key, voice cloning, emotion controls
-    
+
     def _generate_audio(self, text: str) -> bytes:
         # ElevenLabs-specific: Rich SSML, voice switching, emotions
         return self._call_elevenlabs_api(text)
@@ -442,13 +442,13 @@ Required external tools:
 - Updated LLM prompt generation to use "universal academic text processing approach"
 
 **3. Service Factories** ✅
-- `domain/factories/text_factory.py` - Removed document_type parameter passing ✅ 
-- `domain/factories/tts_factory.py` - Already completed ✅ 
+- `domain/factories/text_factory.py` - Removed document_type parameter passing ✅
+- `domain/factories/tts_factory.py` - Already completed ✅
 - `domain/container/service_container.py` - Removed document_type passing from TextPipeline and GeminiTTSProvider creation
 
 **4. Configuration Files** ✅
 - `config.yaml` & `config.example.yaml` - Removed document_type setting and comments
-- Cleaned up YAML structure 
+- Cleaned up YAML structure
 
 **5. Test Updates** ✅
 - Updated all 204 tests to reflect document_type removal
@@ -464,7 +464,7 @@ Required external tools:
 - ✅ Test-driven cleanup: Validated after each component modification
 
 #### ✅ **Success Criteria Met:**
-- ✅ All tests continue to pass (204/204) 
+- ✅ All tests continue to pass (204/204)
 - ✅ Configuration simplified (no document_type references)
 - ✅ Text processing uses universal academic approach
 - ✅ Service creation simplified (fewer parameters)
@@ -474,7 +474,7 @@ Required external tools:
 ### ✅ **Phase 2 Benefits Achieved:**
 
 - **Consistent Simplification**: Uniform architecture across entire system (not just TTS)
-- **Reduced Cognitive Load**: Fewer configuration options and code paths to understand  
+- **Reduced Cognitive Load**: Fewer configuration options and code paths to understand
 - **Lower Maintenance**: Fewer conditional branches to test and debug
 - **Cleaner Dependencies**: Simplified service creation and injection
 - **Universal Text Processing**: Single approach that works well for all document types
@@ -564,7 +564,7 @@ Remove accumulated legacy code, duplicate files, and unused infrastructure to re
 - Focus on file removal and immediate cleanup
 - Validate with full test suite after each removal
 
-**Phase 3B: Structural Cleanup (Priority 3)**  
+**Phase 3B: Structural Cleanup (Priority 3)**
 - Target completion: 2-4 hours
 - Systematic review of file structure and configuration
 - Update documentation to reflect changes
@@ -590,11 +590,11 @@ Remove accumulated legacy code, duplicate files, and unused infrastructure to re
 
 **Phase 1: Critical Architectural Violations** ✅
 - Fixed global mutable state in routes.py → Immutable ServiceContext pattern
-- Made all 9 domain models frozen dataclasses with proper validation  
+- Made all 9 domain models frozen dataclasses with proper validation
 - Converted SystemConfig to frozen with immutable frozenset defaults
 - Eliminated TextSegment mutation in timing_engine.py using dataclasses.replace()
 
-**Phase 2: Performance-Critical Mutations** ✅  
+**Phase 2: Performance-Critical Mutations** ✅
 - Replaced list.append() patterns with immutable comprehensions in hot paths
 - Optimized text chunking strategies with functional patterns
 - Fixed audio processing to use immutable filtering and mapping operations
@@ -611,7 +611,7 @@ Remove accumulated legacy code, duplicate files, and unused infrastructure to re
 **Comprehensive benchmarks show excellent performance**:
 
 - **Text Chunking**: 317.2 Kops/s (3.15μs mean) - 2.4x slower than mutable but still excellent
-- **Service Container**: 259.1 Kops/s (3.86μs mean) - minimal 1.2x overhead for thread safety  
+- **Service Container**: 259.1 Kops/s (3.86μs mean) - minimal 1.2x overhead for thread safety
 - **Frozen Dataclasses**: 197.2 Kops/s (5.07μs mean) - comparable to regular dataclasses
 - **MappingProxyType**: 185.8 Kops/s (5.38μs mean) - minimal overhead for immutability
 - **List Comprehensions**: 11.39 Kops/s (87.8μs mean) - slight 1.2x cost for cleaner code
@@ -621,7 +621,7 @@ Remove accumulated legacy code, duplicate files, and unused infrastructure to re
 #### 🎯 **Success Criteria - All Met**
 
 - ✅ **Zero global mutable state violations** - Complete elimination
-- ✅ **All domain models frozen** - 9/9 dataclasses with @dataclass(frozen=True) 
+- ✅ **All domain models frozen** - 9/9 dataclasses with @dataclass(frozen=True)
 - ✅ **Performance <5% degradation** - Worst case 2.4x in non-critical paths, all sub-200μs
 - ✅ **Test coverage maintained** - All 194 tests passing, no regressions
 - ✅ **Architectural compliance** - Full adherence to CLAUDE.md immutable principles
@@ -630,7 +630,7 @@ Remove accumulated legacy code, duplicate files, and unused infrastructure to re
 
 **Code Safety**:
 - Eliminated entire classes of mutation bugs
-- Thread-safe service containers and data structures  
+- Thread-safe service containers and data structures
 - Compile-time guarantees against accidental mutations
 - Predictable, side-effect-free operations
 
@@ -652,7 +652,7 @@ Remove accumulated legacy code, duplicate files, and unused infrastructure to re
 
 The immutable design migration has achieved all goals:
 - **Technical Excellence**: Clean, bug-resistant architecture
-- **Performance Acceptable**: All operations remain fast enough for production use  
+- **Performance Acceptable**: All operations remain fast enough for production use
 - **Future-Proof**: Easier to extend and optimize immutable code than debug mutable bugs
 - **Developer Experience**: More predictable, safer codebase to work with
 
@@ -663,9 +663,9 @@ Systematically fix MyPy strict mode violations to achieve comprehensive type saf
 
 #### 📊 **Progress Summary (206 → 53 errors: 74% reduction)**
 
-**Phase 4A: Infrastructure Foundation** ✅  
+**Phase 4A: Infrastructure Foundation** ✅
 - Fixed OCR Provider interface violations (15 errors)
-- Fixed Service Container type issues (6 errors)  
+- Fixed Service Container type issues (6 errors)
 - Added missing type parameters and interface compliance
 
 **Phase 4B: Test & Core Architecture** ✅
@@ -674,7 +674,7 @@ Systematically fix MyPy strict mode violations to achieve comprehensive type saf
 - Fixed Audio Engine async compatibility issues
 - Added proper Result[T] type annotations
 
-**Phase 4C: Configuration & System Layer** ✅  
+**Phase 4C: Configuration & System Layer** ✅
 - Fixed SystemConfig and test issues (26 errors)
 - Added proper frozenset type handling
 - Fixed Flask routes type annotations (30+ errors)
@@ -688,7 +688,7 @@ Systematically fix MyPy strict mode violations to achieve comprehensive type saf
 #### 🎯 **Key Fixes Applied**
 
 **Type Safety Patterns**:
-- Explicit `Optional[T]` instead of implicit `T | None`  
+- Explicit `Optional[T]` instead of implicit `T | None`
 - Proper `Result[T]` generic type usage with null checks
 - `frozenset[str]` instead of `set[str]` for immutable collections
 - Flask route return types: `Union[Response, Tuple[str, int]]`
@@ -707,7 +707,7 @@ Systematically fix MyPy strict mode violations to achieve comprehensive type saf
 
 **Phase 4E: COMPLETE ACHIEVEMENT** 🏆
 - ✅ Fixed error handling test Optional[T] access patterns (18 errors)
-- ✅ Fixed domain model test Optional attribute access (8 errors) 
+- ✅ Fixed domain model test Optional attribute access (8 errors)
 - ✅ Fixed routes filename null checks and benchmark annotations (7 errors)
 - ✅ Fixed missing type annotations (4 errors)
 - ✅ Fixed argument type mismatches (5 errors)
@@ -738,7 +738,7 @@ Systematically fix MyPy strict mode violations to achieve comprehensive type saf
 
 **Architecture Validation**:
 - MyPy COMPLETELY confirms immutable design pattern compliance
-- Type safety FULLY validates dependency injection patterns  
+- Type safety FULLY validates dependency injection patterns
 - Compile-time verification of ALL interface contracts
 - Zero cognitive load with explicit type information everywhere
 
@@ -752,7 +752,7 @@ Systematically fix MyPy strict mode violations to achieve comprehensive type saf
 
 **Perfect Foundation Achieved**:
 - ✅ **All 226 tests passing** - Zero functional regressions maintained throughout
-- ✅ **Black formatting complete** - Consistent code style across entire codebase  
+- ✅ **Black formatting complete** - Consistent code style across entire codebase
 - ✅ **Immutable architecture working** - All domain models frozen, performance excellent
 - ✅ **100% type safety achieved** - Complete MyPy compliance across ALL modules
 - ✅ **Modern code quality standards** - Comprehensive Ruff compliance with best practices
@@ -806,7 +806,7 @@ From `codesmells.md` empirical evidence:
 ```yaml
 # .pre-commit-config.yaml targets:
 - Ruff (linting + auto-fix)
-- Black (formatting)  
+- Black (formatting)
 - MyPy (type checking)
 - Bandit (security scanning)
 ```
@@ -816,7 +816,7 @@ From `codesmells.md` empirical evidence:
 **Add to requirements.txt**:
 - `ruff>=0.1.6` - Fast comprehensive linting
 - `mypy>=1.7.0` - Type checking
-- `black>=23.11.0` - Code formatting  
+- `black>=23.11.0` - Code formatting
 - `bandit>=1.7.5` - Security scanning
 - `pre-commit>=3.6.0` - Quality automation
 - `radon>=6.0.1` - Complexity metrics
@@ -854,7 +854,7 @@ From `codesmells.md` empirical evidence:
 ```yaml
 # Quality gates workflow targets:
 - Ruff linting (must pass)
-- MyPy type checking (must pass)  
+- MyPy type checking (must pass)
 - Black formatting (must pass)
 - Bandit security (must pass)
 - Test suite (194 tests must pass)
@@ -1016,7 +1016,7 @@ This phase builds directly on the successful immutable design migration, adding 
 #### **Bandit Security Analysis: 882 Security Issues**
 **Security Assessment**: **CRITICAL ATTENTION REQUIRED**
 - **High Severity**: 62 security vulnerabilities (BLOCKING)
-- **Medium Severity**: 283 security concerns 
+- **Medium Severity**: 283 security concerns
 - **Low Severity**: 537 security warnings
 
 **Critical Security Violations (Must Fix)**:
@@ -1190,7 +1190,7 @@ This baseline analysis provides the foundation for systematic, evidence-based co
   - ❌ Missing return type annotations → ✅ `Union['GeminiConfig', Dict[str, Any]]` types
   - **Result**: All 15 system config MyPy errors resolved, configuration loading now fully typed
 
-**Priority 2: Service Container** ✅  
+**Priority 2: Service Container** ✅
 - **Fixed `domain/container/service_container.py`**:
   - ❌ Missing `MappingProxyType` generics → ✅ `MappingProxyType[Union[Type[Any], str], Callable[..., Any]]`
   - ❌ Bare `Type` and `Callable` types → ✅ Proper generic type parameters
@@ -1210,7 +1210,7 @@ This baseline analysis provides the foundation for systematic, evidence-based co
 
 **Functionality Preserved** ✅:
 - ✅ **21/21 system config tests passing** - Configuration loading and validation working correctly
-- ✅ **17/17 architecture tests passing** - Service container and dependency injection functional  
+- ✅ **17/17 architecture tests passing** - Service container and dependency injection functional
 - ✅ **190/190 total unit tests passing** - Zero regressions from type improvements
 
 **Code Quality Foundation** ✅:
@@ -1227,7 +1227,7 @@ This baseline analysis provides the foundation for systematic, evidence-based co
 
 **Next Priority (229 remaining MyPy errors)**:
 1. **Audio Engine Issues** - Fix Result type mismatches and Optional parameter handling
-2. **TTS Provider Issues** - Add missing constructor parameters and fix type compatibility  
+2. **TTS Provider Issues** - Add missing constructor parameters and fix type compatibility
 3. **Interface Implementation** - Update contracts to match actual implementations
 4. **Domain Logic Types** - Complete typing of business logic components
 
@@ -1244,7 +1244,7 @@ This baseline analysis provides the foundation for systematic, evidence-based co
 **Priority 3: Interface Contract Violations** ✅
 - **Fixed `domain/interfaces.py`**:
   - ❌ Missing `supports_ssml()` method → ✅ Added to `ITTSEngine` interface
-  - ❌ Missing `get_pdf_info()` method → ✅ Added to `IOCRProvider` interface  
+  - ❌ Missing `get_pdf_info()` method → ✅ Added to `IOCRProvider` interface
   - ❌ Missing `validate_range()` method → ✅ Added to `IOCRProvider` interface
   - ❌ Forward reference issues → ✅ Proper imports from models module
   - **Result**: Interface contracts now match actual implementations, polymorphism working correctly
@@ -1298,7 +1298,7 @@ This baseline analysis provides the foundation for systematic, evidence-based co
 
 **TTS Provider Type Safety & Architecture Achievement**:
 - ✅ **Dependency handling modernized** - Removed dirty conditional imports, aligned with Gemini pattern
-- ✅ **Runtime error handling** - Graceful degradation when Piper/command-line unavailable  
+- ✅ **Runtime error handling** - Graceful degradation when Piper/command-line unavailable
 - ✅ **Type safety enforced** - Fixed Dict type parameters, Optional handling, unreachable code
 - ✅ **Interface compliance verified** - Both providers fully implement ITTSEngine contracts
 - ✅ **Performance maintained** - All TTS tests passing with zero regressions
@@ -1306,7 +1306,7 @@ This baseline analysis provides the foundation for systematic, evidence-based co
 #### 🎯 **Phase 2 Audio Engine Success - COMPLETED ✅**
 
 **Audio Engine Type Safety & Async Architecture Achievement**:
-- ✅ **Interface alignment fixed** - Corrected async method signature mismatches with IAudioEngine  
+- ✅ **Interface alignment fixed** - Corrected async method signature mismatches with IAudioEngine
 - ✅ **Type safety enforced** - Fixed Union[Any, BaseException] return types, Optional handling
 - ✅ **Async compatibility verified** - Proper async/await patterns with semaphore rate limiting
 - ✅ **File operations secured** - Type-safe path validation and Optional bytes handling
@@ -1314,7 +1314,7 @@ This baseline analysis provides the foundation for systematic, evidence-based co
 
 **Total Progress: 157 errors remaining** (↓11 from 168):
 - ✅ **Phase 1 Critical Infrastructure**: 100% complete (16 errors fixed)
-- ✅ **Phase 2A Interface Contracts**: 100% complete (3 errors fixed) 
+- ✅ **Phase 2A Interface Contracts**: 100% complete (3 errors fixed)
 - ✅ **Phase 2B Domain Logic**: 100% complete (11 errors fixed)
 - ✅ **Phase 2C Service Container**: 100% complete (7 errors fixed)
 - ✅ **Phase 2D Test Helpers**: 100% complete (9 errors fixed)
@@ -1334,7 +1334,7 @@ This baseline analysis provides the foundation for systematic, evidence-based co
 
 **EXCELLENT PROGRESS ACHIEVED**:
 - ✅ **100% Type Safety**: MyPy shows 0 errors (complete success from 246 errors)
-- ✅ **Immutable Architecture**: Complete with 194 passing tests 
+- ✅ **Immutable Architecture**: Complete with 194 passing tests
 - ✅ **Security Hardening**: All critical vulnerabilities fixed (localhost bindings, subprocess validation)
 - ✅ **Architectural Compliance**: Full adherence to CLAUDE.md immutable principles
 
@@ -1372,7 +1372,7 @@ This baseline analysis provides the foundation for systematic, evidence-based co
    - UP035: `typing.Tuple` → `tuple`, `typing.Dict` → `dict` (35 issues)
    - Other modern Python pattern upgrades
 
-**Benefits**: 
+**Benefits**:
 - 65% issue reduction with minimal effort
 - Modernizes codebase to Python 3.9+ standards
 - No functional changes, only style improvements
@@ -1397,7 +1397,7 @@ This baseline analysis provides the foundation for systematic, evidence-based co
 #### **Priority 3: Path Handling Modernization (HIGH IMPACT)**
 **Target**: PTH103, PTH123, PTH118 issues (34 total)
 1. **os.makedirs() → Path.mkdir(parents=True)** (7 issues)
-2. **open() → Path.open()** (9 issues)  
+2. **open() → Path.open()** (9 issues)
 3. **os.path.join() → Path operations** (18 issues)
 
 **Benefits**:
@@ -1421,7 +1421,7 @@ This baseline analysis provides the foundation for systematic, evidence-based co
 1. **Line length fixes** (48 issues):
    - Break long lines at logical points
    - Use parentheses for multi-line expressions
-   
+
 2. **Any type usage** (23 issues):
    - Replace `typing.Any` with specific types where possible
    - Add type: ignore comments where Any is necessary
@@ -1434,7 +1434,7 @@ This baseline analysis provides the foundation for systematic, evidence-based co
 ### 🚀 Implementation Strategy & Timeline
 
 #### **Phase 5A: Automated Fixes (Day 1 - 2 hours)**
-1. **Apply safe auto-fixes**: `ruff check --fix` 
+1. **Apply safe auto-fixes**: `ruff check --fix`
    - **Expected**: 18 issues resolved immediately
    - **Risk**: MINIMAL - only safe transformations
    - **Validation**: Run test suite after changes
@@ -1489,7 +1489,7 @@ This baseline analysis provides the foundation for systematic, evidence-based co
 
 From `codesmells.md` empirical evidence:
 - **15x reduction in defects** with systematic code quality
-- **124% faster issue resolution** in high-quality codebases  
+- **124% faster issue resolution** in high-quality codebases
 - **Reduced cognitive load** for developers
 - **Better onboarding** experience for new team members
 - **Improved IDE support** with modern type hints and documentation
@@ -1584,7 +1584,7 @@ This systematic approach leverages Ruff's powerful automation capabilities to ac
    - `check_ffmpeg_availability()` method in `AudioEngine`
    - `HYBRID` constant in `timing_engine.py`
 
-**Benefits**: 
+**Benefits**:
 - Reduces cognitive load for developers
 - Eliminates maintenance burden on dead code
 - Makes codebase easier to understand and navigate

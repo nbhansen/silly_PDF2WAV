@@ -159,4 +159,4 @@ The project follows Test-Driven Development (TDD) principles:
 
 ## Questions?
 
-Feel free to open an issue for any questions about contributing. 
+Feel free to open an issue for any questions about contributing.

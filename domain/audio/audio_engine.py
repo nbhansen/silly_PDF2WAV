@@ -6,7 +6,6 @@ Replaces: AudioGenerationService, AudioGenerationCoordinator, AudioProcessor, Au
 from abc import ABC, abstractmethod
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
@@ -496,7 +495,6 @@ class AudioEngine(IAudioEngine):
     def _convert_wav_to_mp3(self, wav_path: str, mp3_path: str) -> Result[str]:
         """Convert WAV file to MP3 using ffmpeg."""
         try:
-            import os
             import subprocess
 
             # Validate input file path for security
