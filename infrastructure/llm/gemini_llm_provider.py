@@ -54,22 +54,61 @@ class GeminiLLMProvider(ILLMProvider):
         if not self.client:
             return Result.failure(llm_provider_error("Client not available"))
 
+        prompt_preview = prompt[:100] + "..." if len(prompt) > 100 else prompt
+        print(f"🔬 LLM API Call: Model={self.model_name}, prompt='{prompt_preview}' ({len(prompt)} chars)")
+
         try:
+            import time
+
+            start_time = time.time()
+
             response = self.client.models.generate_content(
                 model=self.model_name,
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    max_output_tokens=8192,
+                    max_output_tokens=30000,  # Increased from 8192 to avoid empty response bug
                     temperature=0.3,
                 ),
             )
 
-            if response and response.text:
+            api_time = time.time() - start_time
+            print(f"✅ LLM API Success: {api_time:.2f}s for '{prompt_preview}'")
+
+            # Inspect response structure for debugging
+            if response:
+                try:
+                    # Check if response has candidates
+                    if hasattr(response, "candidates") and response.candidates:
+                        candidate = response.candidates[0]
+                        finish_reason = getattr(candidate, "finish_reason", "UNKNOWN")
+                        print(f"📊 Response finish_reason: {finish_reason}")
+
+                        # Try to get text content
+                        if hasattr(candidate, "content") and hasattr(candidate.content, "parts"):
+                            parts = candidate.content.parts
+                            if parts and hasattr(parts[0], "text"):
+                                text_content = parts[0].text
+                                if text_content:
+                                    print(f"📝 LLM Response: {len(text_content)} chars returned")
+                                    return Result.success(text_content)
+                except Exception as e:
+                    print(f"⚠️ Error inspecting response structure: {e}")
+
+            # Try the simple .text accessor as fallback
+            if response and hasattr(response, "text") and response.text:
+                print(f"📝 LLM Response: {len(response.text)} chars returned (via .text accessor)")
                 return Result.success(response.text)
             else:
+                print(f"❌ LLM API: No text in response for '{prompt_preview}'")
+                if response:
+                    print(f"🔍 Response object type: {type(response)}")
+                    print(f"🔍 Response attributes: {dir(response)[:10]}...")  # First 10 attributes
                 return Result.failure(llm_provider_error("Empty response from LLM"))
 
         except Exception as e:
+            api_time = time.time() - start_time
+            error_str = str(e)
+            print(f"💥 LLM API Error ({api_time:.2f}s): {error_str[:200]} for '{prompt_preview}'")
             return Result.failure(llm_provider_error(f"Content generation failed: {e!s}"))
 
     async def generate_content_async(self, prompt: str) -> Result[str]:

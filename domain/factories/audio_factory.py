@@ -33,7 +33,7 @@ def create_audio_engine(
         tts_engine=tts_engine,
         file_manager=file_manager,
         timing_engine=timing_engine,
-        max_concurrent=config.max_concurrent_requests,
+        max_concurrent=config.audio_concurrent_chunks,
         audio_target_chunk_size=config.audio_target_chunk_size,
         audio_max_chunk_size=config.audio_max_chunk_size,
         chunking_service=chunking_service,

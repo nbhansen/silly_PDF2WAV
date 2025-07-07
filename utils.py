@@ -76,7 +76,10 @@ def _get_retry_suggestion(error: ApplicationError, config: SystemConfig) -> str:
     """Get retry suggestion based on error type."""
     if error.retryable:
         if error.code in [ErrorCode.TTS_ENGINE_ERROR, ErrorCode.AUDIO_GENERATION_FAILED]:
-            return "Please try again in a few moments. If the problem persists, the text-to-speech service might be temporarily unavailable."
+            return (
+                "Please try again in a few moments. If the problem persists, "
+                "the text-to-speech service might be temporarily unavailable."
+            )
         elif error.code == ErrorCode.LLM_PROVIDER_ERROR:
             return "Please try again in a few moments, or disable text cleaning in your configuration."
         elif error.code == ErrorCode.TEXT_CLEANING_FAILED:

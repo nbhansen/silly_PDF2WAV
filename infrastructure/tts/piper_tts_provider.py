@@ -105,7 +105,14 @@ except ImportError:
                     return Result.failure(tts_engine_error("TTS engine returned no audio data"))
 
                 return Result.success(audio_data)
+            except subprocess.TimeoutExpired as timeout_ex:
+                timeout_duration = getattr(timeout_ex, "timeout", 30)
+                cmd_info = "piper command"
+                print(f"🔍 PIPER TIMEOUT: Command timed out after {timeout_duration} seconds")
+                print(f"🔍 PIPER TIMEOUT CMD: {cmd_info}")
+                return Result.failure(tts_engine_error(f"Piper command timed out after {timeout_duration} seconds"))
             except Exception as e:
+                print(f"🔍 PIPER EXCEPTION: {type(e).__name__}: {e}")
                 return Result.failure(tts_engine_error(f"Audio generation failed: {e!s}"))
 
         async def generate_audio_data_async(self, text_to_speak: str) -> Result[bytes]:
@@ -158,10 +165,17 @@ except ImportError:
                 self.piper_method = "python_library"
                 return
 
-            # Try command line
+            # Try command line - use absolute paths
+            project_root = "/home/nbhansen/dev/silly_PDF2WAV"
+            piper_cmd = os.path.join(project_root, "piper")
             try:
-                result = subprocess.run(["piper", "--version"], capture_output=True, text=True, timeout=5)
+                env = os.environ.copy()
+                env["LD_LIBRARY_PATH"] = project_root + (
+                    (":" + env.get("LD_LIBRARY_PATH", "")) if env.get("LD_LIBRARY_PATH") else ""
+                )
+                result = subprocess.run([piper_cmd, "--help"], capture_output=True, text=True, timeout=5, env=env)
                 if result.returncode == 0:
+                    self.piper_command = piper_cmd
                     self.piper_method = "command_line"
                     return
             except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError):
@@ -212,7 +226,7 @@ except ImportError:
                     raise Exception("Model path not configured")
 
                 cmd = [
-                    "piper",
+                    getattr(self, "piper_command", "piper"),
                     "--model",
                     self.model_path,
                     "--output_file",
@@ -228,12 +242,31 @@ except ImportError:
                     cmd.extend(["--speaker", str(self.config.speaker_id)])
 
                 # Piper command line can handle basic SSML
-                # Use dynamic timeout based on text length (minimum 60 seconds)
-                timeout = max(60, len(text) // 100)  # ~1 second per 100 chars
-                process = subprocess.run(cmd, input=text, capture_output=True, text=True, timeout=timeout)
+                # Use dynamic timeout based on text length (minimum 30 seconds)
+                timeout = max(30, len(text) // 50)  # ~1 second per 50 chars
+
+                # Set up environment for local piper binary with libraries
+                env = os.environ.copy()
+                project_root = "/home/nbhansen/dev/silly_PDF2WAV"
+                env["LD_LIBRARY_PATH"] = project_root + (
+                    (":" + env.get("LD_LIBRARY_PATH", "")) if env.get("LD_LIBRARY_PATH") else ""
+                )
+
+                print(f"🔍 PIPER COMMAND: {' '.join(cmd)}")
+                print(f"🔍 PIPER ENV LD_LIBRARY_PATH: {env.get('LD_LIBRARY_PATH')}")
+                print(f"🔍 PIPER INPUT LENGTH: {len(text)} chars")
+                process = subprocess.run(cmd, input=text, capture_output=True, text=True, timeout=timeout, env=env)
 
                 if process.returncode != 0:
-                    raise Exception(f"Piper command failed with code {process.returncode}: {process.stderr}")
+                    error_msg = (
+                        f"Piper command failed with code {process.returncode}\n"
+                        f"Command: {' '.join(cmd)}\nStderr: {process.stderr}\n"
+                        f"Stdout: {process.stdout}\n"
+                        f"Env LD_LIBRARY_PATH: {env.get('LD_LIBRARY_PATH', 'not set')}\n"
+                        f"Input text length: {len(text)}\nFirst 200 chars: {text[:200]!r}"
+                    )
+                    print(f"🔍 PIPER DEBUG: {error_msg}")
+                    raise Exception(error_msg)
 
                 if os.path.exists(temp_path):
                     os.path.getsize(temp_path)

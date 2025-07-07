@@ -493,7 +493,7 @@ def _execute_document_processing(
 
     # Use document engine for complete processing
     result = services.document_engine.process_document(
-        request_obj, services.audio_engine, services.text_pipeline, enable_timing
+        request_obj, services.audio_engine, services.text_pipeline, enable_timing, config.llm_chunk_size
     )
     assert isinstance(result, ProcessingResult)
     return result

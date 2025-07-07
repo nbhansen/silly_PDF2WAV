@@ -31,10 +31,15 @@ class SystemConfig:
 
     # Processing settings
     enable_text_cleaning: bool = True
-    enable_ssml: bool = True
+    enable_natural_formatting: bool = True
     enable_async_audio: bool = True
-    max_concurrent_requests: int = 4
-    chunk_size: int = 20000
+
+    # Audio processing parallelism - how many chunks AudioEngine processes simultaneously
+    audio_concurrent_chunks: int = 4
+
+    # Text chunk configuration - different optimal sizes for different APIs
+    chunk_size: int = 20000  # Legacy setting
+    llm_chunk_size: int = 50000  # Large chunks for LLM text cleaning (fewer API calls)
 
     # File management settings
     enable_file_cleanup: bool = True
@@ -42,19 +47,20 @@ class SystemConfig:
     auto_cleanup_interval_hours: float = 6.0  # Run cleanup every 6 hours
     max_disk_usage_mb: int = 1000  # Maximum disk usage before forced cleanup
 
-    # Gemini specific
+    # TTS API configuration - applies to any TTS provider (Gemini, Piper, etc.)
+    tts_concurrent_requests: int = 4  # How many simultaneous TTS API calls
+    tts_request_delay_seconds: float = 2.0  # Delay between TTS requests for rate limiting
+
+    # Gemini TTS specific settings
     gemini_api_key: Optional[str] = None
     gemini_voice_name: str = "Kore"
-    gemini_min_request_interval: float = 6.5  # Optimized for 10 RPM limit (6s + buffer)
-    gemini_measurement_mode_interval: float = 0.8  # Faster rate for measurement mode batches
+    gemini_model_name: str = "gemini-2.5-flash-preview-tts"
     gemini_use_measurement_mode: bool = False  # Enable for accurate read-along timing
-    gemini_max_concurrent_requests: int = 2  # Optimal concurrency for rate limits
-    gemini_requests_per_minute: int = 10  # Official Gemini TTS rate limit
+    gemini_measurement_mode_interval: float = 0.8  # Faster rate for measurement mode batches
 
-    # LLM specific (text cleaning) - Conservative Pro limits
-    llm_min_request_interval: float = 0.5  # Conservative for Pro (120 RPM with buffer)
-    llm_max_concurrent_requests: int = 3  # Safe concurrency for text cleaning
-    llm_requests_per_minute: int = 120  # Buffer under Pro 150 RPM limit
+    # LLM API configuration - for text cleaning (separate from TTS)
+    llm_concurrent_requests: int = 3  # How many simultaneous LLM calls for text cleaning
+    llm_request_delay_seconds: float = 0.5  # Delay between LLM requests
 
     # Piper specific
     piper_model_name: str = "en_US-lessac-medium"
@@ -154,20 +160,32 @@ class SystemConfig:
             ),
             # Text processing
             enable_text_cleaning=cls._parse_bool_value(get_config("text_processing.enable_text_cleaning", True), True),
-            enable_ssml=cls._parse_bool_value(get_config("text_processing.enable_ssml", True), True),
+            enable_natural_formatting=cls._parse_bool_value(
+                get_config("text_processing.enable_natural_formatting", True), True
+            ),
             chunk_size=cls._parse_int_value(
                 get_config("text_processing.chunk_size", 4000), 4000, min_val=1000, max_val=100000
             ),
+            llm_chunk_size=cls._parse_int_value(
+                get_config("text_processing.llm_chunk_size", 50000), 50000, min_val=10000, max_val=200000
+            ),
             audio_target_chunk_size=cls._parse_int_value(
-                get_config("text_processing.audio_target_chunk_size", 2000), 2000, min_val=500, max_val=10000
+                get_config("text_processing.audio_target_chunk_size", 2000), 2000, min_val=100, max_val=10000
             ),
             audio_max_chunk_size=cls._parse_int_value(
-                get_config("text_processing.audio_max_chunk_size", 3000), 3000, min_val=1000, max_val=20000
+                get_config("text_processing.audio_max_chunk_size", 3000), 3000, min_val=100, max_val=20000
             ),
             # Performance
             enable_async_audio=cls._parse_bool_value(get_config("performance.enable_async_audio", True), True),
-            max_concurrent_requests=cls._parse_int_value(
-                get_config("performance.max_concurrent_tts_requests", 3), 3, min_val=1, max_val=20
+            audio_concurrent_chunks=cls._parse_int_value(
+                get_config("audio.concurrent_chunks", 4), 4, min_val=1, max_val=20
+            ),
+            # TTS API settings
+            tts_concurrent_requests=cls._parse_int_value(
+                get_config("tts.concurrent_requests", 4), 4, min_val=1, max_val=10
+            ),
+            tts_request_delay_seconds=cls._parse_float_value(
+                get_config("tts.request_delay_seconds", 2.0), 2.0, min_val=0.1, max_val=10.0
             ),
             # File cleanup
             enable_file_cleanup=cls._parse_bool_value(get_config("files.cleanup.enabled", True), True),
@@ -182,27 +200,21 @@ class SystemConfig:
             ),
             # LLM settings (for text cleaning)
             llm_model_name=get_config("llm.model_name"),
-            llm_min_request_interval=cls._parse_float_value(
-                get_config("llm.min_request_interval", 0.5), 0.5, min_val=0.1, max_val=5.0
+            llm_concurrent_requests=cls._parse_int_value(
+                get_config("llm.concurrent_requests", 3), 3, min_val=1, max_val=10
             ),
-            llm_max_concurrent_requests=cls._parse_int_value(
-                get_config("llm.max_concurrent_requests", 3), 3, min_val=1, max_val=10
+            llm_request_delay_seconds=cls._parse_float_value(
+                get_config("llm.request_delay_seconds", 0.5), 0.5, min_val=0.1, max_val=5.0
             ),
-            llm_requests_per_minute=cls._parse_int_value(
-                get_config("llm.requests_per_minute", 120), 120, min_val=10, max_val=1000
-            ),
-            # Gemini settings
+            # Gemini TTS specific settings
             gemini_api_key=get_config("secrets.google_ai_api_key"),
-            gemini_model_name=get_config("tts.gemini.model_name"),
+            gemini_model_name=get_config("tts.gemini.model_name", "gemini-2.5-flash-preview-tts"),
             gemini_voice_name=get_config("tts.gemini.voice_name", "Kore"),
-            gemini_min_request_interval=cls._parse_float_value(
-                get_config("tts.gemini.min_request_interval", 2.0), 2.0, min_val=0.1, max_val=10.0
+            gemini_use_measurement_mode=cls._parse_bool_value(
+                get_config("tts.gemini.use_measurement_mode", False), False
             ),
             gemini_measurement_mode_interval=cls._parse_float_value(
                 get_config("tts.gemini.measurement_mode_interval", 0.8), 0.8, min_val=0.1, max_val=5.0
-            ),
-            gemini_use_measurement_mode=cls._parse_bool_value(
-                get_config("tts.gemini.use_measurement_mode", False), False
             ),
             # Piper settings
             piper_model_name=get_config("tts.piper.model_name", "en_US-lessac-medium"),
@@ -329,14 +341,14 @@ class SystemConfig:
             return GeminiConfig(
                 voice_name=self.gemini_voice_name,
                 api_key=self.gemini_api_key,
-                min_request_interval=self.gemini_min_request_interval,
+                min_request_interval=self.tts_request_delay_seconds,
             )
         except ImportError:
             # Return a simple dict if the config class doesn't exist yet
             return {
                 "voice_name": self.gemini_voice_name,
                 "api_key": self.gemini_api_key,
-                "min_request_interval": self.gemini_min_request_interval,
+                "min_request_interval": self.tts_request_delay_seconds,
             }
 
     def get_piper_config(self) -> Union["PiperConfig", dict[str, Any]]:
@@ -364,9 +376,11 @@ class SystemConfig:
         print("=" * 50)
         print(f"TTS Engine: {self.tts_engine.value}")
         print(f"Text Cleaning: {'Enabled' if self.enable_text_cleaning else 'Disabled'}")
-        print(f"SSML Enhancement: {'Enabled' if self.enable_ssml else 'Disabled'}")
+        print(f"Natural Formatting: {'Enabled' if self.enable_natural_formatting else 'Disabled'}")
         print(f"Async Audio: {'Enabled' if self.enable_async_audio else 'Disabled'}")
-        print(f"Max Concurrent: {self.max_concurrent_requests}")
+        print(f"Audio Concurrent Chunks: {self.audio_concurrent_chunks}")
+        print(f"TTS Concurrent Requests: {self.tts_concurrent_requests}")
+        print(f"LLM Concurrent Requests: {self.llm_concurrent_requests}")
         print(f"Upload Folder: {self.upload_folder}")
         print(f"Audio Folder: {self.audio_folder}")
 

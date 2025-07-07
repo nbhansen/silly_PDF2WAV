@@ -232,3 +232,11 @@ secrets.json
 .profile
 profile_*
 *.prof
+
+# Piper TTS binaries and models
+libespeak-ng.so*
+libonnxruntime.so*
+libpiper_phonemize.so*
+libtashkeel_model.ort
+piper
+piper_models/

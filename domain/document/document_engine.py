@@ -41,6 +41,7 @@ class IDocumentEngine(ABC):
         audio_engine: "IAudioEngine",
         text_pipeline: "ITextPipeline",
         enable_timing: bool = False,
+        llm_chunk_size: int = 50000,
     ) -> ProcessingResult:
         """Complete document processing workflow."""
 
@@ -97,6 +98,7 @@ class DocumentEngine(IDocumentEngine):
         audio_engine: "IAudioEngine",
         text_pipeline: "ITextPipeline",
         enable_timing: bool = False,
+        llm_chunk_size: int = 50000,
     ) -> ProcessingResult:
         """Complete document processing workflow using new architecture components.
 
@@ -104,6 +106,8 @@ class DocumentEngine(IDocumentEngine):
             request: ProcessingRequest with PDF path, output name, page range
             audio_engine: AudioEngine for audio generation
             text_pipeline: TextPipeline for text cleaning and enhancement
+            enable_timing: Whether to generate timing data
+            llm_chunk_size: Optimal chunk size for LLM processing
 
         Returns:
             ProcessingResult with success/failure and audio files
@@ -123,16 +127,45 @@ class DocumentEngine(IDocumentEngine):
 
             print(f"DocumentEngine: Extracted {len(text_chunks)} text chunks")
 
-            # 3. Process text through pipeline (clean + enhance)
-            processed_chunks = []
-            for chunk in text_chunks:
-                # Clean the text
-                cleaned = text_pipeline.clean_text(chunk)
-                # Enhance with SSML
-                enhanced = text_pipeline.enhance_with_ssml(cleaned)
-                processed_chunks.append(enhanced)
+            # 3. Process text through pipeline with optimized chunking
+            # Combine chunks for efficient LLM processing, then re-chunk for TTS
+            print(f"🔬 DocumentEngine: Using optimized chunking strategy (LLM chunk size: {llm_chunk_size})")
 
-            print(f"DocumentEngine: Processed {len(processed_chunks)} chunks through text pipeline")
+            # Step 3a: Combine chunks for LLM processing
+            combined_chunks = self._combine_chunks_for_llm(text_chunks, llm_chunk_size)
+            print(f"   → Combined {len(text_chunks)} original chunks into {len(combined_chunks)} LLM chunks")
+
+            # Step 3b: Process through LLM cleaning
+            cleaned_chunks = []
+            for i, combined_chunk in enumerate(combined_chunks, 1):
+                print(
+                    f"🔬 DocumentEngine: Processing LLM chunk {i}/{len(combined_chunks)} ({len(combined_chunk)} chars)"
+                )
+                print(f"   Combined text preview: '{combined_chunk[:100]}...'")
+
+                # Clean the text using LLM
+                print("   → Calling text_pipeline.clean_text()...")
+                cleaned = text_pipeline.clean_text(combined_chunk)
+                print(f"   → Cleaned text ({len(cleaned)} chars): '{cleaned[:100]}...'")
+
+                cleaned_chunks.append(cleaned)
+
+            # Step 3c: Re-combine all cleaned text and enhance with natural formatting
+            all_cleaned_text = " ".join(cleaned_chunks)
+            print(f"   → Combined all cleaned text: {len(all_cleaned_text)} chars total")
+
+            print("   → Calling text_pipeline.enhance_with_natural_formatting() on combined text...")
+            enhanced_text = text_pipeline.enhance_with_natural_formatting(all_cleaned_text)
+            print(f"   → Enhanced text ({len(enhanced_text)} chars): '{enhanced_text[:100]}...'")
+
+            # Step 3d: Split enhanced text back into optimal chunks for TTS
+            processed_chunks = self._split_for_tts(enhanced_text)
+            print(f"   → Split enhanced text into {len(processed_chunks)} TTS-optimized chunks")
+
+            print(
+                f"DocumentEngine: Processed through optimized pipeline: "
+                f"{len(text_chunks)} → {len(combined_chunks)} → {len(processed_chunks)} chunks"
+            )
 
             # 4. Generate audio - choose appropriate method based on timing requirement
             if enable_timing:
@@ -234,3 +267,100 @@ class DocumentEngine(IDocumentEngine):
                 except (OSError, FileNotFoundError):
                     # Ignore file cleanup errors - temporary files may already be removed
                     pass
+
+    def _combine_chunks_for_llm(self, text_chunks: list[str], llm_chunk_size: int) -> list[str]:
+        """Combine small PDF chunks into larger chunks optimal for LLM processing.
+
+        Args:
+            text_chunks: Original PDF text chunks
+            llm_chunk_size: Target size for LLM chunks
+
+        Returns:
+            List of combined chunks optimized for LLM processing
+        """
+        if not text_chunks:
+            return []
+
+        combined_chunks = []
+        current_chunk = ""
+
+        for chunk in text_chunks:
+            # Check if adding this chunk would exceed the target size
+            if current_chunk and len(current_chunk) + len(chunk) + 1 > llm_chunk_size:
+                # Current chunk is full, start a new one
+                combined_chunks.append(current_chunk.strip())
+                current_chunk = chunk
+            else:
+                # Add to current chunk
+                if current_chunk:
+                    current_chunk += " " + chunk
+                else:
+                    current_chunk = chunk
+
+        # Add the final chunk if it has content
+        if current_chunk.strip():
+            combined_chunks.append(current_chunk.strip())
+
+        return combined_chunks
+
+    def _split_for_tts(self, text: str, target_chunk_size: int = 4000) -> list[str]:
+        """Split enhanced text into chunks optimal for TTS processing.
+
+        Args:
+            text: Enhanced text with SSML markup
+            target_chunk_size: Target size for TTS chunks
+
+        Returns:
+            List of chunks optimized for TTS processing
+        """
+        if not text:
+            return []
+
+        # Simple sentence-based splitting that handles SSML markup
+        import re
+
+        # If splitting fails, fall back to simple character-based chunking
+        # Split on sentence boundaries, being careful with SSML tags
+        sentences = re.split(r"([.!?]+(?:\s*(?:<[^>]*>)?\s*))", text)
+
+        # Rejoin sentences with their delimiters
+        sentence_list = []
+        for i in range(0, len(sentences) - 1, 2):
+            sentence = sentences[i]
+            if i + 1 < len(sentences):
+                sentence += sentences[i + 1]
+            sentence_list.append(sentence.strip())
+
+        # Combine sentences into chunks of target size
+        chunks = []
+        current_chunk = ""
+
+        for sentence in sentence_list:
+            if not sentence:
+                continue
+
+            # Check if adding this sentence would exceed target size
+            if current_chunk and len(current_chunk) + len(sentence) + 1 > target_chunk_size:
+                # Current chunk is full, start a new one
+                chunks.append(current_chunk.strip())
+                current_chunk = sentence
+            else:
+                # Add to current chunk
+                if current_chunk:
+                    current_chunk += " " + sentence
+                else:
+                    current_chunk = sentence
+
+        # Add the final chunk if it has content
+        if current_chunk.strip():
+            chunks.append(current_chunk.strip())
+
+        # Fallback: if no chunks created, split by character count
+        if not chunks and text.strip():
+            print("   → Sentence splitting failed, using character-based fallback")
+            for i in range(0, len(text), target_chunk_size):
+                chunk = text[i : i + target_chunk_size]
+                if chunk.strip():
+                    chunks.append(chunk.strip())
+
+        return chunks

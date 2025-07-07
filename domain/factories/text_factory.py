@@ -8,8 +8,8 @@ if TYPE_CHECKING:
     from domain.text.text_pipeline import ITextPipeline
 
 
-def create_text_pipeline(config: "SystemConfig", tts_supports_ssml: bool = True) -> "ITextPipeline":
-    """Create text pipeline with optional LLM provider."""
+def create_text_pipeline(config: "SystemConfig") -> "ITextPipeline":
+    """Create text pipeline with optional LLM provider and natural formatting."""
     from domain.text.text_pipeline import TextPipeline
     from infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
 
@@ -20,14 +20,13 @@ def create_text_pipeline(config: "SystemConfig", tts_supports_ssml: bool = True)
         llm_provider = GeminiLLMProvider(
             api_key=config.gemini_api_key,
             model_name=config.llm_model_name,  # Language model, not TTS model
-            min_request_interval=config.llm_min_request_interval,
-            max_concurrent_requests=config.llm_max_concurrent_requests,
-            requests_per_minute=config.llm_requests_per_minute,
+            min_request_interval=config.llm_request_delay_seconds,
+            max_concurrent_requests=config.llm_concurrent_requests,
+            requests_per_minute=30,  # Default rate limit
         )
 
     return TextPipeline(
         llm_provider=llm_provider,  # This is for text processing, not audio generation
         enable_cleaning=config.enable_text_cleaning,
-        enable_ssml=config.enable_ssml,
-        tts_supports_ssml=tts_supports_ssml,
+        enable_natural_formatting=config.enable_natural_formatting,
     )

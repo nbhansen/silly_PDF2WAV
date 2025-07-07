@@ -17,18 +17,15 @@ app:
 # SECRETS (Keep these secure!)
 # =================================================================
 secrets:
-  # Your Google AI API key (required for Gemini TTS and text cleaning)
+  # Your Google AI API key (required for LLM text cleaning only - TTS is local)
   # Get yours at: https://aistudio.google.com/app/apikey
   google_ai_api_key: "YOUR_GOOGLE_AI_API_KEY"  # Fill this in your config.yaml
 
 # =================================================================
-# TEXT-TO-SPEECH CONFIGURATION
+# TEXT-TO-SPEECH CONFIGURATION (Piper Local Engine)
 # =================================================================
 tts:
-  # Choose: 'piper' (local, fast, no API key) or 'gemini' (cloud, high quality)
-  engine: "piper"
-
-  # Piper TTS Settings (local engine)
+  # Piper TTS Settings (local engine - unlimited processing)
   piper:
     # Available models:
     # US Male: en_US-ryan-high, en_US-ryan-medium
@@ -37,22 +34,6 @@ tts:
     models_dir: "piper_models"
     length_scale: 1.0  # Speech speed (0.5-2.0)
     model_repository_url: "https://huggingface.co/rhasspy/piper-voices/resolve/main"
-
-  # Gemini TTS Settings (cloud engine)
-  gemini:
-    # TTS-specific model (has -tts suffix, different from LLM model)
-    model_name: "gemini-2.5-pro-preview-tts"
-    voice_name: "Kore"  # Single consistent voice: Kore, Charon, Aoede, Leda
-
-    # Rate limiting optimized for Gemini TTS limits (10 RPM)
-    min_request_interval: 6.5  # Seconds between requests (optimized for 10 RPM)
-    max_concurrent_requests: 2  # Optimal concurrency for rate limits
-    requests_per_minute: 10  # Official Gemini TTS rate limit
-    chunk_size_multiplier: 2.0  # Increase chunk sizes for efficiency
-
-    # Advanced timing settings
-    use_measurement_mode: false  # Precise timing (slower)
-    measurement_mode_interval: 0.8
 
 # =================================================================
 # LLM CONFIGURATION (for text cleaning)
@@ -69,21 +50,21 @@ text_processing:
   # Enable LLM-powered text cleaning (requires google_ai_api_key)
   enable_text_cleaning: true
 
-  # Enable advanced SSML markup for better narration
-  enable_ssml: true
+  # Enable natural formatting for better narration (dots, pauses)
+  enable_natural_formatting: true
 
   # Text processing chunk sizes
   chunk_size: 4000
   llm_max_chunk_size: 100000
-  audio_target_chunk_size: 4000  # Increased for Gemini efficiency (fewer requests)
-  audio_max_chunk_size: 6000  # Increased for Gemini efficiency
+  audio_target_chunk_size: 4000  # Optimal for natural speech generation
+  audio_max_chunk_size: 6000     # Maximum before forced split
 
 # =================================================================
 # PERFORMANCE SETTINGS
 # =================================================================
 performance:
   enable_async_audio: true
-  max_concurrent_tts_requests: 2  # Optimized for Gemini 10 RPM limits
+  max_concurrent_tts_requests: 8  # Local TTS supports higher concurrency
   max_concurrent_requests: 4
 
 # =================================================================
@@ -120,6 +101,7 @@ ocr:
 # AUDIO PROCESSING
 # =================================================================
 audio:
+  concurrent_chunks: 8  # Local TTS processing supports higher concurrency
   bitrate: "128k"
   sample_rate: 22050
   mp3_codec: "libmp3lame"
@@ -143,20 +125,22 @@ rate_limits:
 # CONFIGURATION NOTES
 # =================================================================
 #
-# IMPORTANT MODEL SEPARATION:
-# - llm.model_name: For text cleaning (use regular Gemini models)
-# - tts.gemini.model_name: For audio generation (use -tts models)
+# ARCHITECTURE OVERVIEW:
+# - LLM (Gemini): For text cleaning only - uses regular Gemini models
+# - TTS (Piper): For audio generation only - local processing, no API needed
 #
 # PIPER VOICE OPTIONS:
 # - en_US-ryan-high/medium: US Male voice
 # - en_GB-cori-high: GB Female voice
 # - en_GB-alba-medium: GB Female voice
 #
-# TTS ENGINE COMPARISON:
-# - Piper: Fast, local, no API costs, basic SSML
-# - Gemini: Slower, cloud, API costs, natural single voice delivery
+# PIPER BENEFITS:
+# - Fast, local processing (no API costs)
+# - Unlimited concurrent processing
+# - Natural speech with punctuation-based pausing
+# - No rate limiting or quota restrictions
 #
 # SIMPLIFIED ARCHITECTURE:
 # - Single consistent voice throughout document (no persona switching)
 # - Shared TextSegmenter utilities for universal text processing
-# - Engine-specific optimizations (rate limiting, audio formats)
+# - Local processing optimizations (higher concurrency, audio formats)

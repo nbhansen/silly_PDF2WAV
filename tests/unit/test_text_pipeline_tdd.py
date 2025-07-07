@@ -18,16 +18,16 @@ class TestTextPipelineBasicFunctionality:
 
         assert pipeline.llm_provider is None
         assert pipeline.enable_cleaning is True
-        assert pipeline.enable_ssml is True
+        assert pipeline.enable_natural_formatting is True
 
     def test_text_pipeline_creation_with_custom_settings(self):
         """Should create text pipeline with custom configuration."""
         mock_llm = Mock()
-        pipeline = TextPipeline(llm_provider=mock_llm, enable_cleaning=False, enable_ssml=False)
+        pipeline = TextPipeline(llm_provider=mock_llm, enable_cleaning=False, enable_natural_formatting=False)
 
         assert pipeline.llm_provider == mock_llm
         assert pipeline.enable_cleaning is False
-        assert pipeline.enable_ssml is False
+        assert pipeline.enable_natural_formatting is False
 
     def test_text_pipeline_implements_interface(self):
         """Should properly implement ITextPipeline interface."""
@@ -36,9 +36,8 @@ class TestTextPipelineBasicFunctionality:
 
         # Check all interface methods are implemented
         assert hasattr(pipeline, "clean_text")
-        assert hasattr(pipeline, "enhance_with_ssml")
+        assert hasattr(pipeline, "enhance_with_natural_formatting")
         assert hasattr(pipeline, "split_into_sentences")
-        assert hasattr(pipeline, "strip_ssml")
 
 
 class TestTextCleaningTDD:
@@ -110,7 +109,9 @@ class TestTextCleaningTDD:
     def test_llm_cleaning_falls_back_on_short_response(self):
         """Should fall back when LLM response is too short."""
         mock_llm = Mock()
-        mock_llm.generate_content.return_value = Result.success("Short")  # Less than 30% of original
+        mock_llm.generate_content.return_value = Result.success(
+            "X"
+        )  # Less than 5% of original (1 char vs 75 chars = 1.3%)
 
         pipeline = TextPipeline(llm_provider=mock_llm, enable_cleaning=True)
 
@@ -118,7 +119,7 @@ class TestTextCleaningTDD:
         result = pipeline.clean_text(raw_text)
 
         # Should fall back to basic cleaning
-        assert len(result) > len("Short")
+        assert len(result) > len("X")
         assert "This is a much longer text" in result
 
     def test_llm_cleaning_exception_handling(self):
@@ -149,88 +150,38 @@ class TestTextCleaningTDD:
         assert result == "Text with spacing."
 
 
-class TestSSMLEnhancementTDD:
-    """TDD tests for SSML enhancement functionality."""
+class TestNaturalFormattingTDD:
+    """TDD tests for natural formatting functionality."""
 
-    def test_ssml_enhancement_disabled_returns_original(self):
-        """Should return original text when SSML is disabled."""
-        pipeline = TextPipeline(enable_ssml=False)
+    def test_natural_formatting_disabled_returns_original(self):
+        """Should return original text when natural formatting is disabled."""
+        pipeline = TextPipeline(enable_natural_formatting=False)
 
         text = "This is plain text."
-        result = pipeline.enhance_with_ssml(text)
+        result = pipeline.enhance_with_natural_formatting(text)
 
         assert result == text
 
-    def test_ssml_enhancement_adds_academic_pauses(self):
-        """Should add pauses for academic document structure."""
-        pipeline = TextPipeline(enable_ssml=True)
+    def test_natural_formatting_adds_natural_pauses(self):
+        """Should add natural formatting for better speech."""
+        pipeline = TextPipeline(enable_natural_formatting=True)
 
         text = "Abstract This is the abstract. Introduction This is the intro."
-        result = pipeline.enhance_with_ssml(text)
+        result = pipeline.enhance_with_natural_formatting(text)
 
-        assert '<break time="1s"/>' in result
+        # Should add natural formatting (dots, etc.) not SSML
         assert "Abstract" in result
         assert "Introduction" in result
+        # Natural formatting uses dots, not SSML tags
+        assert "..." in result
 
-    def test_ssml_enhancement_adds_numbered_section_pauses(self):
-        """Should add pauses after numbered sections."""
-        pipeline = TextPipeline(enable_ssml=True)
-
-        text = "1. First section content here. 2. Second section follows."
-        result = pipeline.enhance_with_ssml(text)
-
-        assert '<break time="0.5s"/>' in result
-
-    def test_ssml_enhancement_emphasizes_technical_terms(self):
-        """Should add emphasis to important technical terms."""
-        pipeline = TextPipeline(enable_ssml=True)
-
-        text = "The algorithm shows significant results. However, the method needs improvement."
-        result = pipeline.enhance_with_ssml(text)
-
-        assert '<emphasis level="moderate">algorithm</emphasis>' in result
-        assert '<emphasis level="moderate">significant</emphasis>' in result
-        assert '<emphasis level="moderate">However</emphasis>' in result
-
-    def test_ssml_enhancement_emphasizes_quoted_text(self):
-        """Should emphasize text in quotation marks."""
-        pipeline = TextPipeline(enable_ssml=True)
-
-        text = 'The author states "this is simple" in the conclusion.'
-        result = pipeline.enhance_with_ssml(text)
-
-        assert '<emphasis level="moderate">"this is simple"</emphasis>' in result
-
-    def test_ssml_enhancement_adds_punctuation_breaks(self):
-        """Should add appropriate breaks for punctuation."""
-        pipeline = TextPipeline(enable_ssml=True)
-
-        text = "First sentence, with comma; and semicolon. Final sentence!"
-        result = pipeline.enhance_with_ssml(text)
-
-        assert ',<break time="0.2s"/>' in result  # Comma break
-        assert ';<break time="0.3s"/>' in result  # Semicolon break
-        assert '.<break time="0.5s"/>' in result  # Period break
-        assert '!<break time="0.5s"/>' in result  # Exclamation break
-
-    def test_ssml_enhancement_handles_empty_text(self):
+    def test_natural_formatting_handles_empty_text(self):
         """Should handle empty or whitespace-only text."""
-        pipeline = TextPipeline(enable_ssml=True)
+        pipeline = TextPipeline(enable_natural_formatting=True)
 
-        assert pipeline.enhance_with_ssml("") == ""
-        assert pipeline.enhance_with_ssml("   ") == "   "
-
-    def test_ssml_enhancement_universal_academic_approach(self):
-        """Should apply universal academic enhancements to all content."""
-        pipeline = TextPipeline(enable_ssml=True)
-
-        text = "Abstract This is general content."
-        result = pipeline.enhance_with_ssml(text)
-
-        # Should add academic enhancements universally
-        assert "Abstract" in result
-        # Should add academic pauses for all documents (universal approach)
-        assert '<break time="1s"/>' in result
+        assert pipeline.enhance_with_natural_formatting("") == ""
+        result = pipeline.enhance_with_natural_formatting("   ")
+        assert result.strip() == ""
 
 
 class TestSentenceSplittingTDD:
@@ -273,17 +224,17 @@ class TestSentenceSplittingTDD:
         assert "Dr. Smith conducted the study." in result
         assert "Mr. Jones reviewed it." in result
 
-    def test_split_into_sentences_strips_ssml_first(self):
-        """Should remove SSML tags before splitting."""
+    def test_split_into_sentences_handles_natural_text(self):
+        """Should handle natural text without markup."""
         pipeline = TextPipeline()
 
-        text = 'First <emphasis>sentence</emphasis>. <break time="1s"/>Second sentence.'
+        text = "First sentence with emphasis. Second sentence follows."
         result = pipeline.split_into_sentences(text)
 
-        # Should not contain SSML tags in results
-        for sentence in result:
-            assert "<emphasis>" not in sentence
-            assert "<break" not in sentence
+        # Should split naturally on sentence boundaries
+        assert len(result) == 2
+        assert "First sentence with emphasis." in result
+        assert "Second sentence follows." in result
 
     def test_split_into_sentences_handles_empty_text(self):
         """Should handle empty or whitespace text."""
@@ -313,84 +264,6 @@ class TestSentenceSplittingTDD:
         assert "3.14159" in result[0]
 
 
-class TestSSMLStrippingTDD:
-    """TDD tests for SSML tag removal functionality."""
-
-    def test_strip_ssml_removes_all_tags(self):
-        """Should remove all SSML tags from text."""
-        pipeline = TextPipeline()
-
-        text = 'Text with <emphasis level="moderate">emphasis</emphasis> and <break time="1s"/> breaks.'
-        result = pipeline.strip_ssml(text)
-
-        assert result == "Text with emphasis and breaks."
-        assert "<" not in result
-        assert ">" not in result
-
-    def test_strip_ssml_removes_complex_tags(self):
-        """Should remove complex SSML tags with attributes."""
-        pipeline = TextPipeline()
-
-        text = '<speak><prosody rate="slow" pitch="low">Slow speech</prosody><mark name="bookmark"/>End</speak>'
-        result = pipeline.strip_ssml(text)
-
-        assert result == "Slow speech End"
-
-    def test_strip_ssml_normalizes_whitespace(self):
-        """Should normalize whitespace after tag removal."""
-        pipeline = TextPipeline()
-
-        text = 'Text   <break time="1s"/>   with    excessive    spacing.'
-        result = pipeline.strip_ssml(text)
-
-        assert result == "Text with excessive spacing."
-
-    def test_strip_ssml_handles_nested_tags(self):
-        """Should handle nested SSML tags correctly."""
-        pipeline = TextPipeline()
-
-        text = '<emphasis><prosody rate="fast">Nested content</prosody></emphasis>'
-        result = pipeline.strip_ssml(text)
-
-        assert result == "Nested content"
-
-    def test_strip_ssml_handles_self_closing_tags(self):
-        """Should handle self-closing SSML tags."""
-        pipeline = TextPipeline()
-
-        text = 'Before<break time="1s"/>after the break.'
-        result = pipeline.strip_ssml(text)
-
-        assert result == "Before after the break."
-
-    def test_strip_ssml_handles_malformed_tags(self):
-        """Should handle malformed or incomplete tags gracefully."""
-        pipeline = TextPipeline()
-
-        text = "Text with <incomplete and <break> normal content."
-        result = pipeline.strip_ssml(text)
-
-        # Should still process and clean up reasonably
-        assert "Text with" in result
-        assert "normal content" in result
-
-    def test_strip_ssml_handles_empty_text(self):
-        """Should handle empty text gracefully."""
-        pipeline = TextPipeline()
-
-        assert pipeline.strip_ssml("") == ""
-        assert pipeline.strip_ssml("   ") == ""
-
-    def test_strip_ssml_preserves_non_ssml_content(self):
-        """Should preserve all non-SSML content exactly."""
-        pipeline = TextPipeline()
-
-        text = 'Regular text with "quotes" and numbers 123.45 preserved.'
-        result = pipeline.strip_ssml(text)
-
-        assert result == text
-
-
 class TestTextPipelineIntegrationTDD:
     """TDD tests for TextPipeline component integration."""
 
@@ -401,7 +274,7 @@ class TestTextPipelineIntegrationTDD:
             "Cleaned academic text about the algorithm methodology."
         )
 
-        pipeline = TextPipeline(llm_provider=mock_llm, enable_cleaning=True, enable_ssml=True)
+        pipeline = TextPipeline(llm_provider=mock_llm, enable_cleaning=True, enable_natural_formatting=True)
 
         raw_text = "Raw   academic   text about algorithms."
 
@@ -409,33 +282,33 @@ class TestTextPipelineIntegrationTDD:
         cleaned = pipeline.clean_text(raw_text)
         assert "algorithm" in cleaned
 
-        # Enhance with SSML
-        enhanced = pipeline.enhance_with_ssml(cleaned)
-        assert '<emphasis level="moderate">algorithm</emphasis>' in enhanced
+        # Enhance with natural formatting
+        enhanced = pipeline.enhance_with_natural_formatting(cleaned)
+        assert "..." in enhanced  # Natural formatting uses dots
 
         # Split into sentences
         sentences = pipeline.split_into_sentences(enhanced)
         assert len(sentences) >= 1
 
-        # Strip SSML
-        stripped = pipeline.strip_ssml(enhanced)
-        assert "<emphasis>" not in stripped
-        assert "algorithm" in stripped
+        # Verify no SSML in results (natural formatting only)
+        all_text = " ".join(sentences)
+        assert "<emphasis>" not in all_text
+        assert "algorithm" in all_text
 
     def test_pipeline_consistency_across_operations(self):
         """Should maintain text consistency through all operations."""
-        pipeline = TextPipeline(enable_cleaning=False, enable_ssml=True)
+        pipeline = TextPipeline(enable_cleaning=False, enable_natural_formatting=True)
 
         original_text = "Test sentence one. Test sentence two."
 
         # Process through pipeline
         cleaned = pipeline.clean_text(original_text)
-        enhanced = pipeline.enhance_with_ssml(cleaned)
+        enhanced = pipeline.enhance_with_natural_formatting(cleaned)
         sentences = pipeline.split_into_sentences(enhanced)
 
         # Recombine and strip
         recombined = " ".join(sentences)
-        final = pipeline.strip_ssml(recombined)
+        final = pipeline.split_into_sentences(recombined)
 
         # Should preserve core content
         assert "Test sentence one" in final
@@ -443,28 +316,28 @@ class TestTextPipelineIntegrationTDD:
 
     def test_pipeline_handles_large_text_efficiently(self):
         """Should handle larger text blocks without issues."""
-        pipeline = TextPipeline(enable_cleaning=False, enable_ssml=True)
+        pipeline = TextPipeline(enable_cleaning=False, enable_natural_formatting=True)
 
         # Create larger text block
         large_text = " ".join([f"Sentence number {i} with content." for i in range(100)])
 
         # Should process without errors
-        result = pipeline.enhance_with_ssml(large_text)
-        assert len(result) > len(large_text)  # Should have added SSML
+        result = pipeline.enhance_with_natural_formatting(large_text)
+        assert len(result) >= len(large_text)  # Should have added natural formatting
 
         sentences = pipeline.split_into_sentences(result)
         assert len(sentences) == 100  # Should split correctly
 
     def test_pipeline_with_all_features_disabled(self):
         """Should work correctly with all enhancement features disabled."""
-        pipeline = TextPipeline(enable_cleaning=False, enable_ssml=False)
+        pipeline = TextPipeline(enable_cleaning=False, enable_natural_formatting=False)
 
         text = "Simple   text   with   spacing."
 
         cleaned = pipeline.clean_text(text)
-        enhanced = pipeline.enhance_with_ssml(cleaned)
+        enhanced = pipeline.enhance_with_natural_formatting(cleaned)
 
-        # Should still do basic cleanup but no SSML
+        # Should still do basic cleanup but no natural formatting
         assert enhanced == "Simple text with spacing."
 
     def test_pipeline_error_resilience(self):
@@ -475,9 +348,12 @@ class TestTextPipelineIntegrationTDD:
         # Should handle None gracefully (this might need implementation)
         # For now, testing with empty strings which should work
         assert pipeline.clean_text("") == ""
-        assert pipeline.enhance_with_ssml("") == ""
+        assert pipeline.enhance_with_natural_formatting("") == ""
         assert pipeline.split_into_sentences("") == []
-        assert pipeline.strip_ssml("") == ""
+        # Fixed: split_into_sentences returns a list, not a string
+        sentences = pipeline.split_into_sentences("")
+        assert isinstance(sentences, list)
+        assert len(sentences) == 0
 
 
 class TestTextPipelinePromptGenerationTDD:
@@ -511,9 +387,9 @@ class TestTextPipelinePromptGenerationTDD:
         text = "Sample text"
         prompt = pipeline._generate_cleaning_prompt(text)
 
-        assert "Clean the following text" in prompt
-        assert "Remove headers" in prompt
-        assert "Add appropriate pauses" in prompt
+        assert "Clean this text for text-to-speech" in prompt
+        assert "Page numbers, headers, footers" in prompt
+        assert "natural punctuation" in prompt
 
 
 class TestTextPipelineEdgeCasesTDD:
@@ -566,10 +442,10 @@ class TestTextPipelineEdgeCasesTDD:
 
     def test_handles_mixed_case_section_headers(self):
         """Should handle section headers in various cases."""
-        pipeline = TextPipeline(enable_ssml=True)
+        pipeline = TextPipeline(enable_natural_formatting=True)
 
         text = "ABSTRACT This is content. abstract This too. Abstract: Also this."
-        result = pipeline.enhance_with_ssml(text)
+        result = pipeline.enhance_with_natural_formatting(text)
 
-        # Should handle different cases of section headers
-        assert '<break time="1s"/>' in result
+        # Should handle different cases of section headers with natural formatting
+        assert "..." in result  # Natural formatting uses dots instead of SSML

@@ -107,7 +107,7 @@ class TestSystemConfigYAMLLoading:
     def test_from_yaml_type_conversions(self):
         """Test that various type conversions work correctly."""
         config_data = {
-            "tts": {"engine": "piper"},
+            "tts": {"engine": "piper", "piper": {"length_scale": "1.5"}},  # String float
             "text_processing": {
                 "enable_text_cleaning": "true",  # String boolean
                 "enable_ssml": 1,  # Integer boolean
@@ -122,7 +122,6 @@ class TestSystemConfigYAMLLoading:
                     "auto_cleanup_interval_hours": 8,  # Integer as float
                 },
             },
-            "tts": {"engine": "piper", "piper": {"length_scale": "1.5"}},  # String float
         }
 
         config_file = self.create_yaml_config(config_data)

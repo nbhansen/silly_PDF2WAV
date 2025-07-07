@@ -58,6 +58,7 @@ class AudioEngine(IAudioEngine):
         max_concurrent: int = 4,
         audio_target_chunk_size: int = 2000,
         audio_max_chunk_size: int = 3000,
+        enable_async: bool = True,
         chunking_service: Optional[ChunkingService] = None,
     ):
         self.tts_engine = tts_engine
@@ -66,6 +67,7 @@ class AudioEngine(IAudioEngine):
         self.max_concurrent = max_concurrent
         self.audio_target_chunk_size = audio_target_chunk_size
         self.audio_max_chunk_size = audio_max_chunk_size
+        self.enable_async = enable_async
         self.chunking_service = chunking_service or create_chunking_service(ChunkingMode.SENTENCE_BASED)
         self.base_delay = self._get_base_delay_for_engine()
 
@@ -97,9 +99,13 @@ class AudioEngine(IAudioEngine):
         print(f"AudioEngine: Processing {len(processed_chunks)} chunks (max size: {max_chunk_size} chars)")
         print(f"🔍 AudioEngine: After rechunking, chunk sizes: {[len(chunk) for chunk in processed_chunks]}")
 
-        # Generate audio using new async interface
-        print("AudioEngine: Using async processing for simple audio generation")
-        audio_chunks = self._generate_chunks_with_new_async_interface(processed_chunks)
+        # Generate audio using sync or async based on config
+        if self.enable_async:
+            print("AudioEngine: Using async processing for simple audio generation")
+            audio_chunks = self._generate_chunks_with_new_async_interface(processed_chunks)
+        else:
+            print("AudioEngine: Using synchronous processing for simple audio generation")
+            audio_chunks = self._generate_chunks_sync(processed_chunks)
 
         if not audio_chunks:
             print("AudioEngine: No successful audio chunks generated")
@@ -161,9 +167,28 @@ class AudioEngine(IAudioEngine):
         finally:
             loop.close()
 
+    def _generate_chunks_sync(self, processed_chunks: list[str]) -> list[bytes]:
+        """Generate audio chunks synchronously - simpler and more reliable."""
+        audio_chunks = []
+
+        for i, chunk in enumerate(processed_chunks, 1):
+            print(f"🎵 AudioEngine: Processing chunk {i}/{len(processed_chunks)} ({len(chunk)} chars)")
+
+            result = self.tts_engine.generate_audio_data(chunk)
+            if result.is_success:
+                audio_chunks.append(result.value)
+                print(f"✅ Chunk {i} completed ({len(result.value)} bytes)")
+            else:
+                print(f"❌ Chunk {i} failed: {result.error}")
+
+        return audio_chunks
+
     async def _process_chunks_async(self, processed_chunks: list[str]) -> list[bytes]:
         """Actually async method that processes chunks in parallel."""
-        print(f"AudioEngine: Starting parallel processing of {len(processed_chunks)} chunks")
+        import time
+
+        start_time = time.time()
+        print(f"🚀 AudioEngine: Starting parallel processing of {len(processed_chunks)} chunks at {start_time:.2f}")
 
         # Create tasks for parallel execution
         tasks = []
@@ -179,6 +204,10 @@ class AudioEngine(IAudioEngine):
 
         results = await asyncio.gather(*limited_tasks, return_exceptions=True)
 
+        end_time = time.time()
+        total_time = end_time - start_time
+        print(f"⏱️  AudioEngine: Parallel processing completed in {total_time:.2f} seconds")
+
         # Filter successful results (immutable) - cast is safe because we filter out non-bytes
         audio_chunks: list[bytes] = [
             result
@@ -191,7 +220,15 @@ class AudioEngine(IAudioEngine):
             if isinstance(result, Exception):
                 print(f"AudioEngine: Chunk {i+1} failed with exception: {result}")
 
-        print(f"AudioEngine: Successfully processed {len(audio_chunks)} chunks in parallel")
+        print(
+            f"✅ AudioEngine: Successfully processed {len(audio_chunks)}/"
+            f"{len(processed_chunks)} chunks in {total_time:.2f}s"
+        )
+        if len(processed_chunks) > 1:
+            avg_time_per_chunk = total_time / len(processed_chunks)
+            theoretical_sequential_time = avg_time_per_chunk * len(processed_chunks)
+            speedup = theoretical_sequential_time / total_time if total_time > 0 else 1
+            print(f"🔥 Async speedup: {speedup:.1f}x faster than sequential processing")
         return audio_chunks
 
     async def _limited_chunk_processing(self, semaphore: asyncio.Semaphore, task: Any) -> Optional[bytes]:
@@ -204,20 +241,28 @@ class AudioEngine(IAudioEngine):
 
     async def _process_single_chunk_async(self, chunk: str, chunk_num: int, total_chunks: int) -> Optional[bytes]:
         """Process a single chunk asynchronously."""
-        print(f"AudioEngine: Processing chunk {chunk_num}/{total_chunks} ({len(chunk)} chars) - TRUE ASYNC")
+        import time
+
+        chunk_start = time.time()
+        print(f"🎵 AudioEngine: Starting chunk {chunk_num}/{total_chunks} ({len(chunk)} chars) at {chunk_start:.2f}")
 
         try:
             # Use the new async interface
             result = await self.tts_engine.generate_audio_data_async(chunk)
+            chunk_end = time.time()
+            chunk_time = chunk_end - chunk_start
+
             if result.is_success and result.value:
+                print(f"✅ Chunk {chunk_num} completed in {chunk_time:.2f}s ({len(result.value)} bytes)")
                 return result.value
             else:
-                print(
-                    f"AudioEngine: Chunk {chunk_num} failed: {result.error if result.is_failure else 'No audio data'}"
-                )
+                error_msg = result.error if result.is_failure else "No audio data"
+                print(f"❌ Chunk {chunk_num} failed in {chunk_time:.2f}s: {error_msg}")
                 return None
         except Exception as e:
-            print(f"AudioEngine: Exception processing chunk {chunk_num}: {e}")
+            chunk_end = time.time()
+            chunk_time = chunk_end - chunk_start
+            print(f"💥 Chunk {chunk_num} exception in {chunk_time:.2f}s: {e}")
             return None
 
     def process_audio_file(self, file_path: str) -> Result[float]:

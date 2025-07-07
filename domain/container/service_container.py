@@ -87,7 +87,7 @@ class ServiceContainer(IServiceContainer):
             ITextPipeline: lambda: TextPipeline(
                 llm_provider=self.get(GeminiLLMProvider) if self.config.gemini_api_key else None,
                 enable_cleaning=self.config.enable_text_cleaning,
-                enable_ssml=self.config.enable_ssml,
+                enable_natural_formatting=self.config.enable_natural_formatting,
             ),
             # Timing Engine
             ITimingEngine: lambda: TimingEngine(
@@ -102,9 +102,10 @@ class ServiceContainer(IServiceContainer):
                 tts_engine=self.get("tts_engine"),
                 file_manager=self.get(FileManager),
                 timing_engine=self.get(ITimingEngine),
-                max_concurrent=self.config.max_concurrent_requests,
+                max_concurrent=self.config.audio_concurrent_chunks,
                 audio_target_chunk_size=self.config.audio_target_chunk_size,
                 audio_max_chunk_size=self.config.audio_max_chunk_size,
+                enable_async=self.config.enable_async_audio,
             ),
             # OCR Provider
             TesseractOCRProvider: lambda: TesseractOCRProvider(config=self.config),
@@ -132,9 +133,9 @@ class ServiceContainer(IServiceContainer):
                 model_name=self.config.gemini_model_name,
                 api_key=self.config.gemini_api_key,
                 voice_name=self.config.gemini_voice_name,
-                min_request_interval=self.config.gemini_min_request_interval,
-                max_concurrent_requests=self.config.gemini_max_concurrent_requests,
-                requests_per_minute=self.config.gemini_requests_per_minute,
+                min_request_interval=self.config.tts_request_delay_seconds,
+                max_concurrent_requests=self.config.tts_concurrent_requests,
+                requests_per_minute=30,  # Default rate limit for Flash TTS
             )
         else:
             piper_config = self.config.get_piper_config()

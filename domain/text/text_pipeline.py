@@ -23,16 +23,12 @@ class ITextPipeline(ABC):
         """Clean and prepare text for TTS asynchronously with rate limiting."""
 
     @abstractmethod
-    def enhance_with_ssml(self, text: str) -> str:
-        """Add SSML enhancements to text."""
+    def enhance_with_natural_formatting(self, text: str) -> str:
+        """Add natural formatting enhancements to text."""
 
     @abstractmethod
     def split_into_sentences(self, text: str) -> list[str]:
         """Split text into sentences for processing."""
-
-    @abstractmethod
-    def strip_ssml(self, text: str) -> str:
-        """Remove SSML tags from text."""
 
 
 class TextPipeline(ITextPipeline):
@@ -44,40 +40,85 @@ class TextPipeline(ITextPipeline):
         self,
         llm_provider: Optional["ILLMProvider"] = None,
         enable_cleaning: bool = True,
-        enable_ssml: bool = True,
-        tts_supports_ssml: bool = True,
+        enable_natural_formatting: bool = True,
     ):
         self.llm_provider = llm_provider
         self.enable_cleaning = enable_cleaning
-        self.enable_ssml = enable_ssml
-        self.tts_supports_ssml = tts_supports_ssml
-
-        # If TTS doesn't support SSML, disable SSML enhancement
-        if not self.tts_supports_ssml:
-            self.enable_ssml = False
+        self.enable_natural_formatting = enable_natural_formatting
 
     def clean_text(self, raw_text: str) -> str:
         """Clean and prepare text for TTS processing."""
+        print(f"🔬 TextPipeline.clean_text(): Input {len(raw_text)} chars")
+
         if not self.enable_cleaning or not self.llm_provider:
-            return self._basic_text_cleanup(raw_text)
+            llm_available = self.llm_provider is not None
+            print(f"   → Using basic cleanup (cleaning={self.enable_cleaning}, " f"llm_provider={llm_available})")
+            result = self._basic_text_cleanup(raw_text)
+            print(f"   → Basic cleanup result: {len(result)} chars")
+            return result
 
         try:
             # Use LLM for advanced cleaning
+            print(f"   → Using LLM cleaning (provider: {type(self.llm_provider).__name__})")
             cleaning_prompt = self._generate_cleaning_prompt(raw_text)
+            print(f"   → Generated cleaning prompt ({len(cleaning_prompt)} chars)")
+
+            print("   → Calling LLM API...")
             result = self.llm_provider.generate_content(cleaning_prompt)
 
             if result.is_success:
                 cleaned = result.value
+                print(f"   → LLM success: {len(cleaned)} chars returned")
                 # Basic validation of LLM output
-                if cleaned and len(cleaned) > len(raw_text) * 0.3:  # At least 30% of original length
-                    return self._basic_text_cleanup(cleaned)
+                if (
+                    cleaned and len(cleaned) > len(raw_text) * 0.05
+                ):  # At least 5% of original length (cleaning should reduce size)
+                    print("   → LLM output valid, applying basic cleanup")
+                    final_result = self._basic_text_cleanup(cleaned)
+                    print(f"   → Final result: {len(final_result)} chars")
+                    return final_result
+                else:
+                    print(f"   → LLM output too short ({len(cleaned) if cleaned else 0} chars), trying smaller chunks")
+            else:
+                print(f"   → LLM failed: {result.error}")
 
-            # Fallback to basic cleaning if LLM fails
-            return self._basic_text_cleanup(raw_text)
+            # If large chunk failed, try processing in smaller pieces
+            if len(raw_text) > 15000:
+                print("   → Attempting retry with smaller chunks (15K chars each)")
+                chunk_size = 15000
+                cleaned_parts = []
+
+                for i in range(0, len(raw_text), chunk_size):
+                    chunk = raw_text[i : i + chunk_size]
+                    print(f"     → Processing sub-chunk {i//chunk_size + 1} ({len(chunk)} chars)")
+
+                    sub_prompt = self._generate_cleaning_prompt(chunk)
+                    sub_result = self.llm_provider.generate_content(sub_prompt)
+
+                    if sub_result.is_success and sub_result.value:
+                        cleaned_parts.append(sub_result.value)
+                        print(f"     → Sub-chunk success: {len(sub_result.value)} chars")
+                    else:
+                        # Use basic cleanup for failed sub-chunks
+                        cleaned_parts.append(self._basic_text_cleanup(chunk))
+                        print("     → Sub-chunk failed, using basic cleanup")
+
+                if cleaned_parts:
+                    combined_result = " ".join(cleaned_parts)
+                    print(f"   → Combined sub-chunks: {len(combined_result)} chars")
+                    return self._basic_text_cleanup(combined_result)
+
+            # Final fallback to basic cleaning if all else fails
+            print("   → All attempts failed, using basic cleanup")
+            fallback_result = self._basic_text_cleanup(raw_text)
+            print(f"   → Fallback result: {len(fallback_result)} chars")
+            return fallback_result
 
         except Exception as e:
-            print(f"TextPipeline: LLM cleaning failed: {e}")
-            return self._basic_text_cleanup(raw_text)
+            print(f"   → TextPipeline: LLM cleaning exception: {e}")
+            fallback_result = self._basic_text_cleanup(raw_text)
+            print(f"   → Exception fallback result: {len(fallback_result)} chars")
+            return fallback_result
 
     async def clean_text_async(self, raw_text: str) -> str:
         """Clean and prepare text for TTS processing asynchronously."""
@@ -107,36 +148,17 @@ class TextPipeline(ITextPipeline):
             print(f"TextPipeline: Async LLM cleaning failed: {e}")
             return self._basic_text_cleanup(raw_text)
 
-    def enhance_with_ssml(self, text: str) -> str:
-        """Add SSML enhancements or natural formatting for better speech synthesis."""
-        # If TTS doesn't support SSML, use natural formatting instead
-        if not self.tts_supports_ssml:
-            return self._enhance_with_natural_formatting(text)
-
-        if not self.enable_ssml:
+    def enhance_with_natural_formatting(self, text: str) -> str:
+        """Add natural formatting for better speech synthesis (Piper-optimized)."""
+        if not self.enable_natural_formatting:
             return text
 
-        enhanced = text
-
-        # Order matters: do non-interfering enhancements first
-
-        # 1. Add emphasis for quotes first (won't interfere with other patterns)
-        enhanced = self._add_emphasis_markup(enhanced)
-
-        # 2. Add technical term emphasis (universal academic approach)
-        enhanced = self._enhance_technical_terms(enhanced)
-
-        # 3. Add structural breaks and pauses (universal academic approach)
-        enhanced = self._add_academic_pauses(enhanced)
-
-        enhanced = self._add_punctuation_breaks(enhanced)
-
-        return enhanced
+        return self._enhance_with_natural_formatting(text)
 
     def split_into_sentences(self, text: str) -> list[str]:
         """Split text into sentences for individual processing."""
-        # Clean SSML first if present
-        clean_text = self.strip_ssml(text)
+        # Use text directly since we only generate natural formatting (no markup)
+        clean_text = text
 
         # Handle abbreviations better - don't split on Dr., Mr., etc.
         # Basic sentence splitting with common edge cases
@@ -144,16 +166,6 @@ class TextPipeline(ITextPipeline):
 
         # Filter out very short sentences and clean up (immutable)
         return [sentence.strip() for sentence in sentences if sentence.strip() and len(sentence.strip()) > 10]
-
-    def strip_ssml(self, text: str) -> str:
-        """Remove SSML tags from text."""
-        # Remove all SSML tags but preserve spacing
-        clean = re.sub(r"<[^>]+>", " ", text)
-
-        # Normalize whitespace but preserve single spaces
-        clean = re.sub(r"\s+", " ", clean)
-
-        return clean.strip()
 
     def _basic_text_cleanup(self, text: str) -> str:
         """Basic text cleanup without LLM."""
@@ -171,76 +183,25 @@ class TextPipeline(ITextPipeline):
         return text.strip()
 
     def _generate_cleaning_prompt(self, text: str) -> str:
-        """Generate LLM prompt for text cleaning."""
-        if self.tts_supports_ssml:
-            pause_instruction = 'Add appropriate pauses with "..." between major sections.'
-        else:
-            pause_instruction = """Use natural punctuation for better speech rhythm:
+        """Generate LLM prompt for text cleaning (optimized for natural speech)."""
+        pause_instruction = """Use natural punctuation for better speech rhythm:
 - Use "..." for medium pauses (between paragraphs or sections)
 - Use "...." or "....." for longer pauses (after major sections)
 - Add extra commas where natural pauses would occur in speech
 - Use line breaks to create natural breathing points"""
 
-        return f"""Clean the following text for text-to-speech conversion.
-Remove headers, footers, page numbers, and artifacts.
+        return f"""Clean this text for text-to-speech by removing ONLY:
+- Page numbers, headers, footers
+- Reference markers like [1], [2], etc.
+- Broken hyphenations across lines
+- Excessive whitespace
+
 {pause_instruction}
-Preserve the main content and structure.
-Use universal academic text processing approach.
 
-Text to clean:
-{text[:5000]}"""  # Limit prompt size
+Return ONLY the cleaned text, nothing else.
 
-    def _add_academic_pauses(self, text: str) -> str:
-        """Add pauses for academic content."""
-        # Add pauses after section headers (case insensitive)
-        text = re.sub(
-            r"(Abstract|Introduction|Conclusion|References)(\s*[:\.]?\s*)",
-            r'\1\2<break time="1s"/>',
-            text,
-            flags=re.IGNORECASE,
-        )
-
-        # Add pauses after numbered sections
-        text = re.sub(r"(\d+\.\s*[A-Z][^.]*\.)", r'\1<break time="0.5s"/>', text)
-
-        return text
-
-    def _enhance_technical_terms(self, text: str) -> str:
-        """Add emphasis to technical terms."""
-        # Common technical terms that benefit from emphasis
-        # Avoid words already inside SSML tags
-        technical_patterns = [
-            r"\b(algorithm|method|approach|technique|system)\b",
-            r"\b(significant|important|critical|essential)\b",
-            r"\b(however|therefore|furthermore|moreover)\b",
-        ]
-
-        for pattern in technical_patterns:
-            # Use negative lookbehind/lookahead to avoid words inside SSML tags
-            enhanced_pattern = r"(?<!>)" + pattern + r"(?!<)"
-            text = re.sub(enhanced_pattern, r'<emphasis level="moderate">\1</emphasis>', text, flags=re.IGNORECASE)
-
-        return text
-
-    def _add_emphasis_markup(self, text: str) -> str:
-        """Add emphasis for naturally emphasized text."""
-        # Emphasize text in quotes
-        text = re.sub(r'"([^"]+)"', r'<emphasis level="moderate">"\1"</emphasis>', text)
-
-        return text
-
-    def _add_punctuation_breaks(self, text: str) -> str:
-        """Add appropriate breaks for punctuation."""
-        # Short pause after commas
-        text = re.sub(r",(\s+)", r',<break time="0.2s"/>\1', text)
-
-        # Medium pause after semicolons
-        text = re.sub(r";(\s+)", r';<break time="0.3s"/>\1', text)
-
-        # Longer pause after periods, exclamations, questions (with or without following space)
-        text = re.sub(r"([.!?])(\s+|$)", r'\1<break time="0.5s"/>\2', text)
-
-        return text
+Text:
+{text}"""
 
     def _enhance_with_natural_formatting(self, text: str) -> str:
         """Apply natural formatting tricks for TTS engines without SSML support."""

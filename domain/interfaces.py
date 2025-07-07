@@ -43,8 +43,8 @@ class ITextProcessor(ABC):
         """Clean and prepare text for TTS."""
 
     @abstractmethod
-    def enhance_with_ssml(self, text: str) -> str:
-        """Add SSML enhancements to text."""
+    def enhance_with_natural_formatting(self, text: str) -> str:
+        """Add natural formatting enhancements to text."""
 
     @abstractmethod
     def split_into_sentences(self, text: str) -> list[str]:

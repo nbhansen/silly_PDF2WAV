@@ -101,15 +101,16 @@ class TimingEngine(ITimingEngine):
         print(f"🔍 TimingEngine: Processing {len(text_chunks)} chunks individually")
 
         for i, chunk in enumerate(text_chunks):
-            # Enhance text with SSML if available
-            enhanced_chunk = self.text_pipeline.enhance_with_ssml(chunk) if self.text_pipeline else chunk
+            # Enhance text with natural formatting if available
+            enhanced_chunk = self.text_pipeline.enhance_with_natural_formatting(chunk) if self.text_pipeline else chunk
 
             print(f"🔍 TimingEngine: Processing chunk {i+1}/{len(text_chunks)} ({len(enhanced_chunk)} chars)")
 
             # Check chunk size
             if len(enhanced_chunk) > 3000:
                 print(
-                    f"🚨 TimingEngine: Chunk {i+1} too large ({len(enhanced_chunk)} chars), falling back to measurement mode"
+                    f"🚨 TimingEngine: Chunk {i+1} too large ({len(enhanced_chunk)} chars), "
+                    f"falling back to measurement mode"
                 )
                 return self._generate_with_measurement(text_chunks, output_filename)
 
@@ -210,7 +211,7 @@ class TimingEngine(ITimingEngine):
 
         # Enhance chunk and split into sentences
         if self.text_pipeline:
-            enhanced_chunk = self.text_pipeline.enhance_with_ssml(chunk)
+            enhanced_chunk = self.text_pipeline.enhance_with_natural_formatting(chunk)
             chunk_sentences = self.text_pipeline.split_into_sentences(enhanced_chunk)
         else:
             chunk_sentences = [chunk]

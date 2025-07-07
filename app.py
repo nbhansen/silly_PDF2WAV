@@ -9,6 +9,7 @@ from app_factory import create_app
 from application.config.system_config import SystemConfig
 from domain.factories.service_factory import create_pdf_service_from_env
 from infrastructure.file.cleanup_scheduler import FileCleanupScheduler
+from routes import ServiceContext, register_routes
 
 # Initialize configuration - prefer YAML, fallback to env vars
 try:
@@ -66,9 +67,6 @@ def signal_handler(sig: int, _frame: Any) -> None:
 
 # Initialize services
 initialize_services()
-
-# Register routes with immutable service context
-from routes import ServiceContext, register_routes
 
 # Create immutable service context
 service_context = ServiceContext(

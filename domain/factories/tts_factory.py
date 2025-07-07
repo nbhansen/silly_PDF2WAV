@@ -9,29 +9,13 @@ if TYPE_CHECKING:
 
 
 def create_tts_engine(config: "SystemConfig") -> "ITTSEngine":
-    """Create TTS engine based on configuration."""
-    from infrastructure.tts.gemini_tts_provider import GeminiTTSProvider
+    """Create Piper TTS engine for local audio generation."""
+    from domain.config.tts_config import PiperConfig
     from infrastructure.tts.piper_tts_provider import PiperTTSProvider
 
-    if config.tts_engine.value == "gemini":
-        # CRITICAL: This creates Gemini TTS for AUDIO GENERATION, not text processing
-        # Uses TTS models like 'text-to-speech-1', NOT language models like 'gemini-1.5-flash'
-        # This is completely different from GeminiLLMProvider used for text cleaning
-        if not config.gemini_api_key:
-            raise ValueError("Gemini API key is required for Gemini TTS engine")
-        return GeminiTTSProvider(
-            model_name=config.gemini_model_name,  # TTS model name, not LLM model
-            api_key=config.gemini_api_key,
-            voice_name=config.gemini_voice_name,
-            min_request_interval=config.gemini_min_request_interval,
-            max_concurrent_requests=config.gemini_max_concurrent_requests,
-            requests_per_minute=config.gemini_requests_per_minute,
-        )
-    else:
-        piper_config = config.get_piper_config()
-        # Type narrowing: get_piper_config should return PiperConfig in normal cases
-        from domain.config.tts_config import PiperConfig
+    piper_config = config.get_piper_config()
+    # Type narrowing: get_piper_config should return PiperConfig in normal cases
+    if not isinstance(piper_config, PiperConfig):
+        raise TypeError("Expected PiperConfig but got dict fallback")
 
-        if not isinstance(piper_config, PiperConfig):
-            raise TypeError("Expected PiperConfig but got dict fallback")
-        return PiperTTSProvider(piper_config, repository_url=config.piper_model_repository_url)
+    return PiperTTSProvider(piper_config, repository_url=config.piper_model_repository_url)

@@ -288,7 +288,7 @@ class TestSystemConfigHelperMethodsTDD:
             gemini_model_name="gemini-1.5-flash",
             gemini_api_key="test_key_123",
             gemini_voice_name="Aoede",
-            gemini_min_request_interval=1.5,
+            tts_request_delay_seconds=1.5,
         )
 
         result = config.get_gemini_config()
@@ -331,7 +331,7 @@ class TestSystemConfigHelperMethodsTDD:
             enable_text_cleaning=True,
             enable_ssml=False,
             enable_async_audio=True,
-            max_concurrent_requests=8,
+            audio_concurrent_chunks=8,
             upload_folder="test_uploads",
             audio_folder="test_audio",
             enable_file_cleanup=True,
@@ -353,7 +353,7 @@ class TestSystemConfigHelperMethodsTDD:
             assert "Text Cleaning: Enabled" in printed_text
             assert "SSML Enhancement: Disabled" in printed_text
             assert "Async Audio: Enabled" in printed_text
-            assert "Max Concurrent: 8" in printed_text
+            assert "Audio Concurrent Chunks: 8" in printed_text
             assert "Upload Folder: test_uploads" in printed_text
             assert "Audio Folder: test_audio" in printed_text
             assert "File Cleanup: Enabled" in printed_text

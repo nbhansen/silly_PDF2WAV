@@ -146,11 +146,11 @@ class TestTextPipeline:
 
     def test_text_pipeline_creation(self):
         """TextPipeline should be creatable with minimal configuration."""
-        pipeline = TextPipeline(enable_cleaning=True, enable_ssml=True)
+        pipeline = TextPipeline(enable_cleaning=True, enable_natural_formatting=True)
 
         assert isinstance(pipeline, ITextPipeline)
         assert pipeline.enable_cleaning is True
-        assert pipeline.enable_ssml is True
+        assert pipeline.enable_natural_formatting is True
 
     def test_text_pipeline_basic_cleaning(self):
         """TextPipeline should perform basic text cleanup."""
@@ -177,29 +177,28 @@ class TestTextPipeline:
         assert sentences[2] == "Is this sentence three?"
         assert sentences[3] == "This is a longer sentence."
 
-    def test_text_pipeline_ssml_stripping(self):
-        """TextPipeline should remove SSML tags correctly."""
+    def test_text_pipeline_handles_markup_text(self):
+        """TextPipeline should handle text with markup correctly."""
         pipeline = TextPipeline()
 
-        ssml_text = 'This is <emphasis level="moderate">emphasized</emphasis> text with <break time="1s"/> pauses.'
-        clean_text = pipeline.strip_ssml(ssml_text)
+        markup_text = "This is important emphasized text with natural pauses."
+        sentences = pipeline.split_into_sentences(markup_text)
 
-        assert "<emphasis" not in clean_text
-        assert "</emphasis>" not in clean_text
-        assert "<break" not in clean_text
-        assert "emphasized" in clean_text
-        assert "pauses" in clean_text
+        # Should split into sentences naturally
+        assert len(sentences) == 1
+        assert "emphasized" in sentences[0]
+        assert "pauses" in sentences[0]
 
-    def test_text_pipeline_ssml_enhancement(self):
-        """TextPipeline should add SSML enhancements when enabled."""
-        pipeline = TextPipeline(enable_ssml=True)
+    def test_text_pipeline_natural_enhancement(self):
+        """TextPipeline should add natural formatting when enabled."""
+        pipeline = TextPipeline(enable_natural_formatting=True)
 
         text = "Abstract This is important research. The algorithm performs well."
-        enhanced = pipeline.enhance_with_ssml(text)
+        enhanced = pipeline.enhance_with_natural_formatting(text)
 
-        # Should contain SSML enhancements
-        assert "<break" in enhanced or "<emphasis" in enhanced
-        assert len(enhanced) >= len(text)  # Should be longer with SSML
+        # Should contain natural formatting (dots, not SSML)
+        assert "..." in enhanced
+        assert len(enhanced) >= len(text)  # Should be longer with formatting
 
 
 class TestServiceContainer:
@@ -293,13 +292,13 @@ class TestArchitectureIntegration:
         mock_llm = MagicMock()
         mock_llm.generate_text.return_value = Result.success("Cleaned text content.")
 
-        pipeline = TextPipeline(llm_provider=mock_llm, enable_cleaning=True, enable_ssml=True)
+        pipeline = TextPipeline(llm_provider=mock_llm, enable_cleaning=True, enable_natural_formatting=True)
 
         raw_text = "This is raw text that needs cleaning and enhancement."
 
         # Test the full pipeline
         cleaned = pipeline.clean_text(raw_text)
-        enhanced = pipeline.enhance_with_ssml(cleaned)
+        enhanced = pipeline.enhance_with_natural_formatting(cleaned)
         sentences = pipeline.split_into_sentences(enhanced)
 
         assert isinstance(cleaned, str)

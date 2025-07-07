@@ -22,11 +22,9 @@ def create_complete_audio_engine(config: SystemConfig) -> IAudioEngine:
     # Create dependencies in order
     file_manager = FileManager(upload_folder=config.upload_folder, output_folder=config.audio_folder)
 
-    # Create TTS engine first to determine SSML support
+    # Create TTS engine and text pipeline (no dependency order required)
     tts_engine = create_tts_engine(config)
-
-    # Create text pipeline with TTS engine's SSML support status
-    text_pipeline = create_text_pipeline(config, tts_supports_ssml=tts_engine.supports_ssml())
+    text_pipeline = create_text_pipeline(config)
 
     # Create timing engine with all dependencies
     timing_engine = create_timing_engine(config, tts_engine, file_manager, text_pipeline)
@@ -49,11 +47,9 @@ def create_complete_service_set(config: SystemConfig) -> dict[str, Any]:
     # Create shared file manager
     file_manager = FileManager(upload_folder=config.upload_folder, output_folder=config.audio_folder)
 
-    # Create TTS engine first to determine SSML support
+    # Create TTS engine and text pipeline (no dependency order required)
     tts_engine = create_tts_engine(config)
-
-    # Create text pipeline with TTS engine's SSML support status
-    text_pipeline = create_text_pipeline(config, tts_supports_ssml=tts_engine.supports_ssml())
+    text_pipeline = create_text_pipeline(config)
 
     # Create timing engine with all dependencies
     timing_engine = create_timing_engine(config, tts_engine, file_manager, text_pipeline)
