@@ -2,6 +2,11 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional, Union
 
+# Type for YAML configuration values (more specific for actual usage)
+YAMLValue = Union[str, int, float, bool, list[str], dict[str, object], None]
+# Type for simple YAML values (no containers)
+SimpleYAMLValue = Union[str, int, float, bool, None]
+
 if TYPE_CHECKING:
     from domain.config.tts_config import GeminiConfig, PiperConfig
 from enum import Enum
@@ -22,7 +27,6 @@ class SystemConfig:
     # Core TTS settings (required fields first)
     tts_engine: TTSEngine
     llm_model_name: str  # Required: LLM model for text cleaning
-    gemini_model_name: str  # Required: Gemini TTS model name
 
     # File handling
     upload_folder: str = "uploads"
@@ -113,7 +117,7 @@ class SystemConfig:
             raise ValueError(f"Invalid YAML in {config_path}: {e}") from e
 
         # Helper function to get nested config values from YAML only
-        def get_config(yaml_path: str, default: Any = None) -> Any:
+        def get_config(yaml_path: str, default: object = None) -> object:
             keys = yaml_path.split(".")
             value = yaml_config
             for key in keys:
@@ -277,7 +281,7 @@ class SystemConfig:
                 raise ValueError("MAX_DISK_USAGE_MB must be positive when file cleanup is enabled")
 
     @staticmethod
-    def _parse_bool_value(value: Any, default: Optional[bool] = None) -> bool:
+    def _parse_bool_value(value: YAMLValue, default: Optional[bool] = None) -> bool:
         """Parse boolean from various representations (for YAML values)."""
         if value is None:
             if default is None:
@@ -292,7 +296,7 @@ class SystemConfig:
         return default if default is not None else False
 
     @staticmethod
-    def _parse_int_value(value: Any, default: int, min_val: Optional[int] = None, max_val: Optional[int] = None) -> int:
+    def _parse_int_value(value: YAMLValue, default: int, min_val: Optional[int] = None, max_val: Optional[int] = None) -> int:
         """Parse integer from various representations with validation."""
         if value is None:
             return default
@@ -315,7 +319,7 @@ class SystemConfig:
 
     @staticmethod
     def _parse_float_value(
-        value: Any, default: float, min_val: Optional[float] = None, max_val: Optional[float] = None
+        value: YAMLValue, default: float, min_val: Optional[float] = None, max_val: Optional[float] = None
     ) -> float:
         """Parse float from various representations with validation."""
         if value is None:
@@ -333,7 +337,7 @@ class SystemConfig:
 
         return parsed
 
-    def get_gemini_config(self) -> Union["GeminiConfig", dict[str, Any]]:
+    def get_gemini_config(self) -> Union["GeminiConfig", dict[str, Union[str, float, None]]]:
         """Get Gemini-specific configuration."""
         try:
             from domain.config.tts_config import GeminiConfig
@@ -351,7 +355,7 @@ class SystemConfig:
                 "min_request_interval": self.tts_request_delay_seconds,
             }
 
-    def get_piper_config(self) -> Union["PiperConfig", dict[str, Any]]:
+    def get_piper_config(self) -> Union["PiperConfig", dict[str, Union[str, float]]]:
         """Get Piper-specific configuration."""
         try:
             from domain.config.tts_config import PiperConfig

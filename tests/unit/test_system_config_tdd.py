@@ -51,7 +51,7 @@ class TestSystemConfigCreation:
         assert config.upload_folder == "uploads"
         assert config.audio_folder == "audio_outputs"
         assert config.enable_text_cleaning is True
-        assert config.enable_ssml is True
+        assert config.enable_natural_formatting is True
 
     def test_system_config_with_custom_values(self):
         """Should create SystemConfig with custom values."""
@@ -62,14 +62,14 @@ class TestSystemConfigCreation:
             upload_folder="custom_uploads",
             audio_folder="custom_audio",
             enable_text_cleaning=False,
-            enable_ssml=False,
+            enable_natural_formatting=False,
         )
 
         assert config.tts_engine == TTSEngine.GEMINI
         assert config.upload_folder == "custom_uploads"
         assert config.audio_folder == "custom_audio"
         assert config.enable_text_cleaning is False
-        assert config.enable_ssml is False
+        assert config.enable_natural_formatting is False
 
     def test_system_config_post_init_sets_default_extensions(self):
         """Should set default file extensions in __post_init__."""
@@ -329,7 +329,7 @@ class TestSystemConfigHelperMethodsTDD:
             llm_model_name="gemini-1.5-flash",
             gemini_model_name="gemini-1.5-flash",
             enable_text_cleaning=True,
-            enable_ssml=False,
+            enable_natural_formatting=False,
             enable_async_audio=True,
             audio_concurrent_chunks=8,
             upload_folder="test_uploads",
@@ -351,7 +351,7 @@ class TestSystemConfigHelperMethodsTDD:
 
             assert "TTS Engine: gemini" in printed_text
             assert "Text Cleaning: Enabled" in printed_text
-            assert "SSML Enhancement: Disabled" in printed_text
+            assert "Natural Formatting: Disabled" in printed_text
             assert "Async Audio: Enabled" in printed_text
             assert "Audio Concurrent Chunks: 8" in printed_text
             assert "Upload Folder: test_uploads" in printed_text

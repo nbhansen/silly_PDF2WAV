@@ -16,7 +16,7 @@ def create_test_config() -> SystemConfig:
         llm_model_name="test-llm-model",
         gemini_model_name="test-gemini-model",
         enable_text_cleaning=False,
-        enable_ssml=False,
+        enable_natural_formatting=False,
         enable_file_cleanup=False,
     )
 
@@ -26,7 +26,7 @@ def test_configuration_loading():
     config = create_test_config()
     assert config.tts_engine == TTSEngine.PIPER
     assert config.enable_text_cleaning is False
-    assert config.enable_ssml is False
+    assert config.enable_natural_formatting is False
     assert config.enable_file_cleanup is False
     # Test new Gemini model configuration
     assert config.gemini_model_name == "test-gemini-model"

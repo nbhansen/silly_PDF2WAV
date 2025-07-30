@@ -7,15 +7,20 @@ dependency injection, eliminating global state.
 import contextlib
 from dataclasses import dataclass
 import json
+import logging
 import os
+from pathlib import Path
 import time
-from typing import Any, Optional, Union
+from typing import Optional, Union
 
-from flask import Response, current_app, jsonify, render_template, request, send_from_directory, url_for
+from flask import Flask, Response, current_app, jsonify, render_template, request, send_from_directory, url_for
+from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
+from application.config.system_config import SystemConfig
 from application.context.application_context import ApplicationContext
-from domain.models import PageRange, ProcessingResult
+from domain.container.service_container import ServiceContainer
+from domain.models import PageRange, ProcessingResult, TimingMetadata
 from infrastructure.file.file_manager import FileManager
 from utils import (
     _get_retry_suggestion,
@@ -41,10 +46,10 @@ class FileProcessingInfo:
 class ProcessingServices:
     """Collection of processing services."""
 
-    service_container: Any
-    document_engine: Any
-    audio_engine: Any
-    text_pipeline: Any
+    service_container: ServiceContainer
+    document_engine: object    # IDocumentEngine - avoiding circular import  
+    audio_engine: object       # IAudioEngine - avoiding circular import
+    text_pipeline: object      # ITextPipeline - avoiding circular import
 
 
 def get_app_context() -> ApplicationContext:
@@ -52,7 +57,7 @@ def get_app_context() -> ApplicationContext:
     return current_app.config["APP_CONTEXT"]  # type: ignore[no-any-return]
 
 
-def get_pdf_service() -> Any:
+def get_pdf_service() -> object:  # Returns audio engine
     """Get PDF service from context."""
     return get_app_context().pdf_service
 
@@ -62,34 +67,34 @@ def is_processor_available() -> bool:
     return get_app_context().is_processor_available
 
 
-def get_app_config() -> Any:
+def get_app_config() -> SystemConfig:
     """Get app config from context."""
     return get_app_context().config
 
 
-def get_logger(name: str):
+def get_logger(name: str) -> logging.Logger:
     """Get logger from context."""
     return get_app_context().get_logger(name)
 
 
-def register_routes(app: Any) -> None:
+def register_routes(app: Flask) -> None:
     """Register all routes with the Flask app."""
 
-    @app.route("/")  # type: ignore[misc]
+    @app.route("/")
     def index() -> str:
         context = get_app_context()
         return render_template("index.html", tts_engine=context.config.tts_engine.value)
 
-    @app.route("/favicon.ico")  # type: ignore[misc]
+    @app.route("/favicon.ico")
     def favicon() -> tuple[str, int]:
         """Return a simple response for favicon requests to avoid 404 errors."""
         return "", 204
 
-    @app.route("/audio_outputs/<filename>")  # type: ignore[misc]
+    @app.route("/audio_outputs/<filename>")
     def serve_audio(filename: str) -> Response:
         return send_from_directory(app.config["AUDIO_FOLDER"], filename)
 
-    @app.route("/read-along/<filename>")  # type: ignore[misc]
+    @app.route("/read-along/<filename>")
     def read_along_view(filename: str) -> Union[str, tuple[str, int]]:
         """Serve read-along interface for audio file."""
         # Extract base filename (remove extension and _combined suffix)
@@ -97,14 +102,14 @@ def register_routes(app: Any) -> None:
 
         # Check if timing data exists
         timing_filename = f"{base_filename}_timing.json"
-        timing_path = os.path.join(app.config["AUDIO_FOLDER"], timing_filename)
+        timing_path = Path(app.config["AUDIO_FOLDER"]) / timing_filename
 
-        if not os.path.exists(timing_path):
+        if not timing_path.exists():
             return f"Timing data not found for {filename}. This file was not processed with read-along support.", 404
 
         # Check if audio file exists
-        audio_path = os.path.join(app.config["AUDIO_FOLDER"], filename)
-        if not os.path.exists(audio_path):
+        audio_path = Path(app.config["AUDIO_FOLDER"]) / filename
+        if not audio_path.exists():
             return f"Audio file {filename} not found.", 404
 
         # Load timing data for template rendering
@@ -125,13 +130,13 @@ def register_routes(app: Any) -> None:
             timing_api_url=url_for("get_timing_data", filename=base_filename),
         )
 
-    @app.route("/api/timing/<filename>")  # type: ignore[misc]
+    @app.route("/api/timing/<filename>")
     def get_timing_data(filename: str) -> Union[Response, tuple[Response, int]]:
         """Serve timing metadata as JSON."""
         timing_filename = f"{filename}_timing.json"
-        timing_path = os.path.join(app.config["AUDIO_FOLDER"], timing_filename)
+        timing_path = Path(app.config["AUDIO_FOLDER"]) / timing_filename
 
-        if not os.path.exists(timing_path):
+        if not timing_path.exists():
             return jsonify({"error": "Timing data not found"}), 404
 
         try:
@@ -143,7 +148,7 @@ def register_routes(app: Any) -> None:
             get_logger("routes").error("Error serving timing data: %s", str(e))
             return jsonify({"error": "Failed to load timing data"}), 500
 
-    @app.route("/get_pdf_info", methods=["POST"])  # type: ignore[misc]
+    @app.route("/get_pdf_info", methods=["POST"])
     def get_pdf_info() -> Union[Response, tuple[Response, int]]:
         service = get_pdf_service()
         if not is_processor_available() or service is None:
@@ -175,7 +180,7 @@ def register_routes(app: Any) -> None:
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
-    @app.route("/upload", methods=["POST"])  # type: ignore[misc]
+    @app.route("/upload", methods=["POST"])
     def upload_file() -> Union[str, tuple[str, int]]:
         """Regular upload WITHOUT timing data."""
         service = get_pdf_service()
@@ -203,7 +208,7 @@ def register_routes(app: Any) -> None:
         # Render result WITHOUT timing data
         return render_upload_result(result, original_filename, base_filename, page_range, enable_timing=False)
 
-    @app.route("/upload-with-timing", methods=["POST"])  # type: ignore[misc]
+    @app.route("/upload-with-timing", methods=["POST"])
     def upload_file_with_timing() -> Union[str, tuple[str, int]]:
         """Upload WITH timing data for read-along functionality."""
         config = get_app_config()
@@ -235,7 +240,7 @@ def register_routes(app: Any) -> None:
         # Render result WITH timing data (enables read-along button)
         return render_upload_result(result, original_filename, base_filename, page_range, enable_timing=True)
 
-    @app.route("/admin/file_stats")  # type: ignore[misc]
+    @app.route("/admin/file_stats")
     def get_file_stats() -> Union[Response, tuple[Response, int]]:
         """Get file management statistics (admin endpoint)."""
         service = get_pdf_service()
@@ -275,7 +280,7 @@ def register_routes(app: Any) -> None:
             get_logger("routes").error("Admin file_stats error: %s", str(e))
             return jsonify({"error": str(e)}), 500
 
-    @app.route("/admin/cleanup", methods=["POST"])  # type: ignore[misc]
+    @app.route("/admin/cleanup", methods=["POST"])
     def manual_cleanup() -> Union[Response, tuple[Response, int]]:
         """Trigger manual file cleanup (admin endpoint)."""
         service = get_pdf_service()
@@ -332,7 +337,7 @@ def register_routes(app: Any) -> None:
             get_logger("routes").error("Admin cleanup error: %s", str(e))
             return jsonify({"error": str(e)}), 500
 
-    @app.route("/admin/cleanup_scheduler", methods=["POST"])  # type: ignore[misc]
+    @app.route("/admin/cleanup_scheduler", methods=["POST"])
     def trigger_scheduler_cleanup() -> Union[Response, tuple[Response, int]]:
         """Trigger scheduler's manual cleanup."""
         try:
@@ -353,7 +358,7 @@ def register_routes(app: Any) -> None:
             get_logger("routes").error("Scheduler cleanup error: %s", str(e))
             return jsonify({"error": str(e)}), 500
 
-    @app.route("/admin/test")  # type: ignore[misc]
+    @app.route("/admin/test")
     def test_admin() -> Union[Response, tuple[Response, int]]:
         """Test endpoint to check what's available."""
         try:
@@ -390,7 +395,7 @@ def register_routes(app: Any) -> None:
 
 
 def process_upload_request(
-    request_form: Any, uploaded_file: Any, enable_timing: bool = False
+    request_form: object, uploaded_file: FileStorage, enable_timing: bool = False
 ) -> tuple[Optional[ProcessingResult], str, str, Optional[str]]:
     """Unified upload processing logic that preserves timing functionality."""
     try:
@@ -427,9 +432,11 @@ def process_upload_request(
         return None, _get_safe_filename_from_locals(locals()), "", f"An unexpected error occurred: {e!s}"
 
 
-def _process_uploaded_file(uploaded_file: Any, request_form: Any) -> FileProcessingInfo:
+def _process_uploaded_file(uploaded_file: FileStorage, request_form: object) -> FileProcessingInfo:
     """Process and validate uploaded file, return file information or error."""
     config = get_app_config()
+    if not uploaded_file.filename:
+        raise ValueError("No filename provided")
     original_filename = secure_filename(uploaded_file.filename)
     base_filename_no_ext = os.path.splitext(original_filename)[0]
     pdf_path = os.path.join(config.upload_folder, original_filename)
@@ -529,13 +536,13 @@ def _handle_timing_data(
         if file_manager:
             updated_debug_info["file_management"] = "available"
             updated_debug_info["cleanup_enabled"] = get_app_config().enable_file_cleanup
-    except Exception:
+    except Exception:  # nosec B110
         pass  # Don't fail upload if file stats fail
 
     return replace(processing_result, debug_info=updated_debug_info)
 
 
-def _get_safe_filename_from_locals(local_vars: dict[str, Any]) -> str:
+def _get_safe_filename_from_locals(local_vars: dict[str, object]) -> str:
     """Safely extract filename from local variables for error handling."""
     filename = local_vars.get("original_filename", "unknown")
     return str(filename)  # Ensure we return a string
@@ -545,7 +552,7 @@ def render_upload_result(
     result: Optional[ProcessingResult],
     original_filename: str,
     base_filename_no_ext: str,
-    page_range: Any,
+    page_range: PageRange,
     enable_timing: bool = False,
 ) -> str:
     """Render the result template with appropriate parameters."""
@@ -594,7 +601,7 @@ def render_upload_result(
             return f"Error: {error_message}"
 
 
-def save_timing_data(base_filename: str, timing_metadata: Any) -> None:
+def save_timing_data(base_filename: str, timing_metadata: TimingMetadata) -> None:
     """Save timing metadata as JSON file."""
     # Convert to JSON-serializable format
     timing_json = {
@@ -628,7 +635,7 @@ def save_timing_data(base_filename: str, timing_metadata: Any) -> None:
             try:
                 if hasattr(service.file_manager, "schedule_cleanup"):
                     service.file_manager.schedule_cleanup(timing_filename, 2.0)  # Same cleanup as audio
-            except Exception:
+            except Exception:  # nosec B110
                 pass
 
     except Exception as e:

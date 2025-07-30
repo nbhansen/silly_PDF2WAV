@@ -34,7 +34,7 @@ def test_config(temp_dir):
         upload_folder=str(temp_dir / "uploads"),
         audio_folder=str(temp_dir / "audio"),
         enable_text_cleaning=False,  # Fast tests
-        enable_ssml=False,  # Fast tests
+        enable_natural_formatting=False,  # Fast tests
         enable_file_cleanup=False,  # Don't interfere with tests
         gemini_api_key=None,  # No external dependencies
     )

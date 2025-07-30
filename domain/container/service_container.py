@@ -6,7 +6,7 @@ Uses immutable MappingProxyType for true immutability.
 
 from abc import ABC, abstractmethod
 import types
-from typing import TYPE_CHECKING, Any, Callable, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Callable, Protocol, TypeVar, Union
 
 if TYPE_CHECKING:
     from application.config.system_config import SystemConfig
@@ -14,6 +14,14 @@ else:
     from application.config.system_config import SystemConfig
 
 T = TypeVar("T")
+
+# Service factory protocol for better type safety
+class ServiceFactory(Protocol):
+    """Protocol for service factories."""
+    def __call__(self) -> object: ...
+
+# Service key type - either a type or string identifier  
+ServiceKey = Union[type[object], str]
 
 
 class IServiceContainer(ABC):
@@ -40,18 +48,18 @@ class ServiceContainer(IServiceContainer):
 
         # Build all factories upfront (immutable)
         factories = self._build_core_services()
-        self._factories: types.MappingProxyType[Union[type[Any], str], Callable[[], Any]] = types.MappingProxyType(
+        self._factories: types.MappingProxyType[ServiceKey, ServiceFactory] = types.MappingProxyType(
             factories
         )
 
         # Mutable singleton cache (internal implementation detail)
         # Note: This is the only mutable part, but it's thread-safe lazy loading
-        self._singletons: dict[Union[type[Any], str], Any] = {}
+        self._singletons: dict[ServiceKey, object] = {}
 
     def get(self, interface: Union[type[T], str]) -> T:
         """Get service instance (singleton pattern)."""
         if interface in self._singletons:
-            return self._singletons[interface]  # type: ignore[no-any-return]
+            return self._singletons[interface]  # type: ignore[return-value]
 
         if interface not in self._factories:
             interface_name = getattr(interface, "__name__", str(interface))
@@ -60,13 +68,13 @@ class ServiceContainer(IServiceContainer):
         # Create instance using factory
         instance = self._factories[interface]()
         self._singletons[interface] = instance
-        return instance  # type: ignore[no-any-return]
+        return instance  # type: ignore[return-value]
 
     def has(self, interface: Union[type[T], str]) -> bool:
         """Check if service is registered."""
         return interface in self._factories
 
-    def _build_core_services(self) -> dict[Union[type[Any], str], Callable[[], Any]]:
+    def _build_core_services(self) -> dict[ServiceKey, ServiceFactory]:
         """Build all core service factories upfront (immutable pattern)."""
         from domain.audio.audio_engine import AudioEngine, IAudioEngine
         from domain.audio.timing_engine import ITimingEngine, TimingEngine, TimingMode
@@ -76,7 +84,7 @@ class ServiceContainer(IServiceContainer):
         from infrastructure.ocr.tesseract_ocr_provider import TesseractOCRProvider
 
         # Build all factories in a single immutable dict
-        factories: dict[Union[type[Any], str], Callable[[], Any]] = {
+        factories: dict[ServiceKey, ServiceFactory] = {
             # File Manager
             FileManager: lambda: FileManager(
                 upload_folder=self.config.upload_folder, output_folder=self.config.audio_folder
@@ -121,7 +129,7 @@ class ServiceContainer(IServiceContainer):
 
         return factories
 
-    def _create_tts_engine(self) -> Any:
+    def _create_tts_engine(self) -> object:  # Returns TTS engine instance
         """Factory for TTS engine based on configuration."""
         from infrastructure.tts.gemini_tts_provider import GeminiTTSProvider
         from infrastructure.tts.piper_tts_provider import PiperTTSProvider
@@ -158,7 +166,7 @@ class ImmutableServiceContainerBuilder:
 
     def __init__(self, config: SystemConfig):
         self.config = config
-        self._additional_factories: dict[Union[type[Any], str], Callable[[], Any]] = {}
+        self._additional_factories: dict[ServiceKey, ServiceFactory] = {}
 
     def register(self, interface: Union[type[T], str], factory: Callable[[], T]) -> "ImmutableServiceContainerBuilder":
         """Register additional service factory (builder pattern)."""

@@ -38,16 +38,16 @@ class TestSystemConfigYAMLLoading:
         config_data = {
             "tts": {
                 "engine": "gemini",
+                "request_delay_seconds": 1.5,
                 "gemini": {
                     "model_name": "test-model",
                     "voice_name": "Aoede",
-                    "min_request_interval": 1.5,
                     "use_measurement_mode": True,
                 },
                 "piper": {"model_name": "en_US-test-high", "models_dir": "test_models", "length_scale": 1.2},
             },
             "secrets": {"google_ai_api_key": "test-api-key-123"},
-            "text_processing": {"enable_text_cleaning": False, "enable_ssml": False, "chunk_size": 5000},
+            "text_processing": {"enable_text_cleaning": False, "enable_natural_formatting": False, "chunk_size": 5000},
             "files": {
                 "upload_folder": "test_uploads",
                 "audio_folder": "test_audio",
@@ -65,13 +65,13 @@ class TestSystemConfigYAMLLoading:
             assert config.tts_engine == TTSEngine.GEMINI
             assert config.gemini_model_name == "test-model"
             assert config.gemini_voice_name == "Aoede"
-            assert config.gemini_min_request_interval == 1.5
+            assert config.tts_request_delay_seconds == 1.5
             assert config.gemini_use_measurement_mode is True
             assert config.gemini_api_key == "test-api-key-123"
 
             # Text processing
             assert config.enable_text_cleaning is False
-            assert config.enable_ssml is False
+            assert config.enable_natural_formatting is False
             assert config.chunk_size == 5000
 
             # File settings
@@ -110,7 +110,7 @@ class TestSystemConfigYAMLLoading:
             "tts": {"engine": "piper", "piper": {"length_scale": "1.5"}},  # String float
             "text_processing": {
                 "enable_text_cleaning": "true",  # String boolean
-                "enable_ssml": 1,  # Integer boolean
+                "enable_natural_formatting": 1,  # Integer boolean
                 "chunk_size": "6000",  # String integer
                 "audio_target_chunk_size": 2500,
             },
@@ -130,7 +130,7 @@ class TestSystemConfigYAMLLoading:
 
             # Boolean conversions
             assert config.enable_text_cleaning is True
-            assert config.enable_ssml is True
+            assert config.enable_natural_formatting is True
             assert config.enable_file_cleanup is True
 
             # Integer conversions
@@ -320,4 +320,4 @@ class TestSystemConfigYAMLLoading:
             assert config.tts_engine == TTSEngine.PIPER
             assert isinstance(config.enable_text_cleaning, bool)
             assert isinstance(config.max_file_size_mb, int)
-            assert isinstance(config.gemini_min_request_interval, float)
+            assert isinstance(config.tts_request_delay_seconds, float)
