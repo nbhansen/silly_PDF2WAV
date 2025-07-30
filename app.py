@@ -1,30 +1,19 @@
-# app.py - Lean main entry point
+"""Main application entry point with proper dependency injection.
+
+This module eliminates all global state by using the Flask application factory
+pattern with dependency injection through ApplicationContext.
+"""
+
 import atexit
 import os
 import signal
 import sys
-from typing import Any, Optional
+from typing import Any
+
+from flask import Flask
 
 from app_factory import create_app
-from application.config.system_config import SystemConfig
-from domain.factories.service_factory import create_pdf_service_from_env
-from infrastructure.file.cleanup_scheduler import FileCleanupScheduler
-from routes import ServiceContext, register_routes
-
-# Initialize configuration - prefer YAML, fallback to env vars
-try:
-    app_config = SystemConfig.from_yaml()
-    print("✅ Loaded configuration from config.yaml")
-except FileNotFoundError:
-    print("⚠️  config.yaml not found, copy config.example.yaml to config.yaml and edit that")
-
-# Create Flask app with our config
-app = create_app(app_config)
-
-# Global services
-pdf_service = None
-processor_available = False
-cleanup_scheduler: Optional[FileCleanupScheduler] = None
+from routes import register_routes
 
 
 def is_flask_reloader() -> bool:
@@ -32,67 +21,57 @@ def is_flask_reloader() -> bool:
     return os.environ.get("WERKZEUG_RUN_MAIN") != "true"
 
 
-def initialize_services() -> None:
-    """Initialize PDF processing service - ONLY in main process."""
-    global pdf_service, processor_available
+def create_application() -> Flask:
+    """Create Flask application with all dependencies properly injected."""
+    app = create_app()
 
-    if not is_flask_reloader():
-        print("Initializing PDF Processing Service...")
-        try:
-            pdf_service = create_pdf_service_from_env(app_config)
-            print("PDF Processing Service initialized successfully")
-            processor_available = True
-        except Exception as e:
-            print(f"CRITICAL: PDF Service initialization failed: {e}")
-            pdf_service = None
-            processor_available = False
-    else:
-        print("⚡ Skipping initialization in Flask reloader process")
+    # Get context from app config
+    context = app.config["APP_CONTEXT"]
+    logger = context.get_logger(__name__)
+
+    # Start cleanup scheduler if available
+    if context.cleanup_scheduler and not is_flask_reloader():
+        logger.info("Starting file cleanup scheduler...")
+        context.cleanup_scheduler.start()
+
+    # Register routes with context
+    register_routes(app)
+
+    # Setup shutdown handlers
+    def shutdown_handler() -> None:
+        """Clean shutdown handler."""
+        if context.cleanup_scheduler and not is_flask_reloader():
+            logger.info("Shutting down file cleanup scheduler...")
+            context.cleanup_scheduler.stop()
+
+    def signal_handler(sig: int, _frame: Any) -> None:
+        logger.info("Received signal %d, shutting down gracefully...", sig)
+        shutdown_handler()
+        sys.exit(0)
+
+    # Register shutdown handlers
+    atexit.register(shutdown_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+    return app
 
 
-def shutdown_cleanup() -> None:
-    """Clean shutdown with proper cleanup scheduler stop."""
-    global cleanup_scheduler
-    if cleanup_scheduler:
-        print("Shutting down file cleanup scheduler...")
-        cleanup_scheduler.stop()
+# Create app instance
+app = create_application()
 
-
-def signal_handler(sig: int, _frame: Any) -> None:
-    print(f"\nReceived signal {sig}, shutting down gracefully...")
-    if not is_flask_reloader():
-        shutdown_cleanup()
-    sys.exit(0)
-
-
-# Initialize services
-initialize_services()
-
-# Create immutable service context
-service_context = ServiceContext(
-    pdf_service=pdf_service, processor_available=processor_available, app_config=app_config
-)
-
-# Store in Flask app config (no global state)
-app.config["SERVICE_CONTEXT"] = service_context
-register_routes(app)
-
-# Register shutdown handlers
-atexit.register(lambda: shutdown_cleanup() if not is_flask_reloader() else None)
-signal.signal(signal.SIGINT, signal_handler)
-signal.signal(signal.SIGTERM, signal_handler)
 
 if __name__ == "__main__":
-    # Only print startup info once
-    if not is_flask_reloader():
-        print("Starting Flask development server...")
-        print(f"TTS Engine: {app_config.tts_engine.value}")
-        print(f"Text Cleaning: {'Enabled' if app_config.enable_text_cleaning else 'Disabled'}")
-        print(f"File Cleanup: {'Enabled' if app_config.enable_file_cleanup else 'Disabled'}")
+    # Get context for logging
+    context = app.config["APP_CONTEXT"]
+    logger = context.get_logger(__name__)
 
-    try:
-        app.run(debug=app_config.flask_debug, host=app_config.flask_host, port=app_config.flask_port)
-    finally:
-        # Only cleanup in main process
-        if not is_flask_reloader():
-            shutdown_cleanup()
+    # Only log startup info once
+    if not is_flask_reloader():
+        logger.info("Starting Flask development server...")
+        logger.info("TTS Engine: %s", context.config.tts_engine.value)
+        logger.info("Text Cleaning: %s", "Enabled" if context.config.enable_text_cleaning else "Disabled")
+        logger.info("File Cleanup: %s", "Enabled" if context.config.enable_file_cleanup else "Disabled")
+
+    # Run Flask app
+    app.run(debug=context.config.flask_debug, host=context.config.flask_host, port=context.config.flask_port)

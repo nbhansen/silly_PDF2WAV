@@ -1,5 +1,9 @@
-# routes.py - All Flask route handlers extracted from app.py
-# Service context for dependency injection - NO GLOBAL STATE
+"""Flask route handlers with proper dependency injection.
+
+This module provides all route handlers that use ApplicationContext for
+dependency injection, eliminating global state.
+"""
+
 import contextlib
 from dataclasses import dataclass
 import json
@@ -10,6 +14,7 @@ from typing import Any, Optional, Union
 from flask import Response, current_app, jsonify, render_template, request, send_from_directory, url_for
 from werkzeug.utils import secure_filename
 
+from application.context.application_context import ApplicationContext
 from domain.models import PageRange, ProcessingResult
 from infrastructure.file.file_manager import FileManager
 from utils import (
@@ -42,33 +47,29 @@ class ProcessingServices:
     text_pipeline: Any
 
 
-@dataclass(frozen=True)
-class ServiceContext:
-    """Immutable service context for dependency injection."""
-
-    pdf_service: Optional[object]
-    processor_available: bool
-    app_config: Optional[object]
-
-
-def get_service_context() -> ServiceContext:
-    """Get service context from Flask app context."""
-    return current_app.config["SERVICE_CONTEXT"]  # type: ignore[no-any-return]
+def get_app_context() -> ApplicationContext:
+    """Get application context from Flask app context."""
+    return current_app.config["APP_CONTEXT"]  # type: ignore[no-any-return]
 
 
 def get_pdf_service() -> Any:
     """Get PDF service from context."""
-    return get_service_context().pdf_service
+    return get_app_context().pdf_service
 
 
 def is_processor_available() -> bool:
     """Check if processor is available from context."""
-    return get_service_context().processor_available
+    return get_app_context().is_processor_available
 
 
 def get_app_config() -> Any:
     """Get app config from context."""
-    return get_service_context().app_config
+    return get_app_context().config
+
+
+def get_logger(name: str):
+    """Get logger from context."""
+    return get_app_context().get_logger(name)
 
 
 def register_routes(app: Any) -> None:
@@ -76,8 +77,8 @@ def register_routes(app: Any) -> None:
 
     @app.route("/")  # type: ignore[misc]
     def index() -> str:
-        config = get_app_config()
-        return render_template("index.html", tts_engine=config.tts_engine.value)
+        context = get_app_context()
+        return render_template("index.html", tts_engine=context.config.tts_engine.value)
 
     @app.route("/favicon.ico")  # type: ignore[misc]
     def favicon() -> tuple[str, int]:
@@ -139,7 +140,7 @@ def register_routes(app: Any) -> None:
 
             return jsonify(timing_data)
         except Exception as e:
-            print(f"Error serving timing data: {e}")
+            get_logger("routes").error("Error serving timing data: %s", str(e))
             return jsonify({"error": "Failed to load timing data"}), 500
 
     @app.route("/get_pdf_info", methods=["POST"])  # type: ignore[misc]
@@ -271,7 +272,7 @@ def register_routes(app: Any) -> None:
                 return jsonify({"error": "File management not available"}), 404
 
         except Exception as e:
-            print(f"Admin file_stats error: {e}")
+            get_logger("routes").error("Admin file_stats error: %s", str(e))
             return jsonify({"error": str(e)}), 500
 
     @app.route("/admin/cleanup", methods=["POST"])  # type: ignore[misc]
@@ -309,7 +310,7 @@ def register_routes(app: Any) -> None:
                                         os.remove(filepath)
                                         removed_files += 1
                                         bytes_freed += file_size
-                                        print(f"Cleaned up old file: {filename}")
+                                        get_logger("routes").info("Cleaned up old file: %s", filename)
                                     except Exception as e:
                                         errors.append(f"Failed to remove {filename}: {e!s}")
 
@@ -328,7 +329,7 @@ def register_routes(app: Any) -> None:
                 return jsonify({"error": "File management not available"}), 404
 
         except Exception as e:
-            print(f"Admin cleanup error: {e}")
+            get_logger("routes").error("Admin cleanup error: %s", str(e))
             return jsonify({"error": str(e)}), 500
 
     @app.route("/admin/cleanup_scheduler", methods=["POST"])  # type: ignore[misc]
@@ -349,7 +350,7 @@ def register_routes(app: Any) -> None:
                 return jsonify({"error": "Cleanup scheduler not available"}), 500
 
         except Exception as e:
-            print(f"Scheduler cleanup error: {e}")
+            get_logger("routes").error("Scheduler cleanup error: %s", str(e))
             return jsonify({"error": str(e)}), 500
 
     @app.route("/admin/test")  # type: ignore[misc]
@@ -419,7 +420,7 @@ def process_upload_request(
         return final_result, file_info.original_filename, file_info.base_filename, None
 
     except Exception as e:
-        print(f"Upload processing error: {e}")
+        get_logger("routes").error("Upload processing error: %s", str(e))
         import traceback
 
         traceback.print_exc()
@@ -484,7 +485,9 @@ def _execute_document_processing(
     config = get_app_config()
     enable_timing = enable_timing and config.tts_engine.value != "gemini"
 
-    print(f"Processing {'with timing data' if enable_timing else 'without timing'} for: {base_filename}")
+    get_logger("routes").info(
+        "Processing %s for: %s", "with timing data" if enable_timing else "without timing", base_filename
+    )
 
     # Create processing request
     from domain.models import ProcessingRequest
@@ -549,7 +552,7 @@ def render_upload_result(
     if result is None:
         return render_template("error.html", error_message="Processing failed - no result returned")
 
-    print(f"🔍 DEBUG: result.success={result.success}, result.error={result.error}")
+    get_logger("routes").debug("DEBUG: result.success=%s, result.error=%s", result.success, result.error)
     if result.success:
         display_filename = original_filename
         if not page_range.is_full_document():
@@ -573,10 +576,10 @@ def render_upload_result(
                     "base_filename": base_filename_no_ext,  # For read-along URL
                 }
             )
-            print("✅ Timing data enabled - read-along button will be available")
+            get_logger("routes").info("Timing data enabled - read-along button will be available")
         else:
             template_params.update({"has_timing_data": False})  # No read-along button
-            print("✅ Standard processing - no read-along functionality")
+            get_logger("routes").info("Standard processing - no read-along functionality")
 
         return render_template("result.html", **template_params)
     else:
@@ -617,7 +620,7 @@ def save_timing_data(base_filename: str, timing_metadata: Any) -> None:
         with open(timing_path, "w", encoding="utf-8") as f:
             json.dump(timing_json, f, indent=2, ensure_ascii=False)
 
-        print(f"Saved timing data: {timing_filename}")
+        get_logger("routes").info("Saved timing data: %s", timing_filename)
 
         # Register timing file with file manager if available
         service = get_pdf_service()
@@ -629,4 +632,4 @@ def save_timing_data(base_filename: str, timing_metadata: Any) -> None:
                 pass
 
     except Exception as e:
-        print(f"Failed to save timing data: {e}")
+        get_logger("routes").error("Failed to save timing data: %s", str(e))
