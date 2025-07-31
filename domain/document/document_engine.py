@@ -10,7 +10,8 @@ from typing import TYPE_CHECKING, Any, Optional
 
 import pdfplumber
 
-from ..errors import audio_generation_error, text_extraction_error
+from ..errors import audio_generation_error
+from ..models import TimedAudioResult
 from ..interfaces import IFileManager, IOCRProvider
 from ..models import PageRange, PDFInfo, ProcessingRequest, ProcessingResult
 
@@ -115,16 +116,18 @@ class DocumentEngine(IDocumentEngine):
         try:
             # Extract and validate text from PDF
             text_chunks = self._extract_initial_text(request)
-            
+
             # Process text through LLM cleaning and optimization pipeline
             processed_chunks = self._process_text_pipeline(text_chunks, text_pipeline, llm_chunk_size)
-            
+
             # Generate audio using appropriate strategy
-            audio_result = self._generate_audio_output(processed_chunks, request.output_name, enable_timing, audio_engine)
-            
+            audio_result = self._generate_audio_output(
+                processed_chunks, request.output_name, enable_timing, audio_engine
+            )
+
             # Assemble final result with debug information
             return self._assemble_processing_result(audio_result, processed_chunks, text_chunks)
-            
+
         except Exception as e:
             print(f"DocumentEngine: Processing failed: {e}")
             return ProcessingResult.failure_result(audio_generation_error(f"Document processing failed: {e!s}"))
@@ -132,58 +135,64 @@ class DocumentEngine(IDocumentEngine):
     def _extract_initial_text(self, request: ProcessingRequest) -> list[str]:
         """Extract and validate text from PDF with page range conversion."""
         print(f"DocumentEngine: Starting processing for {request.pdf_path}")
-        
+
         # Convert page range to page list
         pages_list = self._convert_page_range_to_list(request.pdf_path, request.page_range)
-        
+
         # Extract text from PDF
         text_chunks = self.extract_text(request.pdf_path, pages_list)
-        
+
         if not text_chunks:
             print("DocumentEngine: No text extracted from PDF")
             raise ValueError("No text could be extracted from the PDF")
-        
+
         print(f"DocumentEngine: Extracted {len(text_chunks)} text chunks")
         return text_chunks
 
-    def _process_text_pipeline(self, text_chunks: list[str], text_pipeline: "ITextPipeline", llm_chunk_size: int) -> list[str]:
+    def _process_text_pipeline(
+        self, text_chunks: list[str], text_pipeline: "ITextPipeline", llm_chunk_size: int
+    ) -> list[str]:
         """Process text through LLM cleaning and optimization pipeline."""
         print(f"🔬 DocumentEngine: Using optimized chunking strategy (LLM chunk size: {llm_chunk_size})")
-        
+
         # Step 1: Combine chunks for LLM processing
         combined_chunks = self._combine_chunks_for_llm(text_chunks, llm_chunk_size)
         print(f"   → Combined {len(text_chunks)} original chunks into {len(combined_chunks)} LLM chunks")
-        
+
         # Step 2: Process through LLM cleaning
         cleaned_chunks = []
         for i, combined_chunk in enumerate(combined_chunks, 1):
             print(f"🔬 DocumentEngine: Processing LLM chunk {i}/{len(combined_chunks)} ({len(combined_chunk)} chars)")
             print(f"   Combined text preview: '{combined_chunk[:100]}...'")
-            
+
             print("   → Calling text_pipeline.clean_text()...")
             cleaned = text_pipeline.clean_text(combined_chunk)
             print(f"   → Cleaned text ({len(cleaned)} chars): '{cleaned[:100]}...'")
-            
+
             cleaned_chunks.append(cleaned)
-        
+
         # Step 3: Re-combine all cleaned text and enhance with natural formatting
         all_cleaned_text = " ".join(cleaned_chunks)
         print(f"   → Combined all cleaned text: {len(all_cleaned_text)} chars total")
-        
+
         print("   → Calling text_pipeline.enhance_with_natural_formatting() on combined text...")
         enhanced_text = text_pipeline.enhance_with_natural_formatting(all_cleaned_text)
         print(f"   → Enhanced text ({len(enhanced_text)} chars): '{enhanced_text[:100]}...'")
-        
+
         # Step 4: Split enhanced text back into optimal chunks for TTS
         processed_chunks = self._split_for_tts(enhanced_text)
         print(f"   → Split enhanced text into {len(processed_chunks)} TTS-optimized chunks")
-        
-        print(f"DocumentEngine: Processed through optimized pipeline: "
-              f"{len(text_chunks)} → {len(combined_chunks)} → {len(processed_chunks)} chunks")
-        
+
+        print(
+            f"DocumentEngine: Processed through optimized pipeline: "
+            f"{len(text_chunks)} → {len(combined_chunks)} → {len(processed_chunks)} chunks"
+        )
+
         return processed_chunks
 
-    def _generate_audio_output(self, processed_chunks: list[str], output_name: str, enable_timing: bool, audio_engine: "IAudioEngine") -> "TimedAudioResult":
+    def _generate_audio_output(
+        self, processed_chunks: list[str], output_name: str, enable_timing: bool, audio_engine: "IAudioEngine"
+    ) -> TimedAudioResult:
         """Generate audio using appropriate strategy based on timing requirements."""
         if enable_timing:
             print("DocumentEngine: Using timing-aware audio generation")
@@ -191,17 +200,19 @@ class DocumentEngine(IDocumentEngine):
         else:
             print("DocumentEngine: Using simple audio generation (no timing complexity)")
             timed_result = audio_engine.generate_simple_audio(processed_chunks, output_name)
-        
+
         print(f"🔍 DEBUG: timed_result={timed_result}")
         if timed_result:
             print(f"🔍 DEBUG: timed_result.audio_files={timed_result.audio_files}")
-        
+
         if not timed_result or not timed_result.audio_files:
             raise ValueError("Audio generation failed to produce files")
-        
+
         return timed_result
 
-    def _assemble_processing_result(self, audio_result: "TimedAudioResult", processed_chunks: list[str], original_chunks: list[str]) -> ProcessingResult:
+    def _assemble_processing_result(
+        self, audio_result: TimedAudioResult, processed_chunks: list[str], original_chunks: list[str]
+    ) -> ProcessingResult:
         """Assemble final ProcessingResult with debug information."""
         return ProcessingResult.success_result(
             audio_files=[os.path.basename(f) for f in audio_result.audio_files],

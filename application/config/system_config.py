@@ -106,10 +106,10 @@ class SystemConfig:
         """Load configuration from YAML file using organized parsing methods."""
         # Load and validate YAML file
         yaml_config = cls._load_and_validate_yaml(config_path)
-        
+
         # Create configuration accessor function
         get_config = cls._create_config_accessor(yaml_config)
-        
+
         # Parse each configuration section
         tts_engine = cls._parse_tts_engine(get_config)
         extensions = cls._parse_file_extensions(get_config)
@@ -119,7 +119,6 @@ class SystemConfig:
         llm_tts = cls._parse_llm_and_tts_settings(get_config)
         system = cls._parse_system_settings(get_config)
 
-        
         # Combine all settings and create config
         config = cls(
             tts_engine=tts_engine,
@@ -150,12 +149,13 @@ class SystemConfig:
                 yaml_config = yaml.safe_load(f)
         except yaml.YAMLError as e:
             raise ValueError(f"Invalid YAML in {config_path}: {e}") from e
-        
+
         return yaml_config
 
     @classmethod
-    def _create_config_accessor(cls, yaml_config: dict):
+    def _create_config_accessor(cls, yaml_config: dict[str, object]) -> object:
         """Create helper function to access nested YAML values."""
+
         def get_config(yaml_path: str, default: YAMLValue = None) -> YAMLValue:
             keys = yaml_path.split(".")
             value: YAMLValue = yaml_config  # Cast to our expected type
@@ -165,10 +165,11 @@ class SystemConfig:
                 else:
                     return default
             return value
+
         return get_config
 
     @classmethod
-    def _parse_tts_engine(cls, get_config) -> TTSEngine:
+    def _parse_tts_engine(cls, get_config: object) -> TTSEngine:
         """Parse and validate TTS engine configuration."""
         tts_engine_str = get_config("tts.engine", "piper")
         if not tts_engine_str:
@@ -181,7 +182,7 @@ class SystemConfig:
             raise ValueError(f"Invalid TTS engine '{tts_engine_str}'. Must be one of: {valid_engines}") from e
 
     @classmethod
-    def _parse_file_extensions(cls, get_config) -> dict[str, frozenset[str]]:
+    def _parse_file_extensions(cls, get_config: object) -> dict[str, frozenset[str]]:
         """Parse allowed and audio extensions from YAML configuration."""
         # Process allowed extensions
         allowed_ext = get_config("files.allowed_extensions", ["pdf"])
@@ -205,7 +206,7 @@ class SystemConfig:
         }
 
     @classmethod
-    def _parse_file_settings(cls, get_config) -> dict[str, object]:
+    def _parse_file_settings(cls, get_config: object) -> dict[str, object]:
         """Parse file-related configuration settings."""
         return {
             "upload_folder": cls._parse_string_value(get_config("files.upload_folder", "uploads"), "uploads"),
@@ -216,10 +217,12 @@ class SystemConfig:
         }
 
     @classmethod
-    def _parse_text_processing_settings(cls, get_config) -> dict[str, object]:
+    def _parse_text_processing_settings(cls, get_config: object) -> dict[str, object]:
         """Parse text processing configuration settings."""
         return {
-            "enable_text_cleaning": cls._parse_bool_value(get_config("text_processing.enable_text_cleaning", True), True),
+            "enable_text_cleaning": cls._parse_bool_value(
+                get_config("text_processing.enable_text_cleaning", True), True  # type: ignore[misc]
+            ),
             "enable_natural_formatting": cls._parse_bool_value(
                 get_config("text_processing.enable_natural_formatting", True), True
             ),
@@ -238,7 +241,7 @@ class SystemConfig:
         }
 
     @classmethod
-    def _parse_performance_settings(cls, get_config) -> dict[str, object]:
+    def _parse_performance_settings(cls, get_config: object) -> dict[str, object]:
         """Parse performance and resource management settings."""
         return {
             "enable_async_audio": cls._parse_bool_value(get_config("performance.enable_async_audio", True), True),
@@ -264,7 +267,7 @@ class SystemConfig:
         }
 
     @classmethod
-    def _parse_llm_and_tts_settings(cls, get_config) -> dict[str, object]:
+    def _parse_llm_and_tts_settings(cls, get_config: object) -> dict[str, object]:
         """Parse LLM and TTS provider configuration settings."""
         return {
             # LLM settings
@@ -300,7 +303,7 @@ class SystemConfig:
         }
 
     @classmethod
-    def _parse_system_settings(cls, get_config) -> dict[str, object]:
+    def _parse_system_settings(cls, get_config: object) -> dict[str, object]:
         """Parse system-level configuration settings."""
         return {
             # OCR settings

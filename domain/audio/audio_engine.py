@@ -1,5 +1,6 @@
 # domain/audio/audio_engine.py - Unified Audio Processing Engine
 """Consolidated audio engine that unifies audio generation, processing, and coordination.
+
 Replaces: AudioGenerationService, AudioGenerationCoordinator, AudioProcessor, AudioFileProcessor.
 """
 
@@ -46,6 +47,7 @@ class IAudioEngine(ABC):
 
 class AudioEngine(IAudioEngine):
     """Unified audio engine that consolidates all audio-related operations.
+    
     High cohesion: All audio operations in one place.
     Low coupling: Depends only on abstractions (ITTSEngine, IFileManager).
     """
@@ -187,25 +189,25 @@ class AudioEngine(IAudioEngine):
         """Orchestrate parallel chunk processing with proper async coordination."""
         # Initialize timing and logging
         timing_context = self._initialize_async_timing()
-        
+
         # Create async tasks for all valid chunks
         tasks = self._create_chunk_tasks(processed_chunks)
-        
+
         # Execute tasks with rate limiting
         results = await self._execute_tasks_with_rate_limiting(tasks)
-        
+
         # Process results and calculate metrics
         return self._process_async_results(results, processed_chunks, timing_context)
 
     def _initialize_async_timing(self) -> dict[str, float]:
         """Initialize timing and logging for async processing."""
         import time
-        
+
         start_time = time.time()
         print(f"🚀 AudioEngine: Starting parallel processing at {start_time:.2f}")
         return {"start_time": start_time}
 
-    def _create_chunk_tasks(self, processed_chunks: list[str]) -> list:
+    def _create_chunk_tasks(self, processed_chunks: list[str]) -> list[object]:
         """Create async tasks for all valid chunks."""
         tasks = []
         for i, chunk in enumerate(processed_chunks):
@@ -213,24 +215,26 @@ class AudioEngine(IAudioEngine):
                 continue
             task = self._process_single_chunk_async(chunk, i + 1, len(processed_chunks))
             tasks.append(task)
-        
+
         print(f"🚀 AudioEngine: Created {len(tasks)} tasks from {len(processed_chunks)} chunks")
         return tasks
 
-    async def _execute_tasks_with_rate_limiting(self, tasks: list) -> list:
+    async def _execute_tasks_with_rate_limiting(self, tasks: list[object]) -> list[object]:
         """Execute tasks with semaphore-based rate limiting."""
         # Apply rate limiting
         semaphore = asyncio.Semaphore(self.max_concurrent)
         limited_tasks = [self._limited_chunk_processing(semaphore, task) for task in tasks]
-        
+
         # Execute all tasks concurrently
         results = await asyncio.gather(*limited_tasks, return_exceptions=True)
         return results
 
-    def _process_async_results(self, results: list, processed_chunks: list[str], timing_context: dict[str, float]) -> list[bytes]:
+    def _process_async_results(
+        self, results: list[object], processed_chunks: list[str], timing_context: dict[str, float]
+    ) -> list[bytes]:
         """Process results, calculate metrics, and filter successful chunks."""
         import time
-        
+
         end_time = time.time()
         total_time = end_time - timing_context["start_time"]
         print(f"⏱️  AudioEngine: Parallel processing completed in {total_time:.2f} seconds")
@@ -251,14 +255,14 @@ class AudioEngine(IAudioEngine):
             f"✅ AudioEngine: Successfully processed {len(audio_chunks)}/"
             f"{len(processed_chunks)} chunks in {total_time:.2f}s"
         )
-        
+
         # Calculate and log performance metrics
         if len(processed_chunks) > 1:
             avg_time_per_chunk = total_time / len(processed_chunks)
             theoretical_sequential_time = avg_time_per_chunk * len(processed_chunks)
             speedup = theoretical_sequential_time / total_time if total_time > 0 else 1
             print(f"🔥 Async speedup: {speedup:.1f}x faster than sequential processing")
-        
+
         return audio_chunks
 
     async def _limited_chunk_processing(self, semaphore: asyncio.Semaphore, task: Any) -> Optional[bytes]:
@@ -462,7 +466,7 @@ class AudioEngine(IAudioEngine):
         combined_mp3 = None
         if audio_files:
             combined_path = Path(output_dir) / f"{output_name}_combined.mp3"
-            result = self.combine_audio_files(audio_files, combined_path)
+            result = self.combine_audio_files(audio_files, str(combined_path))
             if result.is_success and result.value:
                 combined_mp3 = Path(result.value).name
             else:
