@@ -43,10 +43,12 @@ class TextPipeline(ITextPipeline):
         llm_provider: Optional["ILLMProvider"] = None,
         enable_cleaning: bool = True,
         enable_natural_formatting: bool = True,
+        enable_plain_english: bool = False,
     ):
         self.llm_provider = llm_provider
         self.enable_cleaning = enable_cleaning
         self.enable_natural_formatting = enable_natural_formatting
+        self.enable_plain_english = enable_plain_english
 
     def clean_text(self, raw_text: str) -> str:
         """Clean and prepare text for TTS processing."""
@@ -57,6 +59,12 @@ class TextPipeline(ITextPipeline):
             print(f"   → Using basic cleanup (cleaning={self.enable_cleaning}, " f"llm_provider={llm_available})")
             result = self._basic_text_cleanup(raw_text)
             print(f"   → Basic cleanup result: {len(result)} chars")
+
+            # Stage 2: Apply plain English conversion if enabled
+            if self.enable_plain_english and self.llm_provider:
+                result = self._apply_plain_english_conversion(result)
+                print(f"   → Plain English applied: {len(result)} chars")
+
             return result
 
         try:
@@ -70,17 +78,25 @@ class TextPipeline(ITextPipeline):
 
             if llm_result.is_success:
                 cleaned = llm_result.value
-                print(f"   → LLM success: {len(cleaned)} chars returned")
+                cleaned_len = len(cleaned) if cleaned else 0
+                print(f"   → LLM success: {cleaned_len} chars returned")
                 # Basic validation of LLM output
                 if (
                     cleaned and len(cleaned) > len(raw_text) * 0.05
                 ):  # At least 5% of original length (cleaning should reduce size)
                     print("   → LLM output valid, applying basic cleanup")
                     final_result = self._basic_text_cleanup(cleaned)
+                    print(f"   → Basic cleanup complete: {len(final_result)} chars")
+
+                    # Stage 2: Apply plain English conversion if enabled
+                    if self.enable_plain_english:
+                        final_result = self._apply_plain_english_conversion(final_result)
+
                     print(f"   → Final result: {len(final_result)} chars")
                     return final_result
                 else:
-                    print(f"   → LLM output too short ({len(cleaned) if cleaned else 0} chars), trying smaller chunks")
+                    cleaned_len = len(cleaned) if cleaned else 0
+                    print(f"   → LLM output too short ({cleaned_len} chars), trying smaller chunks")
             else:
                 print(f"   → LLM failed: {llm_result.error}")
 
@@ -108,18 +124,39 @@ class TextPipeline(ITextPipeline):
                 if cleaned_parts:
                     combined_result = " ".join(cleaned_parts)
                     print(f"   → Combined sub-chunks: {len(combined_result)} chars")
-                    return self._basic_text_cleanup(combined_result)
+                    final_result = self._basic_text_cleanup(combined_result)
+
+                    # Stage 2: Apply plain English conversion if enabled
+                    if self.enable_plain_english:
+                        final_result = self._apply_plain_english_conversion(final_result)
+
+                    return final_result
 
             # Final fallback to basic cleaning if all else fails
             print("   → All attempts failed, using basic cleanup")
             fallback_result = self._basic_text_cleanup(raw_text)
             print(f"   → Fallback result: {len(fallback_result)} chars")
+
+            # Stage 2: Apply plain English conversion if enabled
+            if self.enable_plain_english:
+                fallback_result = self._apply_plain_english_conversion(fallback_result)
+                print(f"   → Plain English applied to fallback: {len(fallback_result)} chars")
+
             return fallback_result
 
         except Exception as e:
             print(f"   → TextPipeline: LLM cleaning exception: {e}")
             fallback_result = self._basic_text_cleanup(raw_text)
             print(f"   → Exception fallback result: {len(fallback_result)} chars")
+
+            # Stage 2: Apply plain English conversion if enabled
+            if self.enable_plain_english:
+                try:
+                    fallback_result = self._apply_plain_english_conversion(fallback_result)
+                    print(f"   → Plain English applied to exception fallback: {len(fallback_result)} chars")
+                except Exception as pe:
+                    print(f"   → Plain English conversion failed in exception handler: {pe}")
+
             return fallback_result
 
     async def clean_text_async(self, raw_text: str) -> str:
@@ -204,6 +241,122 @@ Return ONLY the cleaned text, nothing else.
 
 Text:
 {text}"""
+
+    def _generate_plain_english_prompt(self, text: str) -> str:
+        """Generate LLM prompt for plain English conversion using established rules."""
+        return f"""Rewrite the following academic text using simpler language.
+IMPORTANT: Do NOT summarize or shorten the content. Keep ALL information, just make it easier to understand.
+
+EXAMPLE OF CORRECT REWRITING:
+Original: "The utilization of participatory mechanisms facilitates stakeholder engagement
+in urban place-making initiatives."
+Correct: "Using participatory methods helps stakeholders get involved in urban place-making projects."
+WRONG: "People participate in urban planning." (This is too short - it loses important details)
+
+WORD SUBSTITUTION RULES - Replace complex academic words with simpler alternatives:
+• "utilize" → "use"
+• "facilitate" → "help" or "make possible"
+• "implement" → "carry out" or "do"
+• "demonstrate" → "show" or "prove"
+• "establish" → "show", "find out", or "set up"
+• "indicate" → "show" or "suggest"
+• "obtain" → "get" or "receive"
+• "evaluate" → "test" or "check"
+• "ascertain" → "find out"
+• "substantial" → "large", "great", or "a lot of"
+• "commence" → "start" or "begin"
+• "terminate" → "stop" or "end"
+• "acquire" → "buy" or "get"
+• "accomplish" → "do" or "finish"
+• "constitutes" → "makes up" or "forms"
+
+ELIMINATE POMPOUS PHRASES:
+• "in the majority of instances" → "most" or "mostly"
+• "at this moment in time" → "now" (or edit out)
+• "with regard to" → "about" or "for"
+• "in order that" → "so that"
+• "prior to" → "before"
+• "subsequent to" → "after"
+• "in excess of" → "more than"
+• "in accordance with" → "in line with" or "because of"
+
+REMOVE UNNECESSARY WORDS that add nothing to meaning:
+• "actually", "basically", "currently", "existing", "extremely", "obviously", "quite", "really", "very"
+• "as a matter of fact", "at the end of the day", "in due course", "the fact of the matter is"
+
+INSTRUCTIONS:
+1. Do NOT skip any sentences
+2. Replace complex words with simpler ones from the rules above
+3. Ensure that sentences are 15-20 words average though some can be longer - use your judgement
+4. Convert passive voice to active voice where possible
+5. Keep ALL facts, data, examples, and details from the original
+6. Do NOT summarize, condense, or remove any content
+7. Do NOT add interpretations or explanations not in the original
+8. Maintain the exact same structure and order as the original text
+
+CRITICAL: This is a REWRITING task, not a summarizing task.
+The output should be approximately the same length as the input, just with simpler words and clearer sentences.
+
+Text to convert:
+{text}"""
+
+    def _apply_plain_english_conversion(self, text: str) -> str:
+        """Apply plain English conversion to already-cleaned text."""
+        if not self.llm_provider:
+            print("   → Plain English: No LLM provider available, skipping conversion")
+            return text
+
+        print(f"   → Plain English: Converting {len(text)} chars")
+
+        try:
+            # For very large texts, process in chunks
+            if len(text) > 15000:
+                print("   → Plain English: Processing in chunks")
+                chunk_size = 15000
+                converted_parts = []
+
+                for i in range(0, len(text), chunk_size):
+                    chunk = text[i : i + chunk_size]
+                    print(f"     → Plain English chunk {i//chunk_size + 1} ({len(chunk)} chars)")
+
+                    chunk_prompt = self._generate_plain_english_prompt(chunk)
+                    chunk_result = self.llm_provider.generate_content(chunk_prompt)
+
+                    if chunk_result.is_success and chunk_result.value:
+                        converted_parts.append(chunk_result.value)
+                        print(f"     → Plain English chunk success: {len(chunk_result.value)} chars")
+                    else:
+                        # Use original chunk if conversion fails
+                        converted_parts.append(chunk)
+                        print("     → Plain English chunk failed, using original")
+
+                if converted_parts:
+                    combined_result = " ".join(converted_parts)
+                    print(f"   → Plain English: Combined chunks: {len(combined_result)} chars")
+                    return combined_result
+            else:
+                # Process whole text
+                plain_english_prompt = self._generate_plain_english_prompt(text)
+                result = self.llm_provider.generate_content(plain_english_prompt)
+
+                if result.is_success and result.value:
+                    # Basic validation - converted text should be reasonable length
+                    if len(result.value) > len(text) * 0.3:  # At least 30% of original
+                        print(f"   → Plain English: Success: {len(result.value)} chars")
+                        return result.value
+                    else:
+                        print(f"   → Plain English: Result too short ({len(result.value)} chars), using original")
+                else:
+                    error_msg = result.error if hasattr(result, "error") else "Unknown error"
+                    print(f"   → Plain English: LLM failed: {error_msg}")
+
+            # Fallback to original text if conversion fails
+            print("   → Plain English: Using original text as fallback")
+            return text
+
+        except Exception as e:
+            print(f"   → Plain English: Exception during conversion: {e}")
+            return text
 
     def _enhance_with_natural_formatting(self, text: str) -> str:
         """Apply natural formatting tricks for TTS engines without SSML support."""

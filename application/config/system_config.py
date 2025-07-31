@@ -39,6 +39,7 @@ class SystemConfig:
     # Processing settings
     enable_text_cleaning: bool = True
     enable_natural_formatting: bool = True
+    enable_plain_english_conversion: bool = False
     enable_async_audio: bool = True
 
     # Audio processing parallelism - how many chunks AudioEngine processes simultaneously
@@ -235,6 +236,9 @@ class SystemConfig:
             ),
             "enable_natural_formatting": cls._parse_bool_value(
                 get_config("text_processing.enable_natural_formatting", True), True
+            ),
+            "enable_plain_english_conversion": cls._parse_bool_value(
+                get_config("text_processing.enable_plain_english_conversion", False), False
             ),
             "chunk_size": cls._parse_int_value(
                 get_config("text_processing.chunk_size", 4000), 4000, min_val=1000, max_val=100000
@@ -524,6 +528,7 @@ class SystemConfig:
         print(f"TTS Engine: {self.tts_engine.value}")
         print(f"Text Cleaning: {'Enabled' if self.enable_text_cleaning else 'Disabled'}")
         print(f"Natural Formatting: {'Enabled' if self.enable_natural_formatting else 'Disabled'}")
+        print(f"Plain English Conversion: {'Enabled' if self.enable_plain_english_conversion else 'Disabled'}")
         print(f"Async Audio: {'Enabled' if self.enable_async_audio else 'Disabled'}")
         print(f"Audio Concurrent Chunks: {self.audio_concurrent_chunks}")
         print(f"TTS Concurrent Requests: {self.tts_concurrent_requests}")

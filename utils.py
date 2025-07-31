@@ -33,6 +33,11 @@ def parse_page_range_from_form(form: object) -> PageRange:
     return PageRange(start_page=start_page, end_page=end_page)
 
 
+def parse_plain_english_from_form(form: object) -> bool:
+    """Parse plain English conversion setting from Flask form data."""
+    return form.get("enable_plain_english") == "on"
+
+
 def clean_text_for_display(text: str) -> str:
     """Remove SSML markup and pause markers from text for display."""
     # Remove SSML tags

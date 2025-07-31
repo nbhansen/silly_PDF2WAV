@@ -28,6 +28,7 @@ from utils import (
     allowed_file,
     clean_text_for_display,
     parse_page_range_from_form,
+    parse_plain_english_from_form,
 )
 
 
@@ -39,6 +40,7 @@ class FileProcessingInfo:
     base_filename: str
     pdf_path: str
     page_range: PageRange
+    enable_plain_english: bool = False
     error: Optional[str] = None
 
 
@@ -412,7 +414,12 @@ def process_upload_request(
 
         # Execute document processing
         processing_result = _execute_document_processing(
-            file_info.pdf_path, file_info.base_filename, file_info.page_range, services, enable_timing
+            file_info.pdf_path,
+            file_info.base_filename,
+            file_info.page_range,
+            services,
+            enable_timing,
+            file_info.enable_plain_english,
         )
 
         # Clean up uploaded file
@@ -445,8 +452,9 @@ def _process_uploaded_file(uploaded_file: FileStorage, request_form: object) -> 
     pdf_path = Path(config.upload_folder) / original_filename
     uploaded_file.save(str(pdf_path))
 
-    # Parse and validate page range
+    # Parse and validate page range and plain English setting
     page_range = parse_page_range_from_form(request_form)
+    enable_plain_english = parse_plain_english_from_form(request_form)
 
     if not page_range.is_full_document():
         services = _configure_processing_services()
@@ -461,6 +469,7 @@ def _process_uploaded_file(uploaded_file: FileStorage, request_form: object) -> 
                 base_filename=base_filename_no_ext,
                 pdf_path=str(pdf_path),
                 page_range=page_range,
+                enable_plain_english=enable_plain_english,
                 error=f"Error: {validation.get('error', 'Invalid page range')}",
             )
 
@@ -469,6 +478,7 @@ def _process_uploaded_file(uploaded_file: FileStorage, request_form: object) -> 
         base_filename=base_filename_no_ext,
         pdf_path=str(pdf_path),
         page_range=page_range,
+        enable_plain_english=enable_plain_english,
     )
 
 
@@ -497,7 +507,12 @@ def _configure_processing_services() -> ProcessingServices:
 
 
 def _execute_document_processing(
-    pdf_path: str, base_filename: str, page_range: PageRange, services: ProcessingServices, enable_timing: bool
+    pdf_path: str,
+    base_filename: str,
+    page_range: PageRange,
+    services: ProcessingServices,
+    enable_timing: bool,
+    enable_plain_english: bool = False,
 ) -> ProcessingResult:
     """Execute the core document processing workflow."""
     # Override timing for Gemini TTS
@@ -513,9 +528,25 @@ def _execute_document_processing(
 
     request_obj = ProcessingRequest(pdf_path=pdf_path, output_name=base_filename, page_range=page_range)
 
+    # Create custom text pipeline if plain English is requested
+    text_pipeline = services.text_pipeline
+    if enable_plain_english:
+        # Create a new TextPipeline instance with plain English conversion enabled
+        from domain.text.text_pipeline import TextPipeline
+        from infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
+
+        llm_provider = services.service_container.get(GeminiLLMProvider) if config.gemini_api_key else None
+        text_pipeline = TextPipeline(
+            llm_provider=llm_provider,
+            enable_cleaning=config.enable_text_cleaning,
+            enable_natural_formatting=config.enable_natural_formatting,
+            enable_plain_english=True,
+        )
+        get_logger("routes").info("Created custom TextPipeline with plain English conversion enabled")
+
     # Use document engine for complete processing
     result = services.document_engine.process_document(
-        request_obj, services.audio_engine, services.text_pipeline, enable_timing, config.llm_chunk_size
+        request_obj, services.audio_engine, text_pipeline, enable_timing, config.llm_chunk_size
     )
     assert isinstance(result, ProcessingResult)
     return result
@@ -548,7 +579,7 @@ def _handle_timing_data(
         if file_manager:
             updated_debug_info["file_management"] = "available"
             updated_debug_info["cleanup_enabled"] = get_app_config().enable_file_cleanup
-    except Exception:  # nosec B110
+    except Exception:  # nosec B110 # noqa: S110
         pass  # Don't fail upload if file stats fail
 
     return replace(processing_result, debug_info=updated_debug_info)
@@ -647,7 +678,7 @@ def save_timing_data(base_filename: str, timing_metadata: TimingMetadata) -> Non
             try:
                 if hasattr(service.file_manager, "schedule_cleanup"):
                     service.file_manager.schedule_cleanup(timing_filename, 2.0)  # Same cleanup as audio
-            except Exception:  # nosec B110
+            except Exception:  # nosec B110 # noqa: S110
                 pass
 
     except Exception as e:
