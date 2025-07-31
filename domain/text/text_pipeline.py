@@ -66,10 +66,10 @@ class TextPipeline(ITextPipeline):
             print(f"   → Generated cleaning prompt ({len(cleaning_prompt)} chars)")
 
             print("   → Calling LLM API...")
-            result = self.llm_provider.generate_content(cleaning_prompt)
+            llm_result = self.llm_provider.generate_content(cleaning_prompt)
 
-            if result.is_success:
-                cleaned = result.value
+            if llm_result.is_success:
+                cleaned = llm_result.value
                 print(f"   → LLM success: {len(cleaned)} chars returned")
                 # Basic validation of LLM output
                 if (
@@ -82,7 +82,7 @@ class TextPipeline(ITextPipeline):
                 else:
                     print(f"   → LLM output too short ({len(cleaned) if cleaned else 0} chars), trying smaller chunks")
             else:
-                print(f"   → LLM failed: {result.error}")
+                print(f"   → LLM failed: {llm_result.error}")
 
             # If large chunk failed, try processing in smaller pieces
             if len(raw_text) > 15000:

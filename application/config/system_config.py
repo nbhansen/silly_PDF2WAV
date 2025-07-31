@@ -230,7 +230,8 @@ class SystemConfig:
         """Parse text processing configuration settings."""
         return {
             "enable_text_cleaning": cls._parse_bool_value(
-                get_config("text_processing.enable_text_cleaning", True), True  # type: ignore[misc]
+                get_config("text_processing.enable_text_cleaning", True),
+                True,  # type: ignore[misc]
             ),
             "enable_natural_formatting": cls._parse_bool_value(
                 get_config("text_processing.enable_natural_formatting", True), True

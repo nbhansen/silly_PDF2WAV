@@ -286,7 +286,7 @@ class TestTextPipelineIntegrationTDD:
         # Enhance with natural formatting
         enhanced = pipeline.enhance_with_natural_formatting(cleaned)
         # Natural formatting adds double dots between sentences and commas after academic phrases
-        assert (".. " in enhanced or ",," in enhanced)  # Natural formatting enhancements
+        assert ".. " in enhanced or ",," in enhanced  # Natural formatting enhancements
 
         # Split into sentences
         sentences = pipeline.split_into_sentences(enhanced)

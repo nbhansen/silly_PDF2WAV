@@ -321,7 +321,9 @@ except ImportError:
 
                 if Path(temp_path).exists():
                     # Verify file was created with content
-                    Path(temp_path).stat().st_size  # Check file exists and has size
+                    file_size = Path(temp_path).stat().st_size
+                    if file_size == 0:
+                        raise Exception("Output file exists but contains no audio data")
 
                     with Path(temp_path).open("rb") as f:
                         audio_data = f.read()

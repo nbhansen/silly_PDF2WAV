@@ -27,11 +27,11 @@ class TesseractOCRProvider(IOCRProvider):
             pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
         self.poppler_path_custom = poppler_path_custom
 
-        # Configure OCR settings
+        # Configure OCR settings with type safety
         if config:
-            self.ocr_dpi = config.ocr_dpi
-            self.ocr_threshold = config.ocr_threshold
-            self.ocr_language = config.ocr_language if hasattr(config, "ocr_language") else "eng"
+            self.ocr_dpi = getattr(config, 'ocr_dpi', 300)
+            self.ocr_threshold = getattr(config, 'ocr_threshold', 180)
+            self.ocr_language = getattr(config, 'ocr_language', 'eng')
         else:
             # Default settings
             self.ocr_dpi = 300
@@ -232,12 +232,15 @@ class TesseractOCRProvider(IOCRProvider):
                     )
 
             # Validate range consistency
-            if (page_range.start_page is not None and page_range.end_page is not None
-                and page_range.start_page > page_range.end_page):
-                    return self._error_result(
-                        f"Start page ({page_range.start_page}) cannot be greater than end page ({page_range.end_page})",
-                        total_pages,
-                    )
+            if (
+                page_range.start_page is not None
+                and page_range.end_page is not None
+                and page_range.start_page > page_range.end_page
+            ):
+                return self._error_result(
+                    f"Start page ({page_range.start_page}) cannot be greater than end page ({page_range.end_page})",
+                    total_pages,
+                )
 
             # All validations passed
             actual_start = page_range.start_page if page_range.start_page is not None else 1

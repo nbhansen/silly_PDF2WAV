@@ -11,6 +11,7 @@ from .errors import ApplicationError
 @dataclass(frozen=True)
 class PageRange:
     """Range specification for document page processing."""
+
     start_page: Optional[int] = None
     end_page: Optional[int] = None
 
@@ -61,6 +62,7 @@ class PageRange:
 @dataclass(frozen=True)
 class ProcessingRequest:
     """Request specification for PDF processing operations."""
+
     pdf_path: str
     output_name: str
     page_range: PageRange
@@ -107,6 +109,7 @@ class ProcessingRequest:
 @dataclass(frozen=True)
 class PDFInfo:
     """Information about a PDF document."""
+
     total_pages: int
     title: str
     author: str

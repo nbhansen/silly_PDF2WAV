@@ -40,19 +40,19 @@ def test_service_factory_creation():
         patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True),
         patch("infrastructure.tts.piper_tts_provider.PiperTTSProvider"),
     ):
-            config = create_test_config()
-            container = create_pdf_service_from_env(config)
+        config = create_test_config()
+        container = create_pdf_service_from_env(config)
 
-            # Verify all main services are available
-            from domain.audio.audio_engine import IAudioEngine
-            from domain.document.document_engine import IDocumentEngine
-            from domain.text.text_pipeline import ITextPipeline
-            from infrastructure.file.file_manager import FileManager
+        # Verify all main services are available
+        from domain.audio.audio_engine import IAudioEngine
+        from domain.document.document_engine import IDocumentEngine
+        from domain.text.text_pipeline import ITextPipeline
+        from infrastructure.file.file_manager import FileManager
 
-            assert container.get(IAudioEngine) is not None
-            assert container.get(ITextPipeline) is not None
-            assert container.get(IDocumentEngine) is not None
-            assert container.get(FileManager) is not None
+        assert container.get(IAudioEngine) is not None
+        assert container.get(ITextPipeline) is not None
+        assert container.get(IDocumentEngine) is not None
+        assert container.get(FileManager) is not None
 
 
 def test_basic_workflow_structure():

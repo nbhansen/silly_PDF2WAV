@@ -1,7 +1,6 @@
 # infrastructure/tts/gemini_tts_provider.py
 """Gemini TTS Provider - placeholder implementation for testing compatibility."""
 
-
 from domain.errors import Result, tts_engine_error
 from domain.interfaces import ITTSEngine
 

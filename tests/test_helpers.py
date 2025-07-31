@@ -18,6 +18,7 @@ from domain.models import PageRange, PDFInfo, ProcessingRequest, TimedAudioResul
 
 class FakeTTSEngine(ITTSEngine):
     """Fake TTS engine for testing purposes."""
+
     def __init__(self, should_fail: bool = False, output_format: str = "wav"):
         self.should_fail = should_fail
         self.output_format = output_format
@@ -45,6 +46,7 @@ class FakeTTSEngine(ITTSEngine):
 
 class FakeLLMProvider(ILLMProvider):
     """Fake LLM provider for testing purposes."""
+
     def __init__(self, should_fail: bool = False):
         self.should_fail = should_fail
         self.prompts: list[str] = []
@@ -67,6 +69,7 @@ class FakeLLMProvider(ILLMProvider):
 
 class FakeDocumentProcessor(IDocumentProcessor):
     """Fake document processor for testing purposes."""
+
     def __init__(self, text_to_return: str = "Default extracted text", pdf_info: Optional[PDFInfo] = None):
         self.text_to_return = text_to_return
         self.pdf_info = pdf_info or PDFInfo(total_pages=1, title="Test PDF", author="Test Author")

@@ -258,11 +258,7 @@ def register_routes(app: Flask) -> None:
                     audio_dir = Path(app.config["AUDIO_FOLDER"])
                     if audio_dir.exists():
                         files = list(audio_dir.iterdir())
-                        total_size = sum(
-                            f.stat().st_size
-                            for f in files
-                            if f.is_file()
-                        )
+                        total_size = sum(f.stat().st_size for f in files if f.is_file())
 
                         stats = {
                             "total_files": len(files),
