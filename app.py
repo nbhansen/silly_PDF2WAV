@@ -8,7 +8,6 @@ import atexit
 import os
 import signal
 import sys
-from typing import Any
 
 from flask import Flask
 
@@ -44,7 +43,7 @@ def create_application() -> Flask:
             logger.info("Shutting down file cleanup scheduler...")
             context.cleanup_scheduler.stop()
 
-    def signal_handler(sig: int, _frame: Any) -> None:
+    def signal_handler(sig: int, _frame: object) -> None:
         logger.info("Received signal %d, shutting down gracefully...", sig)
         shutdown_handler()
         sys.exit(0)

@@ -6,7 +6,7 @@ Uses immutable MappingProxyType for true immutability.
 
 from abc import ABC, abstractmethod
 import types
-from typing import TYPE_CHECKING, Any, Callable, Protocol, TypeVar, Union
+from typing import TYPE_CHECKING, Callable, Protocol, TypeVar, Union
 
 if TYPE_CHECKING:
     from application.config.system_config import SystemConfig
@@ -15,12 +15,15 @@ else:
 
 T = TypeVar("T")
 
+
 # Service factory protocol for better type safety
 class ServiceFactory(Protocol):
     """Protocol for service factories."""
+
     def __call__(self) -> object: ...
 
-# Service key type - either a type or string identifier  
+
+# Service key type - either a type or string identifier
 ServiceKey = Union[type[object], str]
 
 
@@ -48,9 +51,7 @@ class ServiceContainer(IServiceContainer):
 
         # Build all factories upfront (immutable)
         factories = self._build_core_services()
-        self._factories: types.MappingProxyType[ServiceKey, ServiceFactory] = types.MappingProxyType(
-            factories
-        )
+        self._factories: types.MappingProxyType[ServiceKey, ServiceFactory] = types.MappingProxyType(factories)
 
         # Mutable singleton cache (internal implementation detail)
         # Note: This is the only mutable part, but it's thread-safe lazy loading

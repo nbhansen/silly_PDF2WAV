@@ -1,6 +1,10 @@
 # application/config/system_config.py
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Optional, Union
+from enum import Enum
+from pathlib import Path
+from typing import TYPE_CHECKING, Optional, Union
+
+import yaml
 
 # Type for YAML configuration values (more specific for actual usage)
 YAMLValue = Union[str, int, float, bool, list[str], dict[str, object], None]
@@ -9,13 +13,10 @@ SimpleYAMLValue = Union[str, int, float, bool, None]
 
 if TYPE_CHECKING:
     from domain.config.tts_config import GeminiConfig, PiperConfig
-from enum import Enum
-from pathlib import Path
-
-import yaml
 
 
 class TTSEngine(Enum):
+    """Enumeration of supported TTS engines."""
     PIPER = "piper"
     GEMINI = "gemini"
 
@@ -26,7 +27,7 @@ class SystemConfig:
 
     # Core TTS settings (required fields first)
     tts_engine: TTSEngine
-    llm_model_name: str  # Required: LLM model for text cleaning
+    llm_model_name: Optional[str]  # LLM model for text cleaning
 
     # File handling
     upload_folder: str = "uploads"
@@ -117,12 +118,12 @@ class SystemConfig:
             raise ValueError(f"Invalid YAML in {config_path}: {e}") from e
 
         # Helper function to get nested config values from YAML only
-        def get_config(yaml_path: str, default: object = None) -> object:
+        def get_config(yaml_path: str, default: YAMLValue = None) -> YAMLValue:
             keys = yaml_path.split(".")
-            value = yaml_config
+            value: YAMLValue = yaml_config  # Cast to our expected type
             for key in keys:
                 if isinstance(value, dict) and key in value:
-                    value = value[key]
+                    value = value[key]  # type: ignore[assignment]  # YAML parsing limitation
                 else:
                     return default
             return value
@@ -157,8 +158,8 @@ class SystemConfig:
         config = cls(
             tts_engine=tts_engine,
             # App settings
-            upload_folder=get_config("files.upload_folder", "uploads"),
-            audio_folder=get_config("files.audio_folder", "audio_outputs"),
+            upload_folder=cls._parse_string_value(get_config("files.upload_folder", "uploads"), "uploads"),
+            audio_folder=cls._parse_string_value(get_config("files.audio_folder", "audio_outputs"), "audio_outputs"),
             max_file_size_mb=cls._parse_int_value(
                 get_config("files.max_file_size_mb", 20), 20, min_val=1, max_val=1000
             ),
@@ -203,7 +204,7 @@ class SystemConfig:
                 get_config("files.cleanup.max_disk_usage_mb", 500), 500, min_val=10, max_val=10000
             ),
             # LLM settings (for text cleaning)
-            llm_model_name=get_config("llm.model_name"),
+            llm_model_name=cls._parse_optional_string_value(get_config("llm.model_name")),
             llm_concurrent_requests=cls._parse_int_value(
                 get_config("llm.concurrent_requests", 3), 3, min_val=1, max_val=10
             ),
@@ -211,9 +212,9 @@ class SystemConfig:
                 get_config("llm.request_delay_seconds", 0.5), 0.5, min_val=0.1, max_val=5.0
             ),
             # Gemini TTS specific settings
-            gemini_api_key=get_config("secrets.google_ai_api_key"),
-            gemini_model_name=get_config("tts.gemini.model_name", "gemini-2.5-flash-preview-tts"),
-            gemini_voice_name=get_config("tts.gemini.voice_name", "Kore"),
+            gemini_api_key=cls._parse_optional_string_value(get_config("secrets.google_ai_api_key")),
+            gemini_model_name=cls._parse_string_value(get_config("tts.gemini.model_name", "gemini-2.5-flash-preview-tts"), "gemini-2.5-flash-preview-tts"),
+            gemini_voice_name=cls._parse_string_value(get_config("tts.gemini.voice_name", "Kore"), "Kore"),
             gemini_use_measurement_mode=cls._parse_bool_value(
                 get_config("tts.gemini.use_measurement_mode", False), False
             ),
@@ -221,22 +222,23 @@ class SystemConfig:
                 get_config("tts.gemini.measurement_mode_interval", 0.8), 0.8, min_val=0.1, max_val=5.0
             ),
             # Piper settings
-            piper_model_name=get_config("tts.piper.model_name", "en_US-lessac-medium"),
-            piper_models_dir=get_config("tts.piper.models_dir", "piper_models"),
+            piper_model_name=cls._parse_string_value(get_config("tts.piper.model_name", "en_US-lessac-medium"), "en_US-lessac-medium"),
+            piper_models_dir=cls._parse_string_value(get_config("tts.piper.models_dir", "piper_models"), "piper_models"),
             piper_length_scale=cls._parse_float_value(
                 get_config("tts.piper.length_scale", 1.0), 1.0, min_val=0.5, max_val=2.0
             ),
             # OCR settings
             ocr_dpi=cls._parse_int_value(get_config("ocr.dpi", 300), 300, min_val=150, max_val=600),
             ocr_threshold=cls._parse_int_value(get_config("ocr.threshold", 180), 180, min_val=100, max_val=240),
-            ocr_language=get_config("ocr.language", "eng"),
+            ocr_language=cls._parse_string_value(get_config("ocr.language", "eng"), "eng"),
             # Flask application settings
             flask_debug=cls._parse_bool_value(get_config("app.debug", True), True),
-            flask_host=get_config("app.host", "127.0.0.1"),  # Secure default: localhost only
+            flask_host=cls._parse_string_value(get_config("app.host", "127.0.0.1"), "127.0.0.1"),  # Secure default: localhost only
             flask_port=cls._parse_int_value(get_config("app.port", 5000), 5000, min_val=1000, max_val=65535),
             # Model repository settings
-            piper_model_repository_url=get_config(
-                "tts.piper.model_repository_url", "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0"
+            piper_model_repository_url=cls._parse_string_value(
+                get_config("tts.piper.model_repository_url", "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0"),
+                "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0"
             ),
             # File extensions (processed above)
             allowed_extensions=allowed_extensions,
@@ -281,6 +283,20 @@ class SystemConfig:
                 raise ValueError("MAX_DISK_USAGE_MB must be positive when file cleanup is enabled")
 
     @staticmethod
+    def _parse_string_value(value: YAMLValue, default: str) -> str:
+        """Parse string from YAML value."""
+        if value is None:
+            return default
+        return str(value)
+
+    @staticmethod
+    def _parse_optional_string_value(value: YAMLValue, default: Optional[str] = None) -> Optional[str]:
+        """Parse optional string from YAML value."""
+        if value is None:
+            return default
+        return str(value)
+
+    @staticmethod
     def _parse_bool_value(value: YAMLValue, default: Optional[bool] = None) -> bool:
         """Parse boolean from various representations (for YAML values)."""
         if value is None:
@@ -296,17 +312,21 @@ class SystemConfig:
         return default if default is not None else False
 
     @staticmethod
-    def _parse_int_value(value: YAMLValue, default: int, min_val: Optional[int] = None, max_val: Optional[int] = None) -> int:
+    def _parse_int_value(
+        value: YAMLValue, default: int, min_val: Optional[int] = None, max_val: Optional[int] = None
+    ) -> int:
         """Parse integer from various representations with validation."""
         if value is None:
             return default
 
         try:
+            # Handle bool before int since bool is subclass of int
             if isinstance(value, bool):
-                # Handle bool before int since bool is subclass of int
                 parsed = 1 if value else 0
-            else:
+            elif isinstance(value, (str, int, float)):
                 parsed = int(value)
+            else:
+                raise ValueError(f"Cannot convert {type(value)} to int")
         except (ValueError, TypeError) as e:
             raise ValueError(f"Value must be a valid integer, got: {value}") from e
 
@@ -326,7 +346,10 @@ class SystemConfig:
             return default
 
         try:
-            parsed = float(value)
+            if isinstance(value, (str, int, float)):
+                parsed = float(value)
+            else:
+                raise ValueError(f"Cannot convert {type(value)} to float")
         except (ValueError, TypeError) as e:
             raise ValueError(f"Value must be a valid number, got: {value}") from e
 

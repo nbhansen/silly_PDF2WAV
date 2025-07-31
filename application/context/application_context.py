@@ -4,9 +4,9 @@ This module provides the ApplicationContext class which encapsulates all applica
 dependencies and eliminates global state, following hexagonal architecture principles.
 """
 
-import logging
 from dataclasses import dataclass
-from typing import Optional, Protocol
+import logging
+from typing import Any, Optional, Protocol
 
 from application.config.system_config import SystemConfig
 from domain.container.service_container import ServiceContainer
@@ -51,7 +51,7 @@ class ApplicationContext:
             return False
 
     @property
-    def pdf_service(self):
+    def pdf_service(self) -> Any:
         """Get PDF processing service (audio engine)."""
         from domain.audio.audio_engine import IAudioEngine
 

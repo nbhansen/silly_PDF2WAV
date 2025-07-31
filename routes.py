@@ -47,9 +47,9 @@ class ProcessingServices:
     """Collection of processing services."""
 
     service_container: ServiceContainer
-    document_engine: object    # IDocumentEngine - avoiding circular import  
-    audio_engine: object       # IAudioEngine - avoiding circular import
-    text_pipeline: object      # ITextPipeline - avoiding circular import
+    document_engine: object  # IDocumentEngine - avoiding circular import
+    audio_engine: object  # IAudioEngine - avoiding circular import
+    text_pipeline: object  # ITextPipeline - avoiding circular import
 
 
 def get_app_context() -> ApplicationContext:

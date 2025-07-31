@@ -5,7 +5,7 @@ the Flask app with all dependencies properly injected, eliminating global state.
 """
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from flask import Flask
 
@@ -18,7 +18,7 @@ from infrastructure.file.cleanup_scheduler import FileCleanupScheduler
 from infrastructure.file.file_manager import FileManager
 
 
-def create_service_container(config: SystemConfig, logger_factory) -> ServiceContainer:
+def create_service_container(config: SystemConfig, logger_factory: ThreadSafeLoggerFactory) -> ServiceContainer:
     """Create service container with all dependencies."""
     logger = logger_factory.get_logger("service_factory")
 
@@ -62,7 +62,7 @@ def create_app(config_path: Optional[Path] = None) -> Flask:
         file_manager = FileManager(app_config.upload_folder, app_config.audio_folder)
         cleanup_scheduler = FileCleanupScheduler(
             file_manager=file_manager,
-            max_file_age_seconds=app_config.max_file_age_hours * 3600,
+            max_file_age_seconds=int(app_config.max_file_age_hours * 3600),
             check_interval_seconds=300,
         )
 
@@ -101,7 +101,7 @@ def register_error_handlers(app: Flask, context: ApplicationContext) -> None:
     logger = context.get_logger("error_handlers")
 
     @app.errorhandler(413)
-    def too_large(e: Any) -> tuple[str, int]:
+    def too_large(e: object) -> tuple[str, int]:
         max_size = context.config.max_file_size_mb
         return f"File is too large. Maximum file size is {max_size}MB.", 413
 
