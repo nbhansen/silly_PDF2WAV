@@ -250,3 +250,8 @@ libpiper_phonemize.so*
 libtashkeel_model.ort
 piper
 piper_models/
+
+# Piper TTS binaries (use pip install piper-tts instead)
+piper_binary
+piper_linux_x86_64.tar.gz
+piper/
