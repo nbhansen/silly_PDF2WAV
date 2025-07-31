@@ -83,6 +83,7 @@ class ServiceContainer(IServiceContainer):
         """Build all core service factories upfront (immutable pattern)."""
         from domain.audio.audio_engine import AudioEngine, IAudioEngine
         from domain.audio.timing_engine import ITimingEngine, TimingEngine, TimingMode
+        from domain.document.document_engine import DocumentEngine, IDocumentEngine
         from domain.text.text_pipeline import ITextPipeline, TextPipeline
         from infrastructure.file.file_manager import FileManager
         from infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
@@ -119,6 +120,11 @@ class ServiceContainer(IServiceContainer):
                 audio_target_chunk_size=self.config.audio_target_chunk_size,
                 audio_max_chunk_size=self.config.audio_max_chunk_size,
                 enable_async=self.config.enable_async_audio,
+            ),
+            # Document Engine
+            IDocumentEngine: lambda: DocumentEngine(
+                ocr_provider=self.get(TesseractOCRProvider),
+                file_manager=self.get(FileManager),
             ),
             # OCR Provider
             TesseractOCRProvider: lambda: TesseractOCRProvider(config=self.config),

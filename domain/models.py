@@ -78,7 +78,7 @@ class ProcessingRequest:
         # Validate output name doesn't contain problematic characters
         import re
 
-        if not re.match(r"^[a-zA-Z0-9_\-\s]+$", self.output_name):
+        if not re.match(r"^[a-zA-Z0-9_\-\s\.]+$", self.output_name):
             raise ValueError("output_name contains invalid characters")
 
         if self.page_range is None:

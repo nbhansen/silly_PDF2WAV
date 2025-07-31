@@ -46,8 +46,11 @@ class ApplicationContext:
             from domain.audio.audio_engine import IAudioEngine
 
             audio_service = self.service_container.get(IAudioEngine)
-            return audio_service is not None
-        except Exception:
+            result = audio_service is not None
+            print(f"DEBUG: Audio service check - service={audio_service}, result={result}")
+            return result
+        except Exception as e:
+            print(f"DEBUG: Audio service check failed: {e}")
             return False
 
     @property

@@ -57,14 +57,22 @@ def get_app_context() -> ApplicationContext:
     return current_app.config["APP_CONTEXT"]  # type: ignore[no-any-return]
 
 
-def get_pdf_service() -> object:  # Returns audio engine
+def get_pdf_service() -> object:  # Returns service container
     """Get PDF service from context."""
-    return get_app_context().pdf_service
+    return get_app_context().service_container
 
 
 def is_processor_available() -> bool:
     """Check if processor is available from context."""
-    return get_app_context().is_processor_available
+    try:
+        result = get_app_context().is_processor_available
+        logger = get_logger("routes")
+        logger.info(f"Processor available check: {result}")
+        return result
+    except Exception as e:
+        logger = get_logger("routes")
+        logger.error(f"Error checking processor availability: {e}")
+        return False
 
 
 def get_app_config() -> SystemConfig:
@@ -466,10 +474,19 @@ def _process_uploaded_file(uploaded_file: FileStorage, request_form: object) -> 
 
 def _configure_processing_services() -> ProcessingServices:
     """Configure and return all required processing services."""
+    from domain.audio.audio_engine import IAudioEngine
+    from domain.document.document_engine import IDocumentEngine
+    from domain.text.text_pipeline import ITextPipeline
+
     service = get_pdf_service()
-    document_engine = service.get("IDocumentEngine")
-    audio_engine = service.get("IAudioEngine")
-    text_pipeline = service.get("ITextPipeline")
+
+    # Debug: Log available services
+    logger = get_logger("routes")
+    logger.info(f"Available services: {list(service._factories.keys())}")
+
+    document_engine = service.get(IDocumentEngine)
+    audio_engine = service.get(IAudioEngine)
+    text_pipeline = service.get(ITextPipeline)
 
     return ProcessingServices(
         service_container=service,

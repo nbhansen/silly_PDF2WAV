@@ -61,7 +61,7 @@ class SystemConfig:
     # Gemini TTS specific settings
     gemini_api_key: Optional[str] = None
     gemini_voice_name: str = "Kore"
-    gemini_model_name: str = "gemini-2.5-flash-preview-tts"
+    gemini_model_name: str = "gemini-2.5-flash"
     gemini_use_measurement_mode: bool = False  # Enable for accurate read-along timing
     gemini_measurement_mode_interval: float = 0.8  # Faster rate for measurement mode batches
 
@@ -291,7 +291,7 @@ class SystemConfig:
             # Gemini TTS settings
             "gemini_api_key": cls._parse_optional_string_value(get_config("secrets.google_ai_api_key")),
             "gemini_model_name": cls._parse_string_value(
-                get_config("tts.gemini.model_name", "gemini-2.5-flash-preview-tts"), "gemini-2.5-flash-preview-tts"
+                get_config("tts.gemini.model_name", "gemini-2.5-flash"), "gemini-2.5-flash"
             ),
             "gemini_voice_name": cls._parse_string_value(get_config("tts.gemini.voice_name", "Kore"), "Kore"),
             "gemini_use_measurement_mode": cls._parse_bool_value(
