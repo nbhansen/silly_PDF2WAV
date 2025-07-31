@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
 class TTSEngine(Enum):
     """Enumeration of supported TTS engines."""
+
     PIPER = "piper"
     GEMINI = "gemini"
 
@@ -102,7 +103,40 @@ class SystemConfig:
 
     @classmethod
     def from_yaml(cls, config_path: str = "config.yaml") -> "SystemConfig":
-        """Load configuration from YAML file only (no environment variable fallback)."""
+        """Load configuration from YAML file using organized parsing methods."""
+        # Load and validate YAML file
+        yaml_config = cls._load_and_validate_yaml(config_path)
+        
+        # Create configuration accessor function
+        get_config = cls._create_config_accessor(yaml_config)
+        
+        # Parse each configuration section
+        tts_engine = cls._parse_tts_engine(get_config)
+        extensions = cls._parse_file_extensions(get_config)
+        file_settings = cls._parse_file_settings(get_config)
+        text_processing = cls._parse_text_processing_settings(get_config)
+        performance = cls._parse_performance_settings(get_config)
+        llm_tts = cls._parse_llm_and_tts_settings(get_config)
+        system = cls._parse_system_settings(get_config)
+
+        
+        # Combine all settings and create config
+        config = cls(
+            tts_engine=tts_engine,
+            **extensions,
+            **file_settings,
+            **text_processing,
+            **performance,
+            **llm_tts,
+            **system,
+        )
+
+        config.validate()
+        return config
+
+    @classmethod
+    def _load_and_validate_yaml(cls, config_path: str) -> dict:
+        """Load and validate YAML configuration file."""
         config_file = Path(config_path)
 
         if not config_file.exists():
@@ -116,8 +150,12 @@ class SystemConfig:
                 yaml_config = yaml.safe_load(f)
         except yaml.YAMLError as e:
             raise ValueError(f"Invalid YAML in {config_path}: {e}") from e
+        
+        return yaml_config
 
-        # Helper function to get nested config values from YAML only
+    @classmethod
+    def _create_config_accessor(cls, yaml_config: dict):
+        """Create helper function to access nested YAML values."""
         def get_config(yaml_path: str, default: YAMLValue = None) -> YAMLValue:
             keys = yaml_path.split(".")
             value: YAMLValue = yaml_config  # Cast to our expected type
@@ -127,19 +165,25 @@ class SystemConfig:
                 else:
                     return default
             return value
+        return get_config
 
-        # Parse TTS engine
+    @classmethod
+    def _parse_tts_engine(cls, get_config) -> TTSEngine:
+        """Parse and validate TTS engine configuration."""
         tts_engine_str = get_config("tts.engine", "piper")
         if not tts_engine_str:
             raise ValueError("Missing required configuration: tts.engine")
         tts_engine_str = str(tts_engine_str).strip().lower()
         try:
-            tts_engine = TTSEngine(tts_engine_str)
+            return TTSEngine(tts_engine_str)
         except ValueError as e:
             valid_engines = [e.value for e in TTSEngine]
             raise ValueError(f"Invalid TTS engine '{tts_engine_str}'. Must be one of: {valid_engines}") from e
 
-        # Process file extensions before creating config
+    @classmethod
+    def _parse_file_extensions(cls, get_config) -> dict[str, frozenset[str]]:
+        """Parse allowed and audio extensions from YAML configuration."""
+        # Process allowed extensions
         allowed_ext = get_config("files.allowed_extensions", ["pdf"])
         allowed_extensions: frozenset[str]
         if isinstance(allowed_ext, list):
@@ -147,6 +191,7 @@ class SystemConfig:
         else:
             allowed_extensions = frozenset(ext.strip() for ext in str(allowed_ext).split(","))
 
+        # Process audio extensions
         audio_ext = get_config("files.audio_extensions", ["wav", "mp3"])
         audio_extensions: frozenset[str]
         if isinstance(audio_ext, list):
@@ -154,101 +199,128 @@ class SystemConfig:
         else:
             audio_extensions = frozenset(ext.strip() for ext in str(audio_ext).split(","))
 
-        # Create config from YAML with proper type parsing
-        config = cls(
-            tts_engine=tts_engine,
-            # App settings
-            upload_folder=cls._parse_string_value(get_config("files.upload_folder", "uploads"), "uploads"),
-            audio_folder=cls._parse_string_value(get_config("files.audio_folder", "audio_outputs"), "audio_outputs"),
-            max_file_size_mb=cls._parse_int_value(
+        return {
+            "allowed_extensions": allowed_extensions,
+            "audio_extensions": audio_extensions,
+        }
+
+    @classmethod
+    def _parse_file_settings(cls, get_config) -> dict[str, object]:
+        """Parse file-related configuration settings."""
+        return {
+            "upload_folder": cls._parse_string_value(get_config("files.upload_folder", "uploads"), "uploads"),
+            "audio_folder": cls._parse_string_value(get_config("files.audio_folder", "audio_outputs"), "audio_outputs"),
+            "max_file_size_mb": cls._parse_int_value(
                 get_config("files.max_file_size_mb", 20), 20, min_val=1, max_val=1000
             ),
-            # Text processing
-            enable_text_cleaning=cls._parse_bool_value(get_config("text_processing.enable_text_cleaning", True), True),
-            enable_natural_formatting=cls._parse_bool_value(
+        }
+
+    @classmethod
+    def _parse_text_processing_settings(cls, get_config) -> dict[str, object]:
+        """Parse text processing configuration settings."""
+        return {
+            "enable_text_cleaning": cls._parse_bool_value(get_config("text_processing.enable_text_cleaning", True), True),
+            "enable_natural_formatting": cls._parse_bool_value(
                 get_config("text_processing.enable_natural_formatting", True), True
             ),
-            chunk_size=cls._parse_int_value(
+            "chunk_size": cls._parse_int_value(
                 get_config("text_processing.chunk_size", 4000), 4000, min_val=1000, max_val=100000
             ),
-            llm_chunk_size=cls._parse_int_value(
+            "llm_chunk_size": cls._parse_int_value(
                 get_config("text_processing.llm_chunk_size", 50000), 50000, min_val=10000, max_val=200000
             ),
-            audio_target_chunk_size=cls._parse_int_value(
-                get_config("text_processing.audio_target_chunk_size", 2000), 2000, min_val=100, max_val=10000
+            "audio_target_chunk_size": cls._parse_int_value(
+                get_config("text_processing.audio_target_chunk_size", 3000), 3000, min_val=100, max_val=10000
             ),
-            audio_max_chunk_size=cls._parse_int_value(
-                get_config("text_processing.audio_max_chunk_size", 3000), 3000, min_val=100, max_val=20000
+            "audio_max_chunk_size": cls._parse_int_value(
+                get_config("text_processing.audio_max_chunk_size", 5000), 5000, min_val=100, max_val=20000
             ),
-            # Performance
-            enable_async_audio=cls._parse_bool_value(get_config("performance.enable_async_audio", True), True),
-            audio_concurrent_chunks=cls._parse_int_value(
+        }
+
+    @classmethod
+    def _parse_performance_settings(cls, get_config) -> dict[str, object]:
+        """Parse performance and resource management settings."""
+        return {
+            "enable_async_audio": cls._parse_bool_value(get_config("performance.enable_async_audio", True), True),
+            "audio_concurrent_chunks": cls._parse_int_value(
                 get_config("audio.concurrent_chunks", 4), 4, min_val=1, max_val=20
             ),
-            # TTS API settings
-            tts_concurrent_requests=cls._parse_int_value(
+            "tts_concurrent_requests": cls._parse_int_value(
                 get_config("tts.concurrent_requests", 4), 4, min_val=1, max_val=10
             ),
-            tts_request_delay_seconds=cls._parse_float_value(
+            "tts_request_delay_seconds": cls._parse_float_value(
                 get_config("tts.request_delay_seconds", 2.0), 2.0, min_val=0.1, max_val=10.0
             ),
-            # File cleanup
-            enable_file_cleanup=cls._parse_bool_value(get_config("files.cleanup.enabled", True), True),
-            max_file_age_hours=cls._parse_float_value(
+            "enable_file_cleanup": cls._parse_bool_value(get_config("files.cleanup.enabled", True), True),
+            "max_file_age_hours": cls._parse_float_value(
                 get_config("files.cleanup.max_file_age_hours", 24.0), 24.0, min_val=0.1, max_val=168.0
             ),
-            auto_cleanup_interval_hours=cls._parse_float_value(
+            "auto_cleanup_interval_hours": cls._parse_float_value(
                 get_config("files.cleanup.auto_cleanup_interval_hours", 6.0), 6.0, min_val=0.1, max_val=24.0
             ),
-            max_disk_usage_mb=cls._parse_int_value(
-                get_config("files.cleanup.max_disk_usage_mb", 500), 500, min_val=10, max_val=10000
+            "max_disk_usage_mb": cls._parse_int_value(
+                get_config("files.cleanup.max_disk_usage_mb", 1000), 1000, min_val=10, max_val=10000
             ),
-            # LLM settings (for text cleaning)
-            llm_model_name=cls._parse_optional_string_value(get_config("llm.model_name")),
-            llm_concurrent_requests=cls._parse_int_value(
+        }
+
+    @classmethod
+    def _parse_llm_and_tts_settings(cls, get_config) -> dict[str, object]:
+        """Parse LLM and TTS provider configuration settings."""
+        return {
+            # LLM settings
+            "llm_model_name": cls._parse_optional_string_value(get_config("llm.model_name")),
+            "llm_concurrent_requests": cls._parse_int_value(
                 get_config("llm.concurrent_requests", 3), 3, min_val=1, max_val=10
             ),
-            llm_request_delay_seconds=cls._parse_float_value(
+            "llm_request_delay_seconds": cls._parse_float_value(
                 get_config("llm.request_delay_seconds", 0.5), 0.5, min_val=0.1, max_val=5.0
             ),
-            # Gemini TTS specific settings
-            gemini_api_key=cls._parse_optional_string_value(get_config("secrets.google_ai_api_key")),
-            gemini_model_name=cls._parse_string_value(get_config("tts.gemini.model_name", "gemini-2.5-flash-preview-tts"), "gemini-2.5-flash-preview-tts"),
-            gemini_voice_name=cls._parse_string_value(get_config("tts.gemini.voice_name", "Kore"), "Kore"),
-            gemini_use_measurement_mode=cls._parse_bool_value(
+            # Gemini TTS settings
+            "gemini_api_key": cls._parse_optional_string_value(get_config("secrets.google_ai_api_key")),
+            "gemini_model_name": cls._parse_string_value(
+                get_config("tts.gemini.model_name", "gemini-2.5-flash-preview-tts"), "gemini-2.5-flash-preview-tts"
+            ),
+            "gemini_voice_name": cls._parse_string_value(get_config("tts.gemini.voice_name", "Kore"), "Kore"),
+            "gemini_use_measurement_mode": cls._parse_bool_value(
                 get_config("tts.gemini.use_measurement_mode", False), False
             ),
-            gemini_measurement_mode_interval=cls._parse_float_value(
+            "gemini_measurement_mode_interval": cls._parse_float_value(
                 get_config("tts.gemini.measurement_mode_interval", 0.8), 0.8, min_val=0.1, max_val=5.0
             ),
             # Piper settings
-            piper_model_name=cls._parse_string_value(get_config("tts.piper.model_name", "en_US-lessac-medium"), "en_US-lessac-medium"),
-            piper_models_dir=cls._parse_string_value(get_config("tts.piper.models_dir", "piper_models"), "piper_models"),
-            piper_length_scale=cls._parse_float_value(
+            "piper_model_name": cls._parse_string_value(
+                get_config("tts.piper.model_name", "en_US-lessac-medium"), "en_US-lessac-medium"
+            ),
+            "piper_models_dir": cls._parse_string_value(
+                get_config("tts.piper.models_dir", "piper_models"), "piper_models"
+            ),
+            "piper_length_scale": cls._parse_float_value(
                 get_config("tts.piper.length_scale", 1.0), 1.0, min_val=0.5, max_val=2.0
             ),
+        }
+
+    @classmethod
+    def _parse_system_settings(cls, get_config) -> dict[str, object]:
+        """Parse system-level configuration settings."""
+        return {
             # OCR settings
-            ocr_dpi=cls._parse_int_value(get_config("ocr.dpi", 300), 300, min_val=150, max_val=600),
-            ocr_threshold=cls._parse_int_value(get_config("ocr.threshold", 180), 180, min_val=100, max_val=240),
-            ocr_language=cls._parse_string_value(get_config("ocr.language", "eng"), "eng"),
+            "ocr_dpi": cls._parse_int_value(get_config("ocr.dpi", 300), 300, min_val=150, max_val=600),
+            "ocr_threshold": cls._parse_int_value(get_config("ocr.threshold", 180), 180, min_val=100, max_val=240),
+            "ocr_language": cls._parse_string_value(get_config("ocr.language", "eng"), "eng"),
             # Flask application settings
-            flask_debug=cls._parse_bool_value(get_config("app.debug", True), True),
-            flask_host=cls._parse_string_value(get_config("app.host", "127.0.0.1"), "127.0.0.1"),  # Secure default: localhost only
-            flask_port=cls._parse_int_value(get_config("app.port", 5000), 5000, min_val=1000, max_val=65535),
+            "flask_debug": cls._parse_bool_value(get_config("app.debug", True), True),
+            "flask_host": cls._parse_string_value(
+                get_config("app.host", "127.0.0.1"), "127.0.0.1"
+            ),  # Secure default: localhost only
+            "flask_port": cls._parse_int_value(get_config("app.port", 5000), 5000, min_val=1000, max_val=65535),
             # Model repository settings
-            piper_model_repository_url=cls._parse_string_value(
-                get_config("tts.piper.model_repository_url", "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0"),
-                "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0"
+            "piper_model_repository_url": cls._parse_string_value(
+                get_config(
+                    "tts.piper.model_repository_url", "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0"
+                ),
+                "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0",
             ),
-            # File extensions (processed above)
-            allowed_extensions=allowed_extensions,
-            audio_extensions=audio_extensions,
-        )
-
-        # Extensions are now handled in constructor
-
-        config.validate()
-        return config
+        }
 
     def validate(self) -> None:
         """Validate configuration and fail fast with clear error messages."""
