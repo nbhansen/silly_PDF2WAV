@@ -1,5 +1,6 @@
 # tests/benchmarks/test_core_performance.py
 """Core performance benchmarks for immutable design patterns.
+
 Focuses on the key refactored components.
 """
 
@@ -48,7 +49,7 @@ class TestChunkingPerformance:
         """Benchmark sentence-based chunking with immutable list comprehensions."""
         chunker = SentenceBasedChunking()
 
-        def chunk_text():
+        def chunk_text() -> list[str]:
             return chunker.chunk_text(large_text_chunks, max_chunk_size=1500)
 
         result = benchmark(chunk_text)
@@ -58,7 +59,7 @@ class TestChunkingPerformance:
         """Benchmark word-based chunking with immutable patterns."""
         chunker = WordBasedChunking()
 
-        def chunk_text():
+        def chunk_text() -> list[str]:
             return chunker.chunk_text(large_text_chunks, max_chunk_size=1200)
 
         result = benchmark(chunk_text)
@@ -71,7 +72,7 @@ class TestDataStructurePerformance:
     def test_frozen_dataclass_creation_performance(self, benchmark):
         """Benchmark creation of frozen TextSegment dataclasses."""
 
-        def create_frozen_segments():
+        def create_frozen_segments() -> list[TextSegment]:
             segments = [
                 TextSegment(
                     text=f"Frozen segment {i}",
@@ -91,7 +92,7 @@ class TestDataStructurePerformance:
     def test_dataclass_replace_vs_mutation_performance(self, benchmark, sample_text_segments):
         """Benchmark dataclasses.replace() for immutable updates."""
 
-        def update_with_replace():
+        def update_with_replace() -> list[TextSegment]:
             updated_segments = [
                 dataclasses_replace(segment, start_time=segment.start_time + 5.0) for segment in sample_text_segments
             ]
@@ -108,7 +109,7 @@ class TestMappingProxyPerformance:
     def test_mapping_proxy_creation_performance(self, benchmark):
         """Benchmark creating MappingProxyType from large dict."""
 
-        def create_proxy():
+        def create_proxy() -> types.MappingProxyType[str, str]:
             base_dict = {f"service_{i}": f"factory_{i}" for i in range(500)}
             return types.MappingProxyType(base_dict)
 
@@ -120,7 +121,7 @@ class TestMappingProxyPerformance:
         base_dict = {f"key_{i}": f"value_{i}" for i in range(1000)}
         proxy = types.MappingProxyType(base_dict)
 
-        def lookup_from_proxy():
+        def lookup_from_proxy() -> list[str]:
             results = []
             for i in range(0, 100, 2):  # Every other key
                 key = f"key_{i}"
@@ -138,7 +139,7 @@ class TestListComprehensionPerformance:
     def test_nested_comprehension_flattening(self, benchmark, large_text_chunks):
         """Benchmark nested comprehensions for text processing."""
 
-        def flatten_words():
+        def flatten_words() -> list[str]:
             # Pattern similar to our chunking strategy refactoring
             return [
                 word.lower()
@@ -155,7 +156,7 @@ class TestListComprehensionPerformance:
         """Benchmark filtering with comprehensions."""
         data = list(range(5000))
 
-        def filter_with_comprehension():
+        def filter_with_comprehension() -> list[int]:
             return [x for x in data if x % 3 == 0 and x > 100]
 
         result = benchmark(filter_with_comprehension)
@@ -168,7 +169,7 @@ class TestMemoryEfficiency:
     def test_large_frozen_dataclass_creation(self, benchmark):
         """Test creation of many frozen dataclasses."""
 
-        def create_many_segments():
+        def create_many_segments() -> list[TextSegment]:
             return [
                 TextSegment(
                     text=f"Memory test segment {i}",
@@ -187,7 +188,7 @@ class TestMemoryEfficiency:
     def test_immutable_container_efficiency(self, benchmark):
         """Test efficiency of immutable containers."""
 
-        def create_immutable_structures():
+        def create_immutable_structures() -> list[types.MappingProxyType[str, int]]:
             # Create multiple immutable structures
             containers = []
             for batch in range(10):

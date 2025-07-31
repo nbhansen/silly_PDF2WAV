@@ -1,4 +1,5 @@
 """Tesseract OCR provider implementation for optical character recognition and PDF processing.
+
 Combines direct text extraction with OCR fallback for reliable text extraction.
 """
 
@@ -20,7 +21,7 @@ class TesseractOCRProvider(IOCRProvider):
         self,
         tesseract_cmd: Optional[str] = None,
         poppler_path_custom: Optional[str] = None,
-        config: Optional[Any] = None,
+        config: Optional[object] = None,
     ) -> None:
         if tesseract_cmd:
             pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
@@ -231,8 +232,8 @@ class TesseractOCRProvider(IOCRProvider):
                     )
 
             # Validate range consistency
-            if page_range.start_page is not None and page_range.end_page is not None:
-                if page_range.start_page > page_range.end_page:
+            if (page_range.start_page is not None and page_range.end_page is not None
+                and page_range.start_page > page_range.end_page):
                     return self._error_result(
                         f"Start page ({page_range.start_page}) cannot be greater than end page ({page_range.end_page})",
                         total_pages,

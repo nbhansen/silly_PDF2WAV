@@ -1,5 +1,6 @@
 # tests/unit/test_error_handling_tdd.py
 """TDD tests for Error Handling System - comprehensive coverage following red-green-refactor cycle.
+
 Tests error creation, result types, error classification, and error factory functions.
 """
 

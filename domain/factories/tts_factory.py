@@ -18,4 +18,6 @@ def create_tts_engine(config: "SystemConfig") -> "ITTSEngine":
     if not isinstance(piper_config, PiperConfig):
         raise TypeError("Expected PiperConfig but got dict fallback")
 
-    return PiperTTSProvider(piper_config, repository_url=config.piper_model_repository_url)
+    return PiperTTSProvider(
+        config=piper_config, repository_url=config.piper_model_repository_url, project_root=config.project_root
+    )

@@ -1,5 +1,6 @@
 # domain/text/chunking_strategy.py - Text Chunking Strategies
 """Text chunking strategies for optimal TTS processing.
+
 Extracted from AudioEngine to follow Single Responsibility Principle.
 """
 
@@ -129,6 +130,7 @@ class WordBasedChunking(IChunkingStrategy):
 
 class ChunkingService:
     """Service for text chunking with configurable strategies.
+
     High cohesion: All chunking logic in one place.
     Low coupling: Strategy pattern allows different implementations.
     """

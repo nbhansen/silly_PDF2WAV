@@ -6,9 +6,11 @@ Replaces: AudioGenerationService, AudioGenerationCoordinator, AudioProcessor, Au
 
 from abc import ABC, abstractmethod
 import asyncio
+from collections.abc import Awaitable
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Optional
 
 from ..errors import Result, audio_generation_error
 from ..interfaces import IFileManager, ITTSEngine
@@ -47,7 +49,7 @@ class IAudioEngine(ABC):
 
 class AudioEngine(IAudioEngine):
     """Unified audio engine that consolidates all audio-related operations.
-    
+
     High cohesion: All audio operations in one place.
     Low coupling: Depends only on abstractions (ITTSEngine, IFileManager).
     """
@@ -79,12 +81,14 @@ class AudioEngine(IAudioEngine):
 
     def generate_with_timing(self, text_chunks: list[str], output_filename: str) -> TimedAudioResult:
         """Main entry point for audio generation with timing.
+
         Delegates to timing engine for strategy-specific processing.
         """
         return self.timing_engine.generate_with_timing(text_chunks, output_filename)
 
     def generate_simple_audio(self, text_chunks: list[str], output_filename: str) -> TimedAudioResult:
         """Simple audio generation without timing complexity - bypasses TimingEngine.
+
         Perfect for regular uploads that don't need timing data.
         """
         print(f"AudioEngine: Generating simple audio for {len(text_chunks)} chunks")
@@ -135,11 +139,9 @@ class AudioEngine(IAudioEngine):
             conversion_result = self._convert_wav_to_mp3(temp_wav_path, str(mp3_path))
 
             # Clean up temporary WAV file
-            try:
+            # Ignore file cleanup errors - temporary files may already be removed
+            with suppress(OSError, FileNotFoundError):
                 Path(temp_wav_path).unlink()
-            except (OSError, FileNotFoundError):
-                # Ignore file cleanup errors - temporary files may already be removed
-                pass
 
             if conversion_result.is_success:
                 print(f"AudioEngine: Simple audio generated and converted to MP3: {mp3_filename}")
@@ -265,7 +267,9 @@ class AudioEngine(IAudioEngine):
 
         return audio_chunks
 
-    async def _limited_chunk_processing(self, semaphore: asyncio.Semaphore, task: Any) -> Optional[bytes]:
+    async def _limited_chunk_processing(
+        self, semaphore: asyncio.Semaphore, task: Awaitable[Optional[bytes]]
+    ) -> Optional[bytes]:
         """Apply semaphore limiting to chunk processing."""
         async with semaphore:
             result = await task
@@ -415,11 +419,9 @@ class AudioEngine(IAudioEngine):
             result = subprocess.run(cmd, capture_output=True, timeout=300)
 
             # Clean up list file
-            try:
+            # Ignore file cleanup errors - temporary files may already be removed
+            with suppress(OSError, FileNotFoundError):
                 Path(list_file).unlink()
-            except (OSError, FileNotFoundError):
-                # Ignore file cleanup errors - temporary files may already be removed
-                pass
 
             if result.returncode == 0:
                 return Result.success(output_path)

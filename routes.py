@@ -116,7 +116,7 @@ def register_routes(app: Flask) -> None:
         import json
 
         try:
-            with open(timing_path) as f:
+            with timing_path.open() as f:
                 timing_json = json.load(f)
                 timing_segments = timing_json.get("text_segments", [])
         except Exception as e:
@@ -140,7 +140,7 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "Timing data not found"}), 404
 
         try:
-            with open(timing_path, encoding="utf-8") as f:
+            with timing_path.open(encoding="utf-8") as f:
                 timing_data = json.load(f)
 
             return jsonify(timing_data)
@@ -164,16 +164,16 @@ def register_routes(app: Flask) -> None:
         try:
             # Save temporary file
             original_filename = secure_filename(file.filename)
-            temp_path = os.path.join(app.config["UPLOAD_FOLDER"], f"temp_{original_filename}")
-            file.save(temp_path)
+            temp_path = Path(app.config["UPLOAD_FOLDER"]) / f"temp_{original_filename}"
+            file.save(str(temp_path))
 
             # Use document engine to get PDF info
             document_engine = service.get("IDocumentEngine")
-            pdf_info = document_engine.get_pdf_info(temp_path)
+            pdf_info = document_engine.get_pdf_info(str(temp_path))
 
             # Clean up
             with contextlib.suppress(Exception):
-                os.remove(temp_path)
+                temp_path.unlink()
 
             return jsonify({"total_pages": pdf_info.total_pages, "title": pdf_info.title, "author": pdf_info.author})
 
@@ -255,19 +255,19 @@ def register_routes(app: Flask) -> None:
                     return jsonify(stats)
                 else:
                     # Fallback: create basic stats manually
-                    audio_dir = app.config["AUDIO_FOLDER"]
-                    if os.path.exists(audio_dir):
-                        files = os.listdir(audio_dir)
+                    audio_dir = Path(app.config["AUDIO_FOLDER"])
+                    if audio_dir.exists():
+                        files = list(audio_dir.iterdir())
                         total_size = sum(
-                            os.path.getsize(os.path.join(audio_dir, f))
+                            f.stat().st_size
                             for f in files
-                            if os.path.isfile(os.path.join(audio_dir, f))
+                            if f.is_file()
                         )
 
                         stats = {
                             "total_files": len(files),
                             "total_size_mb": total_size / (1024 * 1024),
-                            "directory": audio_dir,
+                            "directory": str(audio_dir),
                             "cleanup_enabled": get_app_config().enable_file_cleanup,
                         }
                         return jsonify(stats)
@@ -297,7 +297,7 @@ def register_routes(app: Flask) -> None:
                     return jsonify(result)
                 else:
                     # Fallback: manual cleanup logic
-                    audio_dir = app.config["AUDIO_FOLDER"]
+                    audio_dir = Path(app.config["AUDIO_FOLDER"])
                     cutoff_time = time.time() - (max_age_hours * 3600)
 
                     removed_files = 0
@@ -305,19 +305,18 @@ def register_routes(app: Flask) -> None:
                     errors = []
 
                     try:
-                        for filename in os.listdir(audio_dir):
-                            filepath = os.path.join(audio_dir, filename)
-                            if os.path.isfile(filepath):
-                                file_age = os.path.getmtime(filepath)
+                        for filepath in Path(audio_dir).iterdir():
+                            if filepath.is_file():
+                                file_age = filepath.stat().st_mtime
                                 if file_age < cutoff_time:
                                     try:
-                                        file_size = os.path.getsize(filepath)
-                                        os.remove(filepath)
+                                        file_size = filepath.stat().st_size
+                                        filepath.unlink()
                                         removed_files += 1
                                         bytes_freed += file_size
-                                        get_logger("routes").info("Cleaned up old file: %s", filename)
+                                        get_logger("routes").info("Cleaned up old file: %s", filepath.name)
                                     except Exception as e:
-                                        errors.append(f"Failed to remove {filename}: {e!s}")
+                                        errors.append(f"Failed to remove {filepath.name}: {e!s}")
 
                         result = {
                             "files_removed": removed_files,
@@ -414,7 +413,7 @@ def process_upload_request(
 
         # Clean up uploaded file
         with contextlib.suppress(Exception):
-            os.remove(file_info.pdf_path)
+            Path(file_info.pdf_path).unlink()
 
         if not processing_result.success or not processing_result.audio_files:
             return processing_result, file_info.original_filename, file_info.base_filename, None
@@ -438,9 +437,9 @@ def _process_uploaded_file(uploaded_file: FileStorage, request_form: object) -> 
     if not uploaded_file.filename:
         raise ValueError("No filename provided")
     original_filename = secure_filename(uploaded_file.filename)
-    base_filename_no_ext = os.path.splitext(original_filename)[0]
-    pdf_path = os.path.join(config.upload_folder, original_filename)
-    uploaded_file.save(pdf_path)
+    base_filename_no_ext = Path(original_filename).stem
+    pdf_path = Path(config.upload_folder) / original_filename
+    uploaded_file.save(str(pdf_path))
 
     # Parse and validate page range
     page_range = parse_page_range_from_form(request_form)
@@ -448,15 +447,15 @@ def _process_uploaded_file(uploaded_file: FileStorage, request_form: object) -> 
     if not page_range.is_full_document():
         services = _configure_processing_services()
         document_engine = services.document_engine
-        validation = document_engine.validate_page_range(pdf_path, page_range)
+        validation = document_engine.validate_page_range(str(pdf_path), page_range)
         if not validation.get("valid", False):
             # Clean up file before returning error
             with contextlib.suppress(Exception):
-                os.remove(pdf_path)
+                pdf_path.unlink()
             return FileProcessingInfo(
                 original_filename=original_filename,
                 base_filename=base_filename_no_ext,
-                pdf_path=pdf_path,
+                pdf_path=str(pdf_path),
                 page_range=page_range,
                 error=f"Error: {validation.get('error', 'Invalid page range')}",
             )
@@ -464,7 +463,7 @@ def _process_uploaded_file(uploaded_file: FileStorage, request_form: object) -> 
     return FileProcessingInfo(
         original_filename=original_filename,
         base_filename=base_filename_no_ext,
-        pdf_path=pdf_path,
+        pdf_path=str(pdf_path),
         page_range=page_range,
     )
 
@@ -621,10 +620,10 @@ def save_timing_data(base_filename: str, timing_metadata: TimingMetadata) -> Non
     }
 
     timing_filename = f"{base_filename}_timing.json"
-    timing_path = os.path.join(get_app_config().audio_folder, timing_filename)
+    timing_path = Path(get_app_config().audio_folder) / timing_filename
 
     try:
-        with open(timing_path, "w", encoding="utf-8") as f:
+        with timing_path.open("w", encoding="utf-8") as f:
             json.dump(timing_json, f, indent=2, ensure_ascii=False)
 
         get_logger("routes").info("Saved timing data: %s", timing_filename)

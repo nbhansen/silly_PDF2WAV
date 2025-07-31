@@ -1,6 +1,7 @@
 # application/config/system_config.py
 from dataclasses import dataclass
 from enum import Enum
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union
 
@@ -90,6 +91,9 @@ class SystemConfig:
     flask_host: str = "127.0.0.1"  # Secure default: localhost only
     flask_port: int = 5000
 
+    # Security: Project root path (auto-detected, environment override allowed)
+    project_root: str = ""
+
     # Text processing
     audio_target_chunk_size: int = 3000
     audio_max_chunk_size: int = 5000
@@ -100,6 +104,11 @@ class SystemConfig:
             object.__setattr__(self, "allowed_extensions", frozenset({"pdf"}))
         if self.audio_extensions is None:
             object.__setattr__(self, "audio_extensions", frozenset({"wav", "mp3"}))
+
+        # Security: Initialize project_root if not set
+        if not self.project_root:
+            secure_root = self._get_secure_project_root()
+            object.__setattr__(self, "project_root", secure_root)
 
     @classmethod
     def from_yaml(cls, config_path: str = "config.yaml") -> "SystemConfig":
@@ -339,14 +348,13 @@ class SystemConfig:
         if self.tts_engine == TTSEngine.PIPER and not self.piper_model_name:
             raise ValueError("PIPER_MODEL_NAME cannot be empty when using Piper TTS")
 
-        # Validate directory names
+        # Security validation for all directory paths
         for folder_name, folder_path in [
             ("UPLOAD_FOLDER", self.upload_folder),
             ("AUDIO_FOLDER", self.audio_folder),
             ("PIPER_MODELS_DIR", self.piper_models_dir),
         ]:
-            if not folder_path or folder_path.isspace():
-                raise ValueError(f"{folder_name} cannot be empty or whitespace")
+            self._validate_directory_security(folder_name, folder_path, self.project_root)
 
         # Validate file management settings
         if self.enable_file_cleanup:
@@ -356,6 +364,42 @@ class SystemConfig:
                 raise ValueError("AUTO_CLEANUP_INTERVAL_HOURS must be positive when file cleanup is enabled")
             if self.max_disk_usage_mb <= 0:
                 raise ValueError("MAX_DISK_USAGE_MB must be positive when file cleanup is enabled")
+
+    @staticmethod
+    def _get_secure_project_root() -> str:
+        """Get secure project root path with environment override support."""
+        # Allow environment override (for deployment flexibility)
+        env_root = os.environ.get("PROJECT_ROOT")
+        if env_root:
+            # Validate environment path for security
+            env_path = Path(env_root).resolve()
+            if env_path.exists() and env_path.is_dir():
+                return str(env_path)
+
+        # Default to current working directory (deployment-safe)
+        return str(Path.cwd())
+
+    @staticmethod
+    def _validate_directory_security(name: str, path: str, project_root: str) -> None:
+        """Validate directory path for security vulnerabilities."""
+        if not path or path.isspace():
+            raise ValueError(f"{name} cannot be empty or whitespace")
+
+        # Convert to Path object for security validation
+        path_obj = Path(path)
+
+        # If relative path, resolve relative to project root
+        if not path_obj.is_absolute():
+            path_obj = Path(project_root) / path_obj
+
+        path_resolved = path_obj.resolve()
+        project_resolved = Path(project_root).resolve()
+
+        # Prevent path traversal outside project boundaries
+        try:
+            path_resolved.relative_to(project_resolved)
+        except ValueError as e:
+            raise ValueError(f"{name} must be within project directory: {path}") from e
 
     @staticmethod
     def _parse_string_value(value: YAMLValue, default: str) -> str:

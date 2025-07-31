@@ -1,5 +1,6 @@
 # tests/unit/test_domain_models_tdd.py
 """TDD tests for domain models - comprehensive coverage following red-green-refactor cycle.
+
 Tests written first to drive implementation and ensure all edge cases are covered.
 """
 
@@ -282,7 +283,7 @@ class TestFileInfo:
 
     def test_file_info_with_zero_size(self):
         """Should handle zero-byte files."""
-        file_info = FileInfo(filename="empty.txt", full_path="/tmp/empty.txt", size_bytes=0, created_at=datetime.now())
+        file_info = FileInfo(filename="empty.txt", full_path="/secure/path/empty.txt", size_bytes=0, created_at=datetime.now())
 
         assert file_info.size_mb == 0.0
         assert file_info.size_bytes == 0

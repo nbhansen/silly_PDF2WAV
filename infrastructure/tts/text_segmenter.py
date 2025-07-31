@@ -1,5 +1,6 @@
 # infrastructure/tts/text_segmenter.py
-"""Shared text processing utilities for TTS engines
+"""Shared text processing utilities for TTS engines.
+
 Only includes universal text processing that all TTS engines need.
 """
 

@@ -1,4 +1,5 @@
 """Defines the abstract interfaces for the application's core services.
+
 These interfaces allow for decoupling the application logic from specific
 implementations, facilitating testing and modularity.
 """
@@ -89,6 +90,7 @@ class ILLMProvider(ABC):
     @abstractmethod
     async def generate_content_async(self, prompt: str) -> Result[str]:
         """Generates content based on a prompt asynchronously.
+
         For providers that don't support native async, this can wrap the sync method.
         """
 
@@ -123,6 +125,7 @@ class ITTSEngine(ABC):
     @abstractmethod
     async def generate_audio_data_async(self, text_to_speak: str) -> Result[bytes]:
         """Generates raw audio data from text asynchronously.
+
         For engines that don't support native async, this can wrap the sync method.
 
         Returns:
@@ -139,6 +142,7 @@ class ITTSEngine(ABC):
 
 class IEnhancedTTSEngine(ITTSEngine):
     """Enhanced TTS interface that consolidates audio processing capabilities.
+
     Replaces separate IAudioProcessor and IEngineCapabilityDetector interfaces.
     """
 
@@ -171,7 +175,8 @@ class IEnhancedTTSEngine(ITTSEngine):
 
 
 class ITimestampedTTSEngine(ITTSEngine):
-    """An interface for TTS engines that can return synchronization timestamps
+    """An interface for TTS engines that can return synchronization timestamps.
+
     along with the generated audio. This is the 'ideal path'.
     """
 

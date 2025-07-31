@@ -1,5 +1,6 @@
 # domain/container/service_container.py - Simple Service Container
 """Clean, minimal service container that replaces the complex CompositionRoot.
+
 Focuses on dependency injection without over-engineering.
 Uses immutable MappingProxyType for true immutability.
 """
@@ -20,7 +21,9 @@ T = TypeVar("T")
 class ServiceFactory(Protocol):
     """Protocol for service factories."""
 
-    def __call__(self) -> object: ...
+    def __call__(self) -> object:
+        """Create and return a service instance."""
+        ...
 
 
 # Service key type - either a type or string identifier
@@ -41,6 +44,7 @@ class IServiceContainer(ABC):
 
 class ServiceContainer(IServiceContainer):
     """Immutable service container with lazy initialization.
+
     High cohesion: All dependency injection in one place.
     Low coupling: Uses factories to avoid tight dependencies.
     Thread-safe: Uses immutable MappingProxyType for factories.
@@ -156,10 +160,18 @@ class ServiceContainer(IServiceContainer):
                 piper_config = PiperConfig(**piper_config)
             # Handle both the full PiperTTSProvider and the fallback version
             try:
-                return PiperTTSProvider(config=piper_config, repository_url=self.config.piper_model_repository_url)
+                return PiperTTSProvider(
+                    config=piper_config,
+                    repository_url=self.config.piper_model_repository_url,
+                    project_root=self.config.project_root,
+                )
             except TypeError:
                 # Fallback version only takes config parameter
-                return PiperTTSProvider(config=piper_config)
+                try:
+                    return PiperTTSProvider(config=piper_config, project_root=self.config.project_root)
+                except TypeError:
+                    # Ultimate fallback - config only
+                    return PiperTTSProvider(config=piper_config)
 
 
 class ImmutableServiceContainerBuilder:

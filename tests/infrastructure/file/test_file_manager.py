@@ -1,5 +1,6 @@
 # tests/infrastructure/file/test_file_manager.py
 """Comprehensive unit tests for FileManager implementation.
+
 Tests initialization, file operations, security controls, and error handling.
 """
 
@@ -22,22 +23,22 @@ class TestFileManagerInitialization:
 
         manager = FileManager(upload_path, output_path)
 
-        assert manager.upload_folder == os.path.abspath(upload_path)
-        assert manager.output_folder == os.path.abspath(output_path)
-        assert os.path.exists(manager.upload_folder)
-        assert os.path.exists(manager.output_folder)
+        assert manager.upload_folder == str(Path(upload_path).resolve())
+        assert manager.output_folder == str(Path(output_path).resolve())
+        assert Path(manager.upload_folder).exists()
+        assert Path(manager.output_folder).is_absolute().exists()
 
     def test_init_converts_relative_paths_to_absolute(self, temp_dir):
         """Should convert relative paths to absolute paths."""
         # Change to temp_dir to make relative paths work
-        original_cwd = os.getcwd()
+        original_cwd = str(Path.cwd())
         try:
             os.chdir(str(temp_dir))
 
             manager = FileManager("./uploads", "./outputs")
 
-            assert os.path.isabs(manager.upload_folder)
-            assert os.path.isabs(manager.output_folder)
+            assert Path(manager.upload_folder).is_absolute()
+            assert Path(manager.output_folder).is_absolute().is_absolute()
             assert manager.upload_folder.endswith("uploads")
             assert manager.output_folder.endswith("outputs")
         finally:
@@ -73,8 +74,8 @@ class TestFileManagerInitialization:
         manager = FileManager("", "")
 
         # Should have created directories in current working directory
-        assert os.path.isabs(manager.upload_folder)
-        assert os.path.isabs(manager.output_folder)
+        assert Path(manager.upload_folder).is_absolute()
+        assert Path(manager.output_folder).is_absolute()
 
 
 class TestFileManagerPathAccessors:
@@ -87,8 +88,8 @@ class TestFileManagerPathAccessors:
 
         result = manager.get_output_dir()
 
-        assert result == os.path.abspath(output_path)
-        assert os.path.isabs(result)
+        assert result == str(Path(output_path).resolve())
+        assert Path(result).is_absolute()
 
     def test_get_upload_dir_returns_absolute_path(self, temp_dir):
         """Should return absolute path to upload directory."""
@@ -97,8 +98,8 @@ class TestFileManagerPathAccessors:
 
         result = manager.get_upload_dir()
 
-        assert result == os.path.abspath(upload_path)
-        assert os.path.isabs(result)
+        assert result == str(Path(upload_path).resolve())
+        assert Path(result).is_absolute()
 
 
 class TestFileManagerTempFileOperations:
@@ -112,11 +113,11 @@ class TestFileManagerTempFileOperations:
         filepath = manager.save_temp_file(content)
 
         assert filepath.endswith(".tmp")
-        assert os.path.exists(filepath)
+        assert Path(filepath).exists()
         assert filepath.startswith(manager.output_folder)
 
         # Verify content
-        with open(filepath, "rb") as f:
+        with Path(filepath).open("rb") as f:
             assert f.read() == content
 
     def test_save_temp_file_creates_file_with_custom_suffix(self, temp_dir):
@@ -127,10 +128,10 @@ class TestFileManagerTempFileOperations:
         filepath = manager.save_temp_file(content, suffix=".wav")
 
         assert filepath.endswith(".wav")
-        assert os.path.exists(filepath)
+        assert Path(filepath).exists()
 
         # Verify content
-        with open(filepath, "rb") as f:
+        with Path(filepath).open("rb") as f:
             assert f.read() == content
 
     def test_save_temp_file_handles_binary_content(self, temp_dir):
@@ -140,8 +141,8 @@ class TestFileManagerTempFileOperations:
 
         filepath = manager.save_temp_file(binary_content)
 
-        assert os.path.exists(filepath)
-        with open(filepath, "rb") as f:
+        assert Path(filepath).exists()
+        with Path(filepath).open("rb") as f:
             assert f.read() == binary_content
 
     def test_save_temp_file_handles_empty_content(self, temp_dir):
@@ -150,8 +151,8 @@ class TestFileManagerTempFileOperations:
 
         filepath = manager.save_temp_file(b"")
 
-        assert os.path.exists(filepath)
-        assert os.path.getsize(filepath) == 0
+        assert Path(filepath).exists()
+        assert Path(filepath).stat().st_size == 0
 
     def test_save_temp_file_handles_large_content(self, temp_dir):
         """Should handle large content without issues."""
@@ -160,8 +161,8 @@ class TestFileManagerTempFileOperations:
 
         filepath = manager.save_temp_file(large_content)
 
-        assert os.path.exists(filepath)
-        assert os.path.getsize(filepath) == len(large_content)
+        assert Path(filepath).exists()
+        assert Path(filepath).stat().st_size == len(large_content)
 
     @patch("tempfile.mkstemp")
     def test_save_temp_file_handles_permission_error(self, mock_mkstemp, temp_dir):
@@ -184,7 +185,7 @@ class TestFileManagerTempFileOperations:
 
         manager = FileManager(str(temp_dir / "uploads"), str(temp_dir / "outputs"))
 
-        with pytest.raises(IOError):
+        with pytest.raises(IOError, match="Write failed"):
             manager.save_temp_file(b"test content")
 
         # Verify file descriptor context manager was used
@@ -213,11 +214,11 @@ class TestFileManagerOutputFileOperations:
 
         filepath = manager.save_output_file(content, filename)
 
-        expected_path = os.path.join(manager.output_folder, filename)
+        expected_path = str(Path(manager.output_folder) / filename)
         assert filepath == expected_path
-        assert os.path.exists(filepath)
+        assert Path(filepath).exists()
 
-        with open(filepath, "rb") as f:
+        with Path(filepath).open("rb") as f:
             assert f.read() == content
 
     def test_save_output_file_sanitizes_filename_path_traversal(self, temp_dir):
@@ -238,8 +239,8 @@ class TestFileManagerOutputFileOperations:
             filepath = manager.save_output_file(content, malicious_filename)
 
             # Should only use basename, preventing traversal
-            expected_basename = os.path.basename(malicious_filename)
-            expected_path = os.path.join(manager.output_folder, expected_basename)
+            expected_basename = Path(malicious_filename).name
+            expected_path = str(Path(manager.output_folder) / expected_basename)
             assert filepath == expected_path
             assert filepath.startswith(manager.output_folder)
 
@@ -266,7 +267,7 @@ class TestFileManagerOutputFileOperations:
         for filename in special_filenames:
             filepath = manager.save_output_file(content, filename)
 
-            assert os.path.exists(filepath)
+            assert Path(filepath).exists()
             assert filepath.endswith(filename)
 
     def test_save_output_file_handles_long_filename(self, temp_dir):
@@ -278,9 +279,9 @@ class TestFileManagerOutputFileOperations:
         filepath = manager.save_output_file(content, long_filename)
 
         # Should create the file successfully
-        assert os.path.exists(filepath)
+        assert Path(filepath).exists()
         assert filepath.endswith("long_filename.txt")
-        with open(filepath, "rb") as f:
+        with Path(filepath).open("rb") as f:
             assert f.read() == content
 
     def test_save_output_file_overwrites_existing_file(self, temp_dir):
@@ -297,7 +298,7 @@ class TestFileManagerOutputFileOperations:
         filepath2 = manager.save_output_file(second_content, filename)
 
         assert filepath1 == filepath2
-        with open(filepath2, "rb") as f:
+        with Path(filepath2).open("rb") as f:
             assert f.read() == second_content
 
     @patch("builtins.open")
@@ -316,8 +317,8 @@ class TestFileManagerOutputFileOperations:
 
         filepath = manager.save_output_file(binary_content, "binary_test.bin")
 
-        assert os.path.exists(filepath)
-        with open(filepath, "rb") as f:
+        assert Path(filepath).exists()
+        with Path(filepath).open("rb") as f:
             assert f.read() == binary_content
 
 
@@ -392,7 +393,7 @@ class TestFileManagerDeletion:
         manager = FileManager(str(temp_dir / "uploads"), str(temp_dir / "outputs"))
 
         # Try to delete non-existent file in output directory
-        nonexistent_path = os.path.join(manager.output_folder, "nonexistent.txt")
+        nonexistent_path = str(Path(manager.output_folder) / "nonexistent.txt")
 
         # Should not raise an error
         manager.delete_file(nonexistent_path)
@@ -406,7 +407,7 @@ class TestFileManagerDeletion:
         test_file.write_text("test content")
 
         # Change directory and use relative path
-        original_cwd = os.getcwd()
+        original_cwd = str(Path.cwd())
         try:
             os.chdir(manager.output_folder)
 
@@ -424,22 +425,21 @@ class TestFileManagerDeletion:
         manager = FileManager(str(temp_dir / "uploads"), str(temp_dir / "outputs"))
 
         # Create test file path within managed directory
-        test_path = os.path.join(manager.output_folder, "test.txt")
+        test_path = str(Path(manager.output_folder) / "test.txt")
 
-        with patch("os.path.exists", return_value=True):
-            with pytest.raises(PermissionError):
-                manager.delete_file(test_path)
+        with patch("os.path.exists", return_value=True), pytest.raises(PermissionError):
+            manager.delete_file(test_path)
 
 
 class TestFileManagerErrorHandling:
     """Test error handling and edge cases."""
 
-    @patch("os.makedirs")
-    def test_init_handles_os_error_during_directory_creation(self, mock_makedirs, temp_dir):
+    @patch("pathlib.Path.mkdir")
+    def test_init_handles_os_error_during_directory_creation(self, mock_mkdir, temp_dir):
         """Should handle OS errors during directory creation."""
-        mock_makedirs.side_effect = OSError("Disk full")
+        mock_mkdir.side_effect = OSError("Disk full")
 
-        with pytest.raises(OSError):
+        with pytest.raises(OSError, match="Disk full"):
             FileManager(str(temp_dir / "uploads"), str(temp_dir / "outputs"))
 
     def test_save_temp_file_with_none_content_raises_error(self, temp_dir):
@@ -486,8 +486,8 @@ class TestFileManagerSecurityCompliance:
 
         manager = FileManager(upload_rel, output_rel)
 
-        assert os.path.isabs(manager.upload_folder)
-        assert os.path.isabs(manager.output_folder)
+        assert Path(manager.upload_folder).is_absolute()
+        assert Path(manager.output_folder).is_absolute()
 
     def test_directory_boundary_enforcement_comprehensive(self, temp_dir):
         """Should comprehensively test directory boundary enforcement."""
@@ -541,9 +541,9 @@ class TestFileManagerSecurityCompliance:
             # Should always be in output directory
             assert filepath.startswith(manager.output_folder)
             # Should only use the basename
-            expected_basename = os.path.basename(filename)
+            expected_basename = Path(filename).name
             assert filepath.endswith(expected_basename)
-            assert os.path.exists(filepath)
+            assert Path(filepath).exists()
 
 
 class TestFileManagerIntegration:
@@ -556,21 +556,21 @@ class TestFileManagerIntegration:
         # 1. Create temporary file
         temp_content = b"temporary audio data"
         temp_path = manager.save_temp_file(temp_content, suffix=".wav")
-        assert os.path.exists(temp_path)
+        assert Path(temp_path).exists()
 
         # 2. Create output file
         final_content = b"final processed audio data"
         output_path = manager.save_output_file(final_content, "final_audio.wav")
-        assert os.path.exists(output_path)
+        assert Path(output_path).exists()
 
         # 3. Delete temporary file
         manager.delete_file(temp_path)
-        assert not os.path.exists(temp_path)
-        assert os.path.exists(output_path)  # Output should remain
+        assert not Path(temp_path).exists()
+        assert Path(output_path).exists()  # Output should remain
 
         # 4. Delete output file
         manager.delete_file(output_path)
-        assert not os.path.exists(output_path)
+        assert not Path(output_path).exists()
 
     def test_concurrent_file_operations_simulation(self, temp_dir):
         """Should handle multiple file operations without conflicts."""
@@ -592,9 +592,9 @@ class TestFileManagerIntegration:
 
         # Verify all files exist
         for file_path in files_created:
-            assert os.path.exists(file_path)
+            assert Path(file_path).exists()
 
         # Clean up all files
         for file_path in files_created:
             manager.delete_file(file_path)
-            assert not os.path.exists(file_path)
+            assert not Path(file_path).exists()

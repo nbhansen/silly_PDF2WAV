@@ -1,11 +1,11 @@
 # tests/benchmarks/test_immutable_performance.py
 """Performance benchmarks for immutable design pattern implementation.
+
 Measures the impact of our immutable refactoring on key operations.
 """
 
 from dataclasses import replace as dataclasses_replace
 import types
-from typing import Any
 
 import pytest
 
@@ -55,7 +55,7 @@ class TestServiceContainerPerformance:
     def test_container_creation_performance(self, benchmark, test_config):
         """Benchmark service container creation time."""
 
-        def create_container():
+        def create_container() -> ServiceContainer:
             return ServiceContainer(test_config)
 
         result = benchmark(create_container)
@@ -65,9 +65,9 @@ class TestServiceContainerPerformance:
         """Benchmark service resolution from immutable container."""
         container = ServiceContainer(test_config)
 
-        def get_multiple_services():
+        def get_multiple_services() -> list[object]:
             # Get multiple services to test lookup performance
-            services: list[Any] = []
+            services: list[object] = []
             for _ in range(10):
                 services.append(container.get("tts_engine"))
             return services
@@ -78,7 +78,7 @@ class TestServiceContainerPerformance:
     def test_builder_pattern_performance(self, benchmark, test_config):
         """Benchmark immutable container builder pattern."""
 
-        def create_with_builder():
+        def create_with_builder() -> ServiceContainer:
             return (
                 create_service_container_builder(test_config)
                 .register(str, lambda: "test_service")
@@ -97,7 +97,7 @@ class TestChunkingStrategyPerformance:
         """Benchmark sentence-based chunking with immutable patterns."""
         chunker = SentenceBasedChunking()
 
-        def chunk_large_text():
+        def chunk_large_text() -> list[str]:
             return chunker.chunk_text(large_text_chunks, max_chunk_size=2000)
 
         result = benchmark(chunk_large_text)
@@ -107,7 +107,7 @@ class TestChunkingStrategyPerformance:
         """Benchmark word-based chunking with immutable patterns."""
         chunker = WordBasedChunking()
 
-        def chunk_large_text():
+        def chunk_large_text() -> list[str]:
             return chunker.chunk_text(large_text_chunks, max_chunk_size=1500)
 
         result = benchmark(chunk_large_text)
@@ -117,7 +117,7 @@ class TestChunkingStrategyPerformance:
         """Benchmark chunking service with strategy pattern."""
         service = ChunkingService()
 
-        def process_chunks():
+        def process_chunks() -> list[str]:
             return service.process_chunks(large_text_chunks, max_chunk_size=2000)
 
         result = benchmark(process_chunks)
@@ -130,7 +130,7 @@ class TestImmutableDataStructurePerformance:
     def test_frozen_dataclass_creation(self, benchmark):
         """Benchmark frozen dataclass creation performance."""
 
-        def create_text_segments():
+        def create_text_segments() -> list[TextSegment]:
             segments = []
             for i in range(100):
                 segment = TextSegment(
@@ -150,7 +150,7 @@ class TestImmutableDataStructurePerformance:
     def test_dataclass_replace_performance(self, benchmark, sample_text_segments):
         """Benchmark dataclasses.replace() performance for immutable updates."""
 
-        def update_segments():
+        def update_segments() -> list[TextSegment]:
             updated = []
             for segment in sample_text_segments:
                 new_segment = dataclasses_replace(segment, start_time=segment.start_time + 10.0)
@@ -166,7 +166,7 @@ class TestImmutableDataStructurePerformance:
         regular_dict = {f"key_{i}": f"value_{i}" for i in range(1000)}
         proxy_dict = types.MappingProxyType(regular_dict)
 
-        def access_proxy_values():
+        def access_proxy_values() -> list[str]:
             results = []
             for i in range(100):
                 key = f"key_{i}"
@@ -184,7 +184,7 @@ class TestListComprehensionPerformance:
     def test_list_comprehension_performance(self, benchmark):
         """Benchmark immutable list comprehension patterns."""
 
-        def filter_with_comprehension():
+        def filter_with_comprehension() -> list[int]:
             data = list(range(10000))
             # Immutable filtering pattern
             return [x for x in data if x % 2 == 0 and x > 100]
@@ -195,7 +195,7 @@ class TestListComprehensionPerformance:
     def test_nested_comprehension_performance(self, benchmark, large_text_chunks):
         """Benchmark nested comprehensions for flattening operations."""
 
-        def flatten_with_comprehension():
+        def flatten_with_comprehension() -> list[str]:
             # Simulate the chunking pattern we use
             return [
                 word
@@ -214,7 +214,7 @@ class TestMemoryPerformance:
     def test_frozen_dataclass_memory_efficiency(self, benchmark):
         """Test memory overhead of frozen dataclasses."""
 
-        def create_many_segments():
+        def create_many_segments() -> list[TextSegment]:
             return [
                 TextSegment(
                     text=f"Segment {i}",
@@ -233,7 +233,7 @@ class TestMemoryPerformance:
     def test_mapping_proxy_memory_efficiency(self, benchmark):
         """Test memory efficiency of MappingProxyType."""
 
-        def create_large_proxy():
+        def create_large_proxy() -> types.MappingProxyType[str, str]:
             base_dict = {f"service_{i}": f"instance_{i}" for i in range(1000)}
             return types.MappingProxyType(base_dict)
 
@@ -248,11 +248,11 @@ class TestConcurrencyPerformance:
         """Test concurrent access to immutable service container."""
         container = ServiceContainer(test_config)
 
-        def concurrent_access():
+        def concurrent_access() -> list[object]:
             # Simulate multiple threads accessing services
             results = []
             for _ in range(50):
-                service: Any = container.get("tts_engine")
+                service: object = container.get("tts_engine")
                 results.append(service)
             return results
 

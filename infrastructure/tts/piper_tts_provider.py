@@ -1,8 +1,14 @@
 # infrastructure/tts/piper_tts_provider.py - Fixed imports
+from contextlib import suppress
 import os
+from pathlib import Path
 import re
+import ssl
 import subprocess
 import tempfile
+from typing import Optional
+import urllib.error
+from urllib.parse import urlparse
 import urllib.request
 
 from domain.config import PiperConfig
@@ -25,17 +31,20 @@ except ImportError:
             self,
             config: PiperConfig,
             repository_url: str = "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0",
+            project_root: Optional[str] = None,
         ):
             """Initialize Piper TTS Provider.
 
             Args:
                 config: Piper configuration
                 repository_url: URL for downloading Piper models
+                project_root: Secure project root path (for binary lookup)
             """
             self.config = config
             self.output_format = "wav"
             self.model_path = config.model_path
             self.config_path = config.config_path
+            self.project_root = project_root or str(Path.cwd())  # Secure default
             self.models_dir = config.download_dir
             self.voice_instance = None
             self.repository_url = repository_url
@@ -49,22 +58,22 @@ except ImportError:
                 return
 
             # Ensure models directory exists
-            os.makedirs(self.models_dir, exist_ok=True)
+            Path(self.models_dir).mkdir(parents=True, exist_ok=True)
 
             # Auto-download model if no path specified
             if not self.model_path:
                 self.model_path, self.config_path = self._ensure_model()
 
             # Make paths absolute
-            if self.model_path and not os.path.isabs(self.model_path):
-                self.model_path = os.path.abspath(self.model_path)
-            if self.config_path and not os.path.isabs(self.config_path):
-                self.config_path = os.path.abspath(self.config_path)
+            if self.model_path and not Path(self.model_path).is_absolute():
+                self.model_path = str(Path(self.model_path).resolve())
+            if self.config_path and not Path(self.config_path).is_absolute():
+                self.config_path = str(Path(self.config_path).resolve())
 
             # Verify files exist
-            if self.model_path and not os.path.exists(self.model_path):
+            if self.model_path and not Path(self.model_path).exists():
                 raise FileNotFoundError(f"Model file not found: {self.model_path}")
-            if self.config_path and not os.path.exists(self.config_path):
+            if self.config_path and not Path(self.config_path).exists():
                 raise FileNotFoundError(f"Config file not found: {self.config_path}")
 
             # Initialize Python library if available
@@ -117,6 +126,7 @@ except ImportError:
 
         async def generate_audio_data_async(self, text_to_speak: str) -> Result[bytes]:
             """Async wrapper for Piper TTS - calls sync method in thread pool.
+
             Piper is a local engine and doesn't have native async support.
             """
             import asyncio
@@ -129,13 +139,56 @@ except ImportError:
             return result
 
         def get_output_format(self) -> str:
+            """Return the output audio format."""
             return self.output_format
 
         def prefers_sync_processing(self) -> bool:
+            """Return True if this engine prefers synchronous processing."""
             return True  # Local engine, works well with sync processing
 
         def supports_ssml(self) -> bool:
+            """Return True if this engine supports SSML markup."""
             return False  # Piper does NOT support SSML - all tags must be stripped
+
+        def _secure_download(self, url: str, destination: str, timeout: int = 30) -> None:
+            """Securely download a file with SSL verification and URL validation."""
+            # Validate URL structure
+            parsed_url = urlparse(url)
+            if not parsed_url.scheme or not parsed_url.netloc:
+                raise ValueError(f"Invalid URL format: {url}")
+
+            # Only allow HTTPS for security
+            if parsed_url.scheme != "https":
+                raise ValueError(f"Only HTTPS URLs are allowed: {url}")
+
+            # Create SSL context with certificate verification
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = True
+            ssl_context.verify_mode = ssl.CERT_REQUIRED
+
+            try:
+                # Create request with timeout and proper headers
+                request = urllib.request.Request(url, headers={"User-Agent": "PiperTTS/1.0"})
+
+                # Download with SSL context and timeout
+                with urllib.request.urlopen(request, context=ssl_context, timeout=timeout) as response:
+                    if response.status != 200:
+                        raise urllib.error.HTTPError(url, response.status, "Download failed", None, None)
+
+                    # Write to destination file
+                    with Path(destination).open("wb") as f:
+                        while True:
+                            chunk = response.read(8192)  # Read in 8KB chunks
+                            if not chunk:
+                                break
+                            f.write(chunk)
+
+            except urllib.error.URLError as e:
+                raise Exception(f"Network error downloading {url}: {e}") from e
+            except ssl.SSLError as e:
+                raise Exception(f"SSL verification failed for {url}: {e}") from e
+            except Exception as e:
+                raise Exception(f"Download failed for {url}: {e}") from e
 
         # === SSML Processing ===
 
@@ -165,12 +218,11 @@ except ImportError:
                 self.piper_method = "python_library"
                 return
 
-            # Try command line - use absolute paths
-            project_root = "/home/nbhansen/dev/silly_PDF2WAV"
-            piper_cmd = os.path.join(project_root, "piper")
+            # Try command line - use secure project root
+            piper_cmd = str(Path(self.project_root) / "piper")
             try:
                 env = os.environ.copy()
-                env["LD_LIBRARY_PATH"] = project_root + (
+                env["LD_LIBRARY_PATH"] = self.project_root + (
                     (":" + env.get("LD_LIBRARY_PATH", "")) if env.get("LD_LIBRARY_PATH") else ""
                 )
                 result = subprocess.run([piper_cmd, "--help"], capture_output=True, text=True, timeout=5, env=env)
@@ -203,10 +255,10 @@ except ImportError:
                     raise Exception("Voice instance not initialized")
 
                 audio_buffer = BytesIO()
-                wav_file = wave.open(audio_buffer, "wb")
+                with wave.open(audio_buffer, "wb") as wav_file:
+                    # Piper's Python library can handle basic SSML
+                    self.voice_instance.synthesize(text, wav_file)
 
-                # Piper's Python library can handle basic SSML
-                self.voice_instance.synthesize(text, wav_file)
                 audio_data = audio_buffer.getvalue()
 
                 return audio_data
@@ -235,7 +287,7 @@ except ImportError:
                     str(self.config.length_scale),
                 ]
 
-                if self.config_path and os.path.exists(self.config_path):
+                if self.config_path and Path(self.config_path).exists():
                     cmd.extend(["--config", self.config_path])
 
                 if self.config.speaker_id is not None:
@@ -247,8 +299,7 @@ except ImportError:
 
                 # Set up environment for local piper binary with libraries
                 env = os.environ.copy()
-                project_root = "/home/nbhansen/dev/silly_PDF2WAV"
-                env["LD_LIBRARY_PATH"] = project_root + (
+                env["LD_LIBRARY_PATH"] = self.project_root + (
                     (":" + env.get("LD_LIBRARY_PATH", "")) if env.get("LD_LIBRARY_PATH") else ""
                 )
 
@@ -268,10 +319,11 @@ except ImportError:
                     print(f"🔍 PIPER DEBUG: {error_msg}")
                     raise Exception(error_msg)
 
-                if os.path.exists(temp_path):
-                    os.path.getsize(temp_path)
+                if Path(temp_path).exists():
+                    # Verify file was created with content
+                    Path(temp_path).stat().st_size  # Check file exists and has size
 
-                    with open(temp_path, "rb") as f:
+                    with Path(temp_path).open("rb") as f:
                         audio_data = f.read()
 
                     if len(audio_data) > 0:
@@ -287,11 +339,10 @@ except ImportError:
                 raise Exception(f"Command line generation failed: {e}") from e
             finally:
                 # Always try to clean up temp file
-                if temp_path and os.path.exists(temp_path):
-                    try:
-                        os.unlink(temp_path)
-                    except Exception:
-                        pass  # Ignore cleanup errors
+                if temp_path and Path(temp_path).exists():
+                    # Ignore cleanup errors
+                    with suppress(Exception):
+                        Path(temp_path).unlink()
 
         # === Model Management ===
 
@@ -301,11 +352,11 @@ except ImportError:
             model_file = f"{model_name}.onnx"
             config_file = f"{model_name}.onnx.json"
 
-            model_path = os.path.join(self.models_dir, model_file)
-            config_path = os.path.join(self.models_dir, config_file)
+            model_path = str(Path(self.models_dir) / model_file)
+            config_path = str(Path(self.models_dir) / config_file)
 
             # Return existing model if found
-            if os.path.exists(model_path) and os.path.exists(config_path):
+            if Path(model_path).exists() and Path(config_path).exists():
                 return model_path, config_path
 
             # Download if needed
@@ -324,12 +375,12 @@ except ImportError:
             model_path_segment = model_paths.get(model_name, "en/en_US/lessac/medium")  # fallback
 
             try:
-                # Download model and config
+                # Download model and config securely
                 model_url = f"{base_url}/{model_path_segment}/{model_file}"
                 config_url = f"{base_url}/{model_path_segment}/{config_file}"
 
-                urllib.request.urlretrieve(model_url, model_path)
-                urllib.request.urlretrieve(config_url, config_path)
+                self._secure_download(model_url, model_path)
+                self._secure_download(config_url, config_path)
 
                 return model_path, config_path
 

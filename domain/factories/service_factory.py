@@ -1,5 +1,6 @@
 # domain/factories/service_factory.py - Simple Service Factory
 """Simplified service factory that delegates to focused factories.
+
 Main orchestration point for service creation.
 """
 
@@ -72,7 +73,8 @@ def create_complete_service_set(config: SystemConfig) -> dict[str, Any]:
 
 
 def create_pdf_service_from_env(config: SystemConfig) -> ServiceContainer:
-    """Factory function that replaces CompositionRoot.create_pdf_service_from_env()
+    """Factory function that replaces CompositionRoot.create_pdf_service_from_env().
+
     Returns an immutable service container with all dependencies configured.
     """
     services = create_complete_service_set(config)

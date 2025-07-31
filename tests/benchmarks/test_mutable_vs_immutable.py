@@ -1,12 +1,12 @@
 # tests/benchmarks/test_mutable_vs_immutable.py
 """Comparison benchmarks: Mutable vs Immutable design patterns.
+
 Measures the performance difference between old and new approaches.
 """
 
 from dataclasses import dataclass
 from dataclasses import replace as dataclasses_replace
 import types
-from typing import Any
 
 import pytest
 
@@ -75,13 +75,13 @@ class MutableServiceContainer:
     """Simulates old mutable service container."""
 
     def __init__(self):
-        self._services: dict[str, Any] = {}
+        self._services: dict[str, object] = {}
 
-    def register(self, name: str, service: Any):
+    def register(self, name: str, service: object):
         """Mutable registration."""
         self._services[name] = service
 
-    def get(self, name: str) -> Any:
+    def get(self, name: str) -> object:
         """Service retrieval."""
         return self._services.get(name)
 
@@ -89,10 +89,10 @@ class MutableServiceContainer:
 class ImmutableServiceContainer:
     """New immutable service container pattern."""
 
-    def __init__(self, services: dict[str, Any]):
-        self._services: types.MappingProxyType[str, Any] = types.MappingProxyType(services)
+    def __init__(self, services: dict[str, object]):
+        self._services: types.MappingProxyType[str, object] = types.MappingProxyType(services)
 
-    def get(self, name: str) -> Any:
+    def get(self, name: str) -> object:
         """Service retrieval from immutable container."""
         return self._services.get(name)
 
@@ -122,7 +122,7 @@ class TestChunkingComparison:
         """Benchmark old mutable chunking pattern."""
         chunker = MutableChunker()
 
-        def chunk_with_mutation():
+        def chunk_with_mutation() -> list[str]:
             return chunker.chunk_text_mutable(chunking_test_data, max_chunk_size=1500)
 
         result = benchmark(chunk_with_mutation)
@@ -132,7 +132,7 @@ class TestChunkingComparison:
         """Benchmark new immutable chunking pattern."""
         chunker = ImmutableChunker()
 
-        def chunk_with_comprehension():
+        def chunk_with_comprehension() -> list[str]:
             return chunker.chunk_text_immutable(chunking_test_data, max_chunk_size=1500)
 
         result = benchmark(chunk_with_comprehension)
@@ -148,7 +148,7 @@ class TestServiceContainerComparison:
         for name, service in service_test_data.items():
             container.register(name, service)
 
-        def access_services():
+        def access_services() -> list[object]:
             results = []
             for i in range(0, 50, 2):  # Access every other service
                 service = container.get(f"service_{i}")
@@ -163,7 +163,7 @@ class TestServiceContainerComparison:
         """Benchmark immutable service container access."""
         container = ImmutableServiceContainer(service_test_data)
 
-        def access_services():
+        def access_services() -> list[object]:
             results = []
             for i in range(0, 50, 2):  # Access every other service
                 service = container.get(f"service_{i}")
@@ -181,7 +181,7 @@ class TestListOperationComparison:
     def test_mutable_list_building(self, benchmark):
         """Benchmark old mutable list.append() pattern."""
 
-        def build_with_append():
+        def build_with_append() -> list[str]:
             results = []
             for i in range(1000):
                 if i % 2 == 0:
@@ -196,7 +196,7 @@ class TestListOperationComparison:
     def test_immutable_list_building(self, benchmark):
         """Benchmark new immutable comprehension pattern."""
 
-        def build_with_comprehension():
+        def build_with_comprehension() -> list[str]:
             base_items = [f"item_{i}" for i in range(1000) if i % 2 == 0]
             extra_items = [f"extra_{i}" for i in range(1000) if i % 4 == 0]
             return base_items + extra_items
@@ -231,7 +231,7 @@ class TestDataMutationComparison:
     def test_mutable_data_updates(self, benchmark):
         """Benchmark mutable data updates."""
 
-        def update_mutable_data():
+        def update_mutable_data() -> list[TestDataMutationComparison.MutableData]:
             items = [self.MutableData(f"text_{i}", float(i), 1.0) for i in range(100)]
             # Mutate in place
             for item in items:
@@ -245,7 +245,7 @@ class TestDataMutationComparison:
     def test_immutable_data_updates(self, benchmark):
         """Benchmark immutable data updates."""
 
-        def update_immutable_data():
+        def update_immutable_data() -> list[TestDataMutationComparison.ImmutableData]:
             items = [self.ImmutableData(f"text_{i}", float(i), 1.0) for i in range(100)]
             # Create new instances
             updated_items = [dataclasses_replace(item, start_time=item.start_time + 5.0) for item in items]

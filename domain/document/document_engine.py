@@ -1,19 +1,20 @@
 # domain/document/document_engine.py - Unified Document Processing Engine
 """Consolidated document engine that unifies PDF processing, text extraction, and coordination.
+
 Replaces: PDFProcessingService, complex text extraction logic.
 """
 
 from abc import ABC, abstractmethod
+from contextlib import suppress
 import io
-import os
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
 import pdfplumber
 
 from ..errors import audio_generation_error
-from ..models import TimedAudioResult
 from ..interfaces import IFileManager, IOCRProvider
-from ..models import PageRange, PDFInfo, ProcessingRequest, ProcessingResult
+from ..models import PageRange, PDFInfo, ProcessingRequest, ProcessingResult, TimedAudioResult
 
 if TYPE_CHECKING:
     from ..audio.audio_engine import IAudioEngine
@@ -49,6 +50,7 @@ class IDocumentEngine(ABC):
 
 class DocumentEngine(IDocumentEngine):
     """Unified document engine that consolidates PDF processing.
+
     High cohesion: All document operations in one place.
     Low coupling: Depends only on abstractions (IOCRProvider, IFileManager).
     """
@@ -69,6 +71,7 @@ class DocumentEngine(IDocumentEngine):
 
     def extract_text(self, pdf_path: str, pages: Optional[list[int]] = None) -> list[str]:
         """Extract text from PDF with intelligent OCR fallback.
+
         Uses direct text extraction first, falls back to OCR for poor quality pages.
         """
         extracted_text = []
@@ -215,8 +218,8 @@ class DocumentEngine(IDocumentEngine):
     ) -> ProcessingResult:
         """Assemble final ProcessingResult with debug information."""
         return ProcessingResult.success_result(
-            audio_files=[os.path.basename(f) for f in audio_result.audio_files],
-            combined_mp3=os.path.basename(audio_result.combined_mp3) if audio_result.combined_mp3 else None,
+            audio_files=[Path(f).name for f in audio_result.audio_files],
+            combined_mp3=Path(audio_result.combined_mp3).name if audio_result.combined_mp3 else None,
             timing_data=audio_result.timing_data,
             debug_info={
                 "text_chunks_count": len(original_chunks),
@@ -287,11 +290,9 @@ class DocumentEngine(IDocumentEngine):
         finally:
             # Clean up temporary file
             if temp_image_path:
-                try:
+                # Ignore file cleanup errors - temporary files may already be removed
+                with suppress(OSError, FileNotFoundError):
                     self.file_manager.delete_file(temp_image_path)
-                except (OSError, FileNotFoundError):
-                    # Ignore file cleanup errors - temporary files may already be removed
-                    pass
 
     def _combine_chunks_for_llm(self, text_chunks: list[str], llm_chunk_size: int) -> list[str]:
         """Combine small PDF chunks into larger chunks optimal for LLM processing.

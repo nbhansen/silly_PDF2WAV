@@ -1,5 +1,4 @@
 # tests/unit/test_system_config_yaml.py
-import os
 from pathlib import Path
 import tempfile
 from typing import Any
@@ -31,7 +30,7 @@ class TestSystemConfigYAMLLoading:
             assert config.enable_text_cleaning is True
             assert config.max_file_size_mb == 20
         finally:
-            os.unlink(config_file)
+            Path(config_file).unlink()
 
     def test_from_yaml_with_complete_config(self):
         """Test loading complete YAML configuration."""
@@ -83,7 +82,7 @@ class TestSystemConfigYAMLLoading:
             assert config.max_file_age_hours == 48.0
 
         finally:
-            os.unlink(config_file)
+            Path(config_file).unlink()
 
     def test_from_yaml_missing_file_raises_error(self):
         """Test that missing YAML file raises appropriate error."""
@@ -98,11 +97,10 @@ class TestSystemConfigYAMLLoading:
             config_file = f.name
 
         try:
-            with pytest.raises(ValueError) as exc_info:
+            with pytest.raises(ValueError, match="Invalid YAML"):
                 SystemConfig.from_yaml(config_file)
-            assert "Invalid YAML" in str(exc_info.value)
         finally:
-            os.unlink(config_file)
+            Path(config_file).unlink()
 
     def test_from_yaml_type_conversions(self):
         """Test that various type conversions work correctly."""
@@ -148,7 +146,7 @@ class TestSystemConfigYAMLLoading:
             assert isinstance(config.piper_length_scale, float)
 
         finally:
-            os.unlink(config_file)
+            Path(config_file).unlink()
 
     def test_from_yaml_boolean_variations(self):
         """Test various boolean representations."""
@@ -180,7 +178,7 @@ class TestSystemConfigYAMLLoading:
                 config = SystemConfig.from_yaml(config_file)
                 assert config.enable_text_cleaning is expected, f"Failed for value: {value}"
             finally:
-                os.unlink(config_file)
+                Path(config_file).unlink()
 
     def test_from_yaml_range_validation(self):
         """Test that numeric range validation works."""
@@ -189,22 +187,20 @@ class TestSystemConfigYAMLLoading:
 
         config_file = self.create_yaml_config(config_data)
         try:
-            with pytest.raises(ValueError) as exc_info:
+            with pytest.raises(ValueError, match=">= 1"):
                 SystemConfig.from_yaml(config_file)
-            assert ">= 1" in str(exc_info.value)
         finally:
-            os.unlink(config_file)
+            Path(config_file).unlink()
 
         # Test value too high
         config_data = {"tts": {"engine": "piper"}, "files": {"max_file_size_mb": 2000}}  # Max is 1000
 
         config_file = self.create_yaml_config(config_data)
         try:
-            with pytest.raises(ValueError) as exc_info:
+            with pytest.raises(ValueError, match="<= 1000"):
                 SystemConfig.from_yaml(config_file)
-            assert "<= 1000" in str(exc_info.value)
         finally:
-            os.unlink(config_file)
+            Path(config_file).unlink()
 
     def test_from_yaml_missing_required_fields(self):
         """Test that missing required fields use defaults."""
@@ -217,7 +213,7 @@ class TestSystemConfigYAMLLoading:
             # Should use default value
             assert config.tts_engine == TTSEngine.PIPER
         finally:
-            os.unlink(config_file)
+            Path(config_file).unlink()
 
     def test_from_yaml_invalid_tts_engine(self):
         """Test that invalid TTS engine raises error."""
@@ -225,13 +221,10 @@ class TestSystemConfigYAMLLoading:
 
         config_file = self.create_yaml_config(config_data)
         try:
-            with pytest.raises(ValueError) as exc_info:
+            with pytest.raises(ValueError, match="Invalid TTS engine.*piper.*gemini"):
                 SystemConfig.from_yaml(config_file)
-            assert "Invalid TTS engine" in str(exc_info.value)
-            assert "piper" in str(exc_info.value)
-            assert "gemini" in str(exc_info.value)
         finally:
-            os.unlink(config_file)
+            Path(config_file).unlink()
 
     def test_from_yaml_list_and_string_extensions(self):
         """Test that file extensions can be specified as list or string."""
@@ -247,7 +240,7 @@ class TestSystemConfigYAMLLoading:
             assert config.allowed_extensions == frozenset({"pdf", "txt", "doc"})
             assert config.audio_extensions == frozenset({"wav", "mp3", "ogg"})
         finally:
-            os.unlink(config_file)
+            Path(config_file).unlink()
 
         # Test string format
         config_data = {
@@ -261,7 +254,7 @@ class TestSystemConfigYAMLLoading:
             assert config.allowed_extensions == frozenset({"pdf", "txt", "doc"})
             assert config.audio_extensions == frozenset({"wav", "mp3", "ogg"})
         finally:
-            os.unlink(config_file)
+            Path(config_file).unlink()
 
     def test_from_yaml_gemini_validation(self):
         """Test Gemini-specific validation."""
@@ -273,11 +266,10 @@ class TestSystemConfigYAMLLoading:
 
         config_file = self.create_yaml_config(config_data)
         try:
-            with pytest.raises(ValueError) as exc_info:
+            with pytest.raises(ValueError, match="GOOGLE_AI_API_KEY is required"):
                 SystemConfig.from_yaml(config_file)
-            assert "GOOGLE_AI_API_KEY is required" in str(exc_info.value)
         finally:
-            os.unlink(config_file)
+            Path(config_file).unlink()
 
     def test_from_yaml_with_null_values(self):
         """Test handling of null/None values in YAML."""
@@ -295,7 +287,7 @@ class TestSystemConfigYAMLLoading:
             assert config.enable_text_cleaning is True  # Default value
             assert config.chunk_size == 4000  # Default value
         finally:
-            os.unlink(config_file)
+            Path(config_file).unlink()
 
     def test_from_yaml_case_insensitive_tts_engine(self):
         """Test that TTS engine is case-insensitive."""
@@ -309,7 +301,7 @@ class TestSystemConfigYAMLLoading:
                 config = SystemConfig.from_yaml(config_file)
                 assert config.tts_engine == TTSEngine.PIPER
             finally:
-                os.unlink(config_file)
+                Path(config_file).unlink()
 
     def test_from_yaml_with_example_file(self):
         """Test loading the actual example YAML file if it exists."""

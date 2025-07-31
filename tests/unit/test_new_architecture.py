@@ -1,8 +1,10 @@
 # tests/unit/test_new_architecture.py - Tests for Consolidated Architecture
 """Tests for the new consolidated domain aggregates.
+
 Focuses on testing the high-cohesion, low-coupling design.
 """
 
+from pathlib import Path
 from unittest.mock import MagicMock
 
 from application.config.system_config import SystemConfig, TTSEngine
@@ -57,7 +59,6 @@ class TestAudioEngine:
 
     def test_audio_engine_process_audio_file_success(self):
         """AudioEngine should process audio files and return duration."""
-        import os
         import tempfile
 
         mock_tts = MagicMock()
@@ -77,7 +78,7 @@ class TestAudioEngine:
             assert isinstance(result.value, float)
             assert result.value > 0
         finally:
-            os.unlink(temp_path)
+            Path(temp_path).unlink()
 
 
 class TestTimingEngine:

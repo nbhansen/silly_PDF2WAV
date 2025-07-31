@@ -268,7 +268,7 @@ class TestGeminiLLMProviderSyncContentGeneration:
 
             with (
                 patch("time.time", side_effect=[1000.0, 1001.0]),
-                patch("builtins.print") as mock_print,
+                patch("builtins.print"),
             ):
                 result = provider.generate_content("test prompt")
 
@@ -464,7 +464,7 @@ class TestGeminiLLMProviderSyncContentGeneration:
 
             with (
                 patch("time.time", side_effect=[1000.0, 1001.0]),
-                patch("builtins.print") as mock_print,
+                patch("builtins.print"),
             ):
                 result = provider.generate_content("test prompt")
 
@@ -571,7 +571,7 @@ class TestGeminiLLMProviderAsyncContentGeneration:
             provider.generate_content = Mock(return_value=success_result)  # type: ignore[method-assign]
 
             with (
-                patch("asyncio.sleep") as mock_sleep,
+                patch("asyncio.sleep"),
                 patch("concurrent.futures.ThreadPoolExecutor") as mock_executor_class,
                 patch("asyncio.get_event_loop") as mock_get_loop,
             ):

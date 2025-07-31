@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Enhanced test runner for PDF to Audio Converter with TDD support.
+
 Supports comprehensive testing strategies including TDD workflows.
 """
 

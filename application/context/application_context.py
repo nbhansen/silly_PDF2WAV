@@ -6,7 +6,7 @@ dependencies and eliminates global state, following hexagonal architecture princ
 
 from dataclasses import dataclass
 import logging
-from typing import Any, Optional, Protocol
+from typing import Optional, Protocol
 
 from application.config.system_config import SystemConfig
 from domain.container.service_container import ServiceContainer
@@ -51,7 +51,7 @@ class ApplicationContext:
             return False
 
     @property
-    def pdf_service(self) -> Any:
+    def pdf_service(self) -> object:
         """Get PDF processing service (audio engine)."""
         from domain.audio.audio_engine import IAudioEngine
 

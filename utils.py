@@ -1,6 +1,5 @@
 # utils.py - Pure utility functions extracted from app.py
 import re
-from typing import Any
 
 from application.config.system_config import SystemConfig
 from domain.errors import ApplicationError, ErrorCode
@@ -8,10 +7,11 @@ from domain.models import PageRange
 
 
 def allowed_file(filename: str) -> bool:
+    """Check if the filename has an allowed file extension."""
     return "." in filename and filename.rsplit(".", 1)[1].lower() in {"pdf"}
 
 
-def parse_page_range_from_form(form: Any) -> PageRange:
+def parse_page_range_from_form(form: object) -> PageRange:
     """Parse page range from Flask form data."""
     use_page_range = form.get("use_page_range") == "on"
 

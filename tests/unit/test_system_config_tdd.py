@@ -1,5 +1,6 @@
 # tests/unit/test_system_config_tdd.py
 """TDD tests for SystemConfig - comprehensive coverage following red-green-refactor cycle.
+
 Tests configuration loading, validation, and error handling without external dependencies.
 """
 
@@ -25,14 +26,14 @@ class TestTTSEngineEnum:
 
     def test_tts_engine_enum_invalid_value_raises_error(self):
         """Should raise ValueError for invalid TTS engine values."""
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="'invalid_engine' is not a valid TTSEngine"):
             TTSEngine("invalid_engine")
 
     def test_tts_engine_enum_case_sensitivity(self):
         """Should be case-sensitive for enum values."""
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="'PIPER' is not a valid TTSEngine"):
             TTSEngine("PIPER")
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="'Gemini' is not a valid TTSEngine"):
             TTSEngine("Gemini")
 
 
@@ -122,10 +123,8 @@ class TestSystemConfigValidationTDD:
             gemini_api_key=None,
         )
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="GOOGLE_AI_API_KEY is required when TTS_ENGINE=gemini"):
             config.validate()
-
-        assert "GOOGLE_AI_API_KEY is required when TTS_ENGINE=gemini" in str(exc_info.value)
 
     def test_validate_gemini_rejects_placeholder_api_key(self):
         """Should reject placeholder API key for Gemini."""
@@ -136,10 +135,8 @@ class TestSystemConfigValidationTDD:
             gemini_api_key="YOUR_GOOGLE_AI_API_KEY",
         )
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="Please set a valid GOOGLE_AI_API_KEY"):
             config.validate()
-
-        assert "Please set a valid GOOGLE_AI_API_KEY" in str(exc_info.value)
 
     def test_validate_gemini_accepts_valid_api_key(self):
         """Should accept valid API key for Gemini."""
@@ -162,10 +159,8 @@ class TestSystemConfigValidationTDD:
             piper_model_name="",
         )
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="PIPER_MODEL_NAME cannot be empty when using Piper TTS"):
             config.validate()
-
-        assert "PIPER_MODEL_NAME cannot be empty when using Piper TTS" in str(exc_info.value)
 
     def test_validate_piper_accepts_valid_model_name(self):
         """Should accept valid model name for Piper."""
@@ -200,10 +195,8 @@ class TestSystemConfigValidationTDD:
             config = SystemConfig(**config_kwargs)  # type: ignore[arg-type]
 
             # Validation should catch empty/whitespace paths
-            with pytest.raises(ValueError) as exc_info:
+            with pytest.raises(ValueError, match="cannot be empty or whitespace"):
                 config.validate()
-
-            assert "cannot be empty or whitespace" in str(exc_info.value)
 
     def test_validate_file_cleanup_settings_when_enabled(self):
         """Should validate file cleanup settings when cleanup is enabled."""
@@ -229,9 +222,8 @@ class TestSystemConfigValidationTDD:
             auto_cleanup_interval_hours=6.0,
             max_disk_usage_mb=1000,
         )
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="MAX_FILE_AGE_HOURS must be positive"):
             config_invalid_age.validate()
-        assert "MAX_FILE_AGE_HOURS must be positive" in str(exc_info.value)
 
         # Test invalid auto_cleanup_interval_hours - create new config with invalid value
         config_invalid_interval = SystemConfig(
@@ -243,9 +235,8 @@ class TestSystemConfigValidationTDD:
             auto_cleanup_interval_hours=-1.0,
             max_disk_usage_mb=1000,
         )
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="AUTO_CLEANUP_INTERVAL_HOURS must be positive"):
             config_invalid_interval.validate()
-        assert "AUTO_CLEANUP_INTERVAL_HOURS must be positive" in str(exc_info.value)
 
         # Test invalid max_disk_usage_mb - create new config with invalid value
         config_invalid_disk = SystemConfig(
@@ -257,9 +248,8 @@ class TestSystemConfigValidationTDD:
             auto_cleanup_interval_hours=6.0,
             max_disk_usage_mb=0,
         )
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="MAX_DISK_USAGE_MB must be positive"):
             config_invalid_disk.validate()
-        assert "MAX_DISK_USAGE_MB must be positive" in str(exc_info.value)
 
     def test_validate_file_cleanup_settings_when_disabled(self):
         """Should skip file cleanup validation when cleanup is disabled."""

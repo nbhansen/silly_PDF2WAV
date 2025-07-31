@@ -1,9 +1,11 @@
 # domain/audio/timing_engine.py - Unified Timing Engine
 """Consolidated timing engine that unifies all timing strategies.
+
 Replaces: GeminiTimestampStrategy, SentenceMeasurementStrategy, EnhancedTimingStrategy, TimingCalculator.
 """
 
 from abc import ABC, abstractmethod
+from contextlib import suppress
 import dataclasses
 from enum import Enum
 from pathlib import Path
@@ -52,6 +54,7 @@ class ITimingEngine(ABC):
 
 class TimingEngine(ITimingEngine):
     """Unified timing engine that consolidates all timing strategies.
+
     Uses strategy pattern internally but presents unified interface.
     """
 
@@ -476,11 +479,9 @@ class TimingEngine(ITimingEngine):
             if result.stderr:
                 print(f"🔍 DEBUG: ffmpeg stderr: {result.stderr.decode()}")
 
-            try:
+            # Ignore file cleanup errors - temporary files may already be removed
+            with suppress(OSError, FileNotFoundError):
                 Path(list_file).unlink()
-            except (OSError, FileNotFoundError):
-                # Ignore file cleanup errors - temporary files may already be removed
-                pass
 
             return result.returncode == 0
         except Exception as e:

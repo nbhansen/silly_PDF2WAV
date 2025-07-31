@@ -1,5 +1,6 @@
 # domain/text/text_pipeline.py - Unified Text Processing Pipeline
 """Consolidated text processing pipeline that unifies text cleaning and SSML enhancement.
+
 Replaces: TextCleaningService, AcademicSSMLService (as separate concerns).
 """
 
@@ -33,6 +34,7 @@ class ITextPipeline(ABC):
 
 class TextPipeline(ITextPipeline):
     """Unified text processing pipeline with high cohesion.
+
     Handles cleaning, SSML enhancement, and sentence splitting in one place.
     """
 

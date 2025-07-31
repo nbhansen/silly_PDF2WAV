@@ -34,12 +34,12 @@ def test_configuration_loading():
 
 def test_service_factory_creation():
     """Test that service factory can create all services."""
-    with tempfile.TemporaryDirectory():
+    with (
+        tempfile.TemporaryDirectory(),
         # Mock piper availability to avoid infrastructure dependency
-        with (
-            patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True),
-            patch("infrastructure.tts.piper_tts_provider.PiperTTSProvider"),
-        ):
+        patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True),
+        patch("infrastructure.tts.piper_tts_provider.PiperTTSProvider"),
+    ):
             config = create_test_config()
             container = create_pdf_service_from_env(config)
 

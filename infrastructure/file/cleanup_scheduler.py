@@ -1,7 +1,9 @@
 """Background service for managing cleanup of old files.
+
 Runs in a separate thread to periodically remove expired files.
 """
 
+from contextlib import suppress
 import threading
 import time
 
@@ -10,6 +12,7 @@ from domain.interfaces import IFileManager
 
 class FileCleanupScheduler:
     """Background thread service for periodic cleanup of expired files.
+
     Monitors registered files and removes them when they exceed max age.
     """
 
@@ -52,11 +55,9 @@ class FileCleanupScheduler:
     def _cleanup_job(self) -> None:
         """Main cleanup loop running in background thread."""
         while not self._stop_event.is_set():
-            try:
+            # Log error but continue running
+            with suppress(Exception):
                 self._process_expired_files()
-            except Exception:
-                # Log error but continue running
-                pass
 
             # Wait for next interval, checking stop event
             self._stop_event.wait(self.check_interval_seconds)
