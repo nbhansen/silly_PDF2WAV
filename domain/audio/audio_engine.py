@@ -6,11 +6,11 @@ Replaces: AudioGenerationService, AudioGenerationCoordinator, AudioProcessor, Au
 
 from abc import ABC, abstractmethod
 import asyncio
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Coroutine
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from ..errors import Result, audio_generation_error
 from ..interfaces import IFileManager, ITTSEngine
@@ -179,7 +179,7 @@ class AudioEngine(IAudioEngine):
             print(f"🎵 AudioEngine: Processing chunk {i}/{len(processed_chunks)} ({len(chunk)} chars)")
 
             result = self.tts_engine.generate_audio_data(chunk)
-            if result.is_success:
+            if result.is_success and result.value is not None:
                 audio_chunks.append(result.value)
                 print(f"✅ Chunk {i} completed ({len(result.value)} bytes)")
             else:
@@ -209,9 +209,9 @@ class AudioEngine(IAudioEngine):
         print(f"🚀 AudioEngine: Starting parallel processing at {start_time:.2f}")
         return {"start_time": start_time}
 
-    def _create_chunk_tasks(self, processed_chunks: list[str]) -> list[object]:
+    def _create_chunk_tasks(self, processed_chunks: list[str]) -> list[Coroutine[Any, Any, Optional[bytes]]]:
         """Create async tasks for all valid chunks."""
-        tasks = []
+        tasks: list[Coroutine[Any, Any, Optional[bytes]]] = []
         for i, chunk in enumerate(processed_chunks):
             if not chunk.strip():
                 continue
@@ -221,18 +221,25 @@ class AudioEngine(IAudioEngine):
         print(f"🚀 AudioEngine: Created {len(tasks)} tasks from {len(processed_chunks)} chunks")
         return tasks
 
-    async def _execute_tasks_with_rate_limiting(self, tasks: list[object]) -> list[object]:
+    async def _execute_tasks_with_rate_limiting(
+        self, tasks: list[Coroutine[Any, Any, Optional[bytes]]]
+    ) -> list[Union[Optional[bytes], BaseException]]:
         """Execute tasks with semaphore-based rate limiting."""
         # Apply rate limiting
         semaphore = asyncio.Semaphore(self.max_concurrent)
         limited_tasks = [self._limited_chunk_processing(semaphore, task) for task in tasks]
 
         # Execute all tasks concurrently
-        results = await asyncio.gather(*limited_tasks, return_exceptions=True)
+        results: list[Union[Optional[bytes], BaseException]] = await asyncio.gather(
+            *limited_tasks, return_exceptions=True
+        )
         return results
 
     def _process_async_results(
-        self, results: list[object], processed_chunks: list[str], timing_context: dict[str, float]
+        self,
+        results: list[Union[Optional[bytes], BaseException]],
+        processed_chunks: list[str],
+        timing_context: dict[str, float],
     ) -> list[bytes]:
         """Process results, calculate metrics, and filter successful chunks."""
         import time
@@ -275,7 +282,7 @@ class AudioEngine(IAudioEngine):
             result = await task
             # Add small delay for rate limiting
             await asyncio.sleep(self.base_delay)
-            return result  # type: ignore[no-any-return]
+            return result
 
     async def _process_single_chunk_async(self, chunk: str, chunk_num: int, total_chunks: int) -> Optional[bytes]:
         """Process a single chunk asynchronously."""

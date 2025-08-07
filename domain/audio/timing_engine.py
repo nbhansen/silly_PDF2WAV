@@ -344,7 +344,7 @@ class TimingEngine(ITimingEngine):
             if len(all_temp_audio_files) > 1:
                 print(f"🔍 DEBUG: Combining {len(all_temp_audio_files)} audio files")
                 combined_path = Path(self.file_manager.get_output_dir()) / f"{output_filename}_combined.mp3"
-                if self._combine_audio_files(all_temp_audio_files, combined_path):
+                if self._combine_audio_files(all_temp_audio_files, str(combined_path)):
                     final_audio_files = [Path(combined_path).name]
                     print(f"🔍 DEBUG: Audio combination successful: {final_audio_files}")
                 else:
