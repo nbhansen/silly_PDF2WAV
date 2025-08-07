@@ -93,7 +93,7 @@ def register_routes(app: Flask) -> None:
     @app.route("/")
     def index() -> str:
         context = get_app_context()
-        return render_template("index.html", tts_engine=context.config.tts_engine.value)
+        return render_template("index.html", tts_engine=context.config.tts.engine.value)
 
     @app.route("/favicon.ico")
     def favicon() -> tuple[str, int]:
@@ -246,7 +246,7 @@ def register_routes(app: Flask) -> None:
     def upload_file_with_timing() -> Union[str, tuple[str, int]]:
         """Upload WITH timing data for read-along functionality."""
         config = get_app_config()
-        if config.tts_engine.value == "gemini":
+        if config.tts.engine.value == "gemini":
             return "Read-along mode is not available with Gemini TTS. Please use regular upload or switch to Piper TTS."
 
         file, error = _validate_upload_request()
@@ -466,7 +466,7 @@ def _process_uploaded_file(uploaded_file: FileStorage, request_form: object) -> 
         raise ValueError("No filename provided")
     original_filename = secure_filename(uploaded_file.filename)
     base_filename_no_ext = Path(original_filename).stem
-    pdf_path = Path(config.upload_folder) / original_filename
+    pdf_path = Path(config.files.upload_folder) / original_filename
     uploaded_file.save(str(pdf_path))
 
     # Parse and validate page range and plain English setting
@@ -557,7 +557,7 @@ def _execute_document_processing(
     """Execute the core document processing workflow."""
     # Override timing for Gemini TTS
     config = get_app_config()
-    enable_timing = enable_timing and config.tts_engine.value != "gemini"
+    enable_timing = enable_timing and config.tts.engine.value != "gemini"
 
     get_logger("routes").info(
         "Processing %s for: %s", "with timing data" if enable_timing else "without timing", base_filename
@@ -575,11 +575,11 @@ def _execute_document_processing(
         from domain.text.text_pipeline import TextPipeline
         from infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
 
-        llm_provider = services.service_container.get(GeminiLLMProvider) if config.gemini_api_key else None
+        llm_provider = services.service_container.get(GeminiLLMProvider) if config.gemini.api_key else None
         text_pipeline = TextPipeline(
             llm_provider=llm_provider,
-            enable_cleaning=config.enable_text_cleaning,
-            enable_natural_formatting=config.enable_natural_formatting,
+            enable_cleaning=config.text_processing.enable_cleaning,
+            enable_natural_formatting=config.text_processing.enable_natural_formatting,
             enable_plain_english=True,
         )
         get_logger("routes").info("Created custom TextPipeline with plain English conversion enabled")
@@ -594,14 +594,15 @@ def _execute_document_processing(
     assert isinstance(services.audio_engine, IAudioEngine)
     assert isinstance(text_pipeline, ITextPipeline)
     processing_result = services.document_engine.process_document(
-        request_obj, services.audio_engine, text_pipeline, enable_timing, config.llm_chunk_size
+        request_obj, services.audio_engine, text_pipeline, enable_timing, config.text_processing.llm_chunk_size
     )
 
+    # Import needed for both success and failure cases
+    from domain.errors import ApplicationError, ErrorCode
+    from domain.models import ProcessingResult
+    
     if processing_result.is_failure:
         # Convert Result[T] error to ProcessingResult for backward compatibility
-        from domain.errors import ApplicationError, ErrorCode
-        from domain.models import ProcessingResult
-
         error = ApplicationError(
             code=ErrorCode.AUDIO_GENERATION_FAILED, message=str(processing_result.error), retryable=True
         )
@@ -686,7 +687,7 @@ def render_upload_result(
             "audio_files": result.audio_files or [],
             "combined_mp3_file": result.combined_mp3_file,
             "original_filename": display_filename,
-            "tts_engine": get_app_config().tts_engine.value,
+            "tts_engine": get_app_config().tts.engine.value,
             "file_count": len(result.audio_files) if result.audio_files else 0,
             "debug_info": result.debug_info,
         }
