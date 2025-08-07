@@ -1,9 +1,13 @@
 # utils.py - Pure utility functions extracted from app.py
 import re
+from typing import Any, Optional, Union
 
 from application.config.system_config import SystemConfig
 from domain.errors import ApplicationError, ErrorCode
 from domain.models import PageRange
+
+# Type alias for form data (can be dict-like or Flask's ImmutableMultiDict)
+FormData = Union[dict[str, Any], Any]  # Any covers Flask's ImmutableMultiDict
 
 
 def allowed_file(filename: str) -> bool:
@@ -11,18 +15,18 @@ def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in {"pdf"}
 
 
-def parse_page_range_from_form(form: object) -> PageRange:
+def parse_page_range_from_form(form: FormData) -> PageRange:
     """Parse page range from Flask form data."""
     use_page_range = form.get("use_page_range") == "on"
 
     if not use_page_range:
         return PageRange()
 
-    start_page = None
-    end_page = None
+    start_page: Optional[int] = None
+    end_page: Optional[int] = None
 
-    start_page_str = form.get("start_page", "").strip()
-    end_page_str = form.get("end_page", "").strip()
+    start_page_str = str(form.get("start_page", "")).strip()
+    end_page_str = str(form.get("end_page", "")).strip()
 
     if start_page_str:
         start_page = int(start_page_str)
@@ -33,9 +37,9 @@ def parse_page_range_from_form(form: object) -> PageRange:
     return PageRange(start_page=start_page, end_page=end_page)
 
 
-def parse_plain_english_from_form(form: object) -> bool:
+def parse_plain_english_from_form(form: FormData) -> bool:
     """Parse plain English conversion setting from Flask form data."""
-    return form.get("enable_plain_english") == "on"
+    return bool(form.get("enable_plain_english") == "on")
 
 
 def clean_text_for_display(text: str) -> str:
