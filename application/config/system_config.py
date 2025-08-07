@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from enum import Enum
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Callable, Optional, Union, cast
 
 import yaml
 
@@ -11,6 +11,8 @@ import yaml
 YAMLValue = Union[str, int, float, bool, list[str], dict[str, object], None]
 # Type for simple YAML values (no containers)
 SimpleYAMLValue = Union[str, int, float, bool, None]
+# Type for config accessor function
+ConfigAccessor = Callable[[str, Optional[YAMLValue]], YAMLValue]
 
 if TYPE_CHECKING:
     from domain.config.tts_config import GeminiConfig, PiperConfig
@@ -129,22 +131,62 @@ class SystemConfig:
         llm_tts = cls._parse_llm_and_tts_settings(get_config)
         system = cls._parse_system_settings(get_config)
 
-        # Combine all settings and create config
+        # Create config with explicit field assignment to satisfy type checker
+        # Using assertions since we know the parsing methods return the correct types
         config = cls(
             tts_engine=tts_engine,
-            **extensions,
-            **file_settings,
-            **text_processing,
-            **performance,
-            **llm_tts,
-            **system,
+            # Extensions - already properly typed as frozenset[str]
+            allowed_extensions=extensions.get("allowed_extensions"),
+            audio_extensions=extensions.get("audio_extensions"),
+            # File settings
+            upload_folder=str(file_settings["upload_folder"]),
+            audio_folder=str(file_settings["audio_folder"]),
+            max_file_size_mb=cast(int, file_settings["max_file_size_mb"]),
+            # Text processing
+            enable_text_cleaning=bool(text_processing["enable_text_cleaning"]),
+            enable_natural_formatting=bool(text_processing["enable_natural_formatting"]),
+            enable_plain_english_conversion=bool(text_processing["enable_plain_english_conversion"]),
+            chunk_size=cast(int, text_processing["chunk_size"]),
+            llm_chunk_size=cast(int, text_processing["llm_chunk_size"]),
+            audio_target_chunk_size=cast(int, text_processing["audio_target_chunk_size"]),
+            audio_max_chunk_size=cast(int, text_processing["audio_max_chunk_size"]),
+            # Performance settings
+            enable_async_audio=bool(performance["enable_async_audio"]),
+            audio_concurrent_chunks=cast(int, performance["audio_concurrent_chunks"]),
+            tts_concurrent_requests=cast(int, performance["tts_concurrent_requests"]),
+            tts_request_delay_seconds=cast(float, performance["tts_request_delay_seconds"]),
+            enable_file_cleanup=bool(performance["enable_file_cleanup"]),
+            max_file_age_hours=cast(float, performance["max_file_age_hours"]),
+            auto_cleanup_interval_hours=cast(float, performance["auto_cleanup_interval_hours"]),
+            max_disk_usage_mb=cast(int, performance["max_disk_usage_mb"]),
+            # LLM and TTS settings
+            llm_model_name=cast(Optional[str], llm_tts.get("llm_model_name")),
+            llm_concurrent_requests=cast(int, llm_tts["llm_concurrent_requests"]),
+            llm_request_delay_seconds=cast(float, llm_tts["llm_request_delay_seconds"]),
+            gemini_api_key=cast(Optional[str], llm_tts.get("gemini_api_key")),
+            gemini_model_name=str(llm_tts["gemini_model_name"]),
+            gemini_voice_name=str(llm_tts["gemini_voice_name"]),
+            gemini_use_measurement_mode=bool(llm_tts["gemini_use_measurement_mode"]),
+            gemini_measurement_mode_interval=cast(float, llm_tts["gemini_measurement_mode_interval"]),
+            piper_model_name=str(llm_tts["piper_model_name"]),
+            piper_models_dir=str(llm_tts["piper_models_dir"]),
+            piper_length_scale=cast(float, llm_tts["piper_length_scale"]),
+            # System settings
+            ocr_dpi=cast(int, system["ocr_dpi"]),
+            ocr_threshold=cast(int, system["ocr_threshold"]),
+            ocr_language=str(system["ocr_language"]),
+            piper_model_repository_url=str(system["piper_model_repository_url"]),
+            flask_debug=bool(system["flask_debug"]),
+            flask_host=str(system["flask_host"]),
+            flask_port=cast(int, system["flask_port"]),
+            project_root=str(system.get("project_root", "")),
         )
 
         config.validate()
         return config
 
     @classmethod
-    def _load_and_validate_yaml(cls, config_path: str) -> dict:
+    def _load_and_validate_yaml(cls, config_path: str) -> dict[str, object]:
         """Load and validate YAML configuration file."""
         config_file = Path(config_path)
 
@@ -160,13 +202,13 @@ class SystemConfig:
         except yaml.YAMLError as e:
             raise ValueError(f"Invalid YAML in {config_path}: {e}") from e
 
-        return yaml_config
+        return cast(dict[str, object], yaml_config)
 
     @classmethod
-    def _create_config_accessor(cls, yaml_config: dict[str, object]) -> object:
+    def _create_config_accessor(cls, yaml_config: dict[str, object]) -> ConfigAccessor:
         """Create helper function to access nested YAML values."""
 
-        def get_config(yaml_path: str, default: YAMLValue = None) -> YAMLValue:
+        def get_config(yaml_path: str, default: Optional[YAMLValue] = None) -> YAMLValue:
             keys = yaml_path.split(".")
             value: YAMLValue = yaml_config  # Cast to our expected type
             for key in keys:
@@ -179,7 +221,7 @@ class SystemConfig:
         return get_config
 
     @classmethod
-    def _parse_tts_engine(cls, get_config: object) -> TTSEngine:
+    def _parse_tts_engine(cls, get_config: ConfigAccessor) -> TTSEngine:
         """Parse and validate TTS engine configuration."""
         tts_engine_str = get_config("tts.engine", "piper")
         if not tts_engine_str:
@@ -192,7 +234,7 @@ class SystemConfig:
             raise ValueError(f"Invalid TTS engine '{tts_engine_str}'. Must be one of: {valid_engines}") from e
 
     @classmethod
-    def _parse_file_extensions(cls, get_config: object) -> dict[str, frozenset[str]]:
+    def _parse_file_extensions(cls, get_config: ConfigAccessor) -> dict[str, frozenset[str]]:
         """Parse allowed and audio extensions from YAML configuration."""
         # Process allowed extensions
         allowed_ext = get_config("files.allowed_extensions", ["pdf"])
@@ -216,7 +258,7 @@ class SystemConfig:
         }
 
     @classmethod
-    def _parse_file_settings(cls, get_config: object) -> dict[str, object]:
+    def _parse_file_settings(cls, get_config: ConfigAccessor) -> dict[str, object]:
         """Parse file-related configuration settings."""
         return {
             "upload_folder": cls._parse_string_value(get_config("files.upload_folder", "uploads"), "uploads"),
@@ -227,12 +269,12 @@ class SystemConfig:
         }
 
     @classmethod
-    def _parse_text_processing_settings(cls, get_config: object) -> dict[str, object]:
+    def _parse_text_processing_settings(cls, get_config: ConfigAccessor) -> dict[str, object]:
         """Parse text processing configuration settings."""
         return {
             "enable_text_cleaning": cls._parse_bool_value(
                 get_config("text_processing.enable_text_cleaning", True),
-                True,  # type: ignore[misc]
+                True,
             ),
             "enable_natural_formatting": cls._parse_bool_value(
                 get_config("text_processing.enable_natural_formatting", True), True
@@ -255,7 +297,7 @@ class SystemConfig:
         }
 
     @classmethod
-    def _parse_performance_settings(cls, get_config: object) -> dict[str, object]:
+    def _parse_performance_settings(cls, get_config: ConfigAccessor) -> dict[str, object]:
         """Parse performance and resource management settings."""
         return {
             "enable_async_audio": cls._parse_bool_value(get_config("performance.enable_async_audio", True), True),
@@ -281,11 +323,11 @@ class SystemConfig:
         }
 
     @classmethod
-    def _parse_llm_and_tts_settings(cls, get_config: object) -> dict[str, object]:
+    def _parse_llm_and_tts_settings(cls, get_config: ConfigAccessor) -> dict[str, object]:
         """Parse LLM and TTS provider configuration settings."""
         return {
             # LLM settings
-            "llm_model_name": cls._parse_optional_string_value(get_config("llm.model_name")),
+            "llm_model_name": cls._parse_optional_string_value(get_config("llm.model_name", None)),
             "llm_concurrent_requests": cls._parse_int_value(
                 get_config("llm.concurrent_requests", 3), 3, min_val=1, max_val=10
             ),
@@ -293,7 +335,7 @@ class SystemConfig:
                 get_config("llm.request_delay_seconds", 0.5), 0.5, min_val=0.1, max_val=5.0
             ),
             # Gemini TTS settings
-            "gemini_api_key": cls._parse_optional_string_value(get_config("secrets.google_ai_api_key")),
+            "gemini_api_key": cls._parse_optional_string_value(get_config("secrets.google_ai_api_key", None)),
             "gemini_model_name": cls._parse_string_value(
                 get_config("tts.gemini.model_name", "gemini-2.5-flash"), "gemini-2.5-flash"
             ),
@@ -317,7 +359,7 @@ class SystemConfig:
         }
 
     @classmethod
-    def _parse_system_settings(cls, get_config: object) -> dict[str, object]:
+    def _parse_system_settings(cls, get_config: ConfigAccessor) -> dict[str, object]:
         """Parse system-level configuration settings."""
         return {
             # OCR settings
