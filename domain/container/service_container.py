@@ -161,9 +161,23 @@ class ServiceContainer(IServiceContainer):
             # Ensure we have a proper PiperConfig object, not a dict fallback
             if isinstance(piper_config, dict):
                 # Create PiperConfig from dict if needed
+                # Explicitly map dict fields to avoid **dict unpacking type error
+                from typing import cast
+
                 from domain.config.tts_config import PiperConfig
 
-                piper_config = PiperConfig(**piper_config)
+                piper_config = PiperConfig(
+                    model_name=str(piper_config.get("model_name", "en_US-lessac-medium")),
+                    model_path=cast(str, piper_config.get("model_path")) if piper_config.get("model_path") else None,
+                    config_path=cast(str, piper_config.get("config_path")) if piper_config.get("config_path") else None,
+                    speaker_id=int(piper_config["speaker_id"]) if piper_config.get("speaker_id") is not None else None,
+                    length_scale=float(piper_config.get("length_scale", 1.0)),
+                    noise_scale=float(piper_config.get("noise_scale", 0.667)),
+                    noise_w=float(piper_config.get("noise_w", 0.8)),
+                    sentence_silence=float(piper_config.get("sentence_silence", 0.2)),
+                    download_dir=str(piper_config.get("download_dir", "piper_models")),
+                    use_gpu=bool(piper_config.get("use_gpu", True)),
+                )
             # Handle both the full PiperTTSProvider and the fallback version
             try:
                 return PiperTTSProvider(

@@ -1,7 +1,7 @@
-# domain/audio/audio_engine.py - Unified Audio Processing Engine
-"""Consolidated audio engine that unifies audio generation, processing, and coordination.
+# domain/audio/audio_engine.py - Audio Processing Engine with Result[T] pattern
+"""Audio engine using Result[T] pattern for type-safe error handling.
 
-Replaces: AudioGenerationService, AudioGenerationCoordinator, AudioProcessor, AudioFileProcessor.
+No exceptions thrown - all errors returned as Result[T].
 """
 
 from abc import ABC, abstractmethod
@@ -15,21 +15,21 @@ from typing import TYPE_CHECKING, Any, Optional, Union
 from ..errors import Result, audio_generation_error
 from ..interfaces import IFileManager, ITTSEngine
 from ..models import TimedAudioResult
-from ..text.chunking_strategy import ChunkingMode, ChunkingService, create_chunking_service
+from ..text.chunking_strategy import ChunkingMode, IChunkingStrategy, create_chunking_strategy
 
 if TYPE_CHECKING:
     from .timing_engine import ITimingEngine
 
 
 class IAudioEngine(ABC):
-    """Unified interface for all audio operations."""
+    """Interface for audio operations using Result[T] pattern."""
 
     @abstractmethod
-    def generate_with_timing(self, text_chunks: list[str], output_filename: str) -> TimedAudioResult:
+    def generate_with_timing(self, text_chunks: list[str], output_filename: str) -> Result[TimedAudioResult]:
         """Generate audio with timing data from text chunks."""
 
     @abstractmethod
-    def generate_simple_audio(self, text_chunks: list[str], output_filename: str) -> TimedAudioResult:
+    def generate_simple_audio(self, text_chunks: list[str], output_filename: str) -> Result[TimedAudioResult]:
         """Generate audio without timing complexity - for regular uploads."""
 
     @abstractmethod
@@ -48,10 +48,9 @@ class IAudioEngine(ABC):
 
 
 class AudioEngine(IAudioEngine):
-    """Unified audio engine that consolidates all audio-related operations.
+    """Audio engine using Result[T] pattern for all operations.
 
-    High cohesion: All audio operations in one place.
-    Low coupling: Depends only on abstractions (ITTSEngine, IFileManager).
+    Pure functions with no exceptions - all errors returned as Result[T].
     """
 
     def __init__(
@@ -63,7 +62,7 @@ class AudioEngine(IAudioEngine):
         audio_target_chunk_size: int = 2000,
         audio_max_chunk_size: int = 3000,
         enable_async: bool = True,
-        chunking_service: Optional[ChunkingService] = None,
+        chunking_strategy: Optional[IChunkingStrategy] = None,
     ):
         self.tts_engine = tts_engine
         self.file_manager = file_manager
@@ -72,65 +71,71 @@ class AudioEngine(IAudioEngine):
         self.audio_target_chunk_size = audio_target_chunk_size
         self.audio_max_chunk_size = audio_max_chunk_size
         self.enable_async = enable_async
-        self.chunking_service = chunking_service or create_chunking_service(ChunkingMode.SENTENCE_BASED)
+        self.chunking_strategy = chunking_strategy or create_chunking_strategy(ChunkingMode.SENTENCE_BASED)
         self.base_delay = self._get_base_delay_for_engine()
 
         print("🔍 AudioEngine: Initialized with chunk sizes:")
         print(f"  - audio_target_chunk_size: {self.audio_target_chunk_size}")
         print(f"  - audio_max_chunk_size: {self.audio_max_chunk_size}")
 
-    def generate_with_timing(self, text_chunks: list[str], output_filename: str) -> TimedAudioResult:
+    def generate_with_timing(self, text_chunks: list[str], output_filename: str) -> Result[TimedAudioResult]:
         """Main entry point for audio generation with timing.
 
         Delegates to timing engine for strategy-specific processing.
         """
         return self.timing_engine.generate_with_timing(text_chunks, output_filename)
 
-    def generate_simple_audio(self, text_chunks: list[str], output_filename: str) -> TimedAudioResult:
-        """Simple audio generation without timing complexity - bypasses TimingEngine.
+    def generate_simple_audio(self, text_chunks: list[str], output_filename: str) -> Result[TimedAudioResult]:
+        """Simple audio generation without timing complexity.
 
-        Perfect for regular uploads that don't need timing data.
+        Returns Result with audio result or error - no exceptions thrown.
         """
         print(f"AudioEngine: Generating simple audio for {len(text_chunks)} chunks")
         print(f"🔍 AudioEngine: Chunk sizes: {[len(chunk) for chunk in text_chunks]}")
 
         if not text_chunks:
-            return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
-
-        # Use chunking service for optimal text splitting
-        max_chunk_size = self.audio_target_chunk_size
-        print(f"🔍 AudioEngine: Using max_chunk_size = {max_chunk_size} (from self.audio_target_chunk_size)")
-
-        processed_chunks = self.chunking_service.process_chunks(text_chunks, max_chunk_size)
-        print(f"AudioEngine: Processing {len(processed_chunks)} chunks (max size: {max_chunk_size} chars)")
-        print(f"🔍 AudioEngine: After rechunking, chunk sizes: {[len(chunk) for chunk in processed_chunks]}")
-
-        # Generate audio using sync or async based on config
-        if self.enable_async:
-            print("AudioEngine: Using async processing for simple audio generation")
-            audio_chunks = self._generate_chunks_with_new_async_interface(processed_chunks)
-        else:
-            print("AudioEngine: Using synchronous processing for simple audio generation")
-            audio_chunks = self._generate_chunks_sync(processed_chunks)
-
-        if not audio_chunks:
-            print("AudioEngine: No successful audio chunks generated")
-            return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
+            return Result.success(TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None))
 
         try:
+            # Use chunking strategy for optimal text splitting
+            max_chunk_size = self.audio_target_chunk_size
+            print(f"🔍 AudioEngine: Using max_chunk_size = {max_chunk_size} (from self.audio_target_chunk_size)")
+
+            chunks_result = self.chunking_strategy.chunk_text(text_chunks, max_chunk_size)
+            if chunks_result.is_failure:
+                return Result.failure(chunks_result.error)  # type: ignore[arg-type]
+
+            processed_chunks = chunks_result.value
+            if processed_chunks is None:
+                return Result.success(TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None))
+
+            print(f"AudioEngine: Processing {len(processed_chunks)} chunks (max size: {max_chunk_size} chars)")
+            print(f"🔍 AudioEngine: After rechunking, chunk sizes: {[len(chunk) for chunk in processed_chunks]}")
+
+            # Generate audio using sync or async based on config
+            if self.enable_async:
+                print("AudioEngine: Using async processing for simple audio generation")
+                audio_chunks = self._generate_chunks_with_new_async_interface(processed_chunks)
+            else:
+                print("AudioEngine: Using synchronous processing for simple audio generation")
+                audio_chunks = self._generate_chunks_sync(processed_chunks)
+
+            if not audio_chunks:
+                print("AudioEngine: No successful audio chunks generated")
+                return Result.success(TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None))
+
             # Combine audio chunks
             combined_audio = self._combine_wav_chunks(audio_chunks)
-            audio_data = combined_audio
 
-            if not audio_data:
-                return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
+            if not combined_audio:
+                return Result.success(TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None))
 
             # Save audio file as WAV first (since TTS engines typically generate WAV)
             temp_wav_filename = f"{output_filename}_temp.wav"
-            temp_wav_path = self.file_manager.save_output_file(audio_data, temp_wav_filename)
+            temp_wav_path = self.file_manager.save_output_file(combined_audio, temp_wav_filename)
 
             if not temp_wav_path:
-                return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
+                return Result.success(TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None))
 
             # Convert WAV to MP3 using ffmpeg
             mp3_filename = f"{output_filename}_simple.mp3"
@@ -139,40 +144,51 @@ class AudioEngine(IAudioEngine):
             conversion_result = self._convert_wav_to_mp3(temp_wav_path, str(mp3_path))
 
             # Clean up temporary WAV file
-            # Ignore file cleanup errors - temporary files may already be removed
             with suppress(OSError, FileNotFoundError):
                 Path(temp_wav_path).unlink()
 
             if conversion_result.is_success:
                 print(f"AudioEngine: Simple audio generated and converted to MP3: {mp3_filename}")
-                return TimedAudioResult(
-                    audio_files=[mp3_filename],
-                    combined_mp3=mp3_filename,
-                    timing_data=None,  # No timing data needed for simple generation
+                return Result.success(
+                    TimedAudioResult(
+                        audio_files=[mp3_filename],
+                        combined_mp3=mp3_filename,
+                        timing_data=None,
+                    )
                 )
             else:
                 print(f"AudioEngine: MP3 conversion failed: {conversion_result.error}")
-                return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
+                return Result.success(TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None))
 
         except Exception as e:
             print(f"AudioEngine: Simple audio generation failed: {e}")
-            return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
+            return Result.failure(audio_generation_error(f"Simple audio generation failed: {e}"))
 
     def _generate_chunks_with_new_async_interface(self, processed_chunks: list[str]) -> list[bytes]:
-        """Generate audio chunks using the new async interface with true parallelism."""
+        """Generate audio chunks using the new async interface with true parallelism.
+
+        Pure function - returns empty list on error.
+        """
         import asyncio
 
-        # Create and run async processing
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
         try:
-            audio_chunks = loop.run_until_complete(self._process_chunks_async(processed_chunks))
-            return audio_chunks
-        finally:
-            loop.close()
+            # Create and run async processing
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                audio_chunks = loop.run_until_complete(self._process_chunks_async(processed_chunks))
+                return audio_chunks
+            finally:
+                loop.close()
+        except Exception as e:
+            print(f"AudioEngine: Async processing failed: {e}")
+            return []
 
     def _generate_chunks_sync(self, processed_chunks: list[str]) -> list[bytes]:
-        """Generate audio chunks synchronously - simpler and more reliable."""
+        """Generate audio chunks synchronously.
+
+        Pure function - returns list of successful chunks.
+        """
         audio_chunks = []
 
         for i, chunk in enumerate(processed_chunks, 1):
@@ -188,7 +204,10 @@ class AudioEngine(IAudioEngine):
         return audio_chunks
 
     async def _process_chunks_async(self, processed_chunks: list[str]) -> list[bytes]:
-        """Orchestrate parallel chunk processing with proper async coordination."""
+        """Orchestrate parallel chunk processing with proper async coordination.
+
+        Returns list of successful audio chunks.
+        """
         # Initialize timing and logging
         timing_context = self._initialize_async_timing()
 
@@ -311,7 +330,10 @@ class AudioEngine(IAudioEngine):
             return None
 
     def process_audio_file(self, file_path: str) -> Result[float]:
-        """Get audio file duration using ffprobe or fallback."""
+        """Get audio file duration using ffprobe or fallback.
+
+        Returns Result with duration or error.
+        """
         try:
             import subprocess
 
@@ -338,7 +360,10 @@ class AudioEngine(IAudioEngine):
             return Result.failure(audio_generation_error(f"Failed to get audio duration: {e}"))
 
     def _combine_wav_chunks(self, audio_chunks: list[bytes]) -> bytes:
-        """Combine multiple WAV audio chunks into a single WAV file."""
+        """Combine multiple WAV audio chunks into a single WAV file.
+
+        Pure function - returns empty bytes on error.
+        """
         try:
             import io
             import wave
@@ -376,7 +401,10 @@ class AudioEngine(IAudioEngine):
             return audio_chunks[0] if audio_chunks else b""
 
     def combine_audio_files(self, file_paths: list[str], output_path: str) -> Result[str]:
-        """Combine multiple audio files using ffmpeg."""
+        """Combine multiple audio files using ffmpeg.
+
+        Returns Result with output path or error.
+        """
         if not file_paths:
             return Result.failure(audio_generation_error("No audio files to combine"))
 
@@ -426,7 +454,6 @@ class AudioEngine(IAudioEngine):
             result = subprocess.run(cmd, capture_output=True, timeout=300)
 
             # Clean up list file
-            # Ignore file cleanup errors - temporary files may already be removed
             with suppress(OSError, FileNotFoundError):
                 Path(list_file).unlink()
 
@@ -452,7 +479,10 @@ class AudioEngine(IAudioEngine):
     async def generate_audio_async(
         self, text_chunks: list[str], output_name: str, output_dir: str
     ) -> tuple[list[str], Optional[str]]:
-        """Generate audio files concurrently with intelligent coordination."""
+        """Generate audio files concurrently with intelligent coordination.
+
+        Async function for backward compatibility - returns tuple directly.
+        """
         if not self.tts_engine:
             print("AudioEngine: No TTS engine available")
             return [], None
@@ -484,7 +514,10 @@ class AudioEngine(IAudioEngine):
         return [Path(f).name for f in audio_files], combined_mp3
 
     def _filter_valid_chunks(self, text_chunks: list[str]) -> list[tuple[int, str]]:
-        """Filter out invalid or empty text chunks."""
+        """Filter out invalid or empty text chunks.
+
+        Pure function.
+        """
         valid_chunks = []
         for i, text_chunk in enumerate(text_chunks):
             if (
@@ -548,7 +581,6 @@ class AudioEngine(IAudioEngine):
                     return None
 
                 # Save the audio file
-                Path(output_dir) / filename
                 save_path = self.file_manager.save_output_file(audio_result.value, filename)
 
                 if save_path:
@@ -570,7 +602,10 @@ class AudioEngine(IAudioEngine):
             return Result.failure(audio_generation_error(f"TTS engine call failed: {e!s}"))
 
     def _get_base_delay_for_engine(self) -> float:
-        """Get base delay for rate limiting based on TTS engine."""
+        """Get base delay for rate limiting based on TTS engine.
+
+        Pure function.
+        """
         engine_name = self.tts_engine.__class__.__name__.lower()
 
         if "gemini" in engine_name:
@@ -581,7 +616,10 @@ class AudioEngine(IAudioEngine):
             return 0.5  # Default for unknown engines
 
     def _convert_wav_to_mp3(self, wav_path: str, mp3_path: str) -> Result[str]:
-        """Convert WAV file to MP3 using ffmpeg."""
+        """Convert WAV file to MP3 using ffmpeg.
+
+        Returns Result with output path or error.
+        """
         try:
             import subprocess
 

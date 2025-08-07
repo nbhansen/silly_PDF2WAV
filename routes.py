@@ -177,15 +177,25 @@ def register_routes(app: Flask) -> None:
             temp_path = Path(app.config["UPLOAD_FOLDER"]) / f"temp_{original_filename}"
             file.save(str(temp_path))
 
-            # Use document engine to get PDF info
-            document_engine = service.get("IDocumentEngine")
-            pdf_info = document_engine.get_pdf_info(str(temp_path))
+            # Use document engine to get PDF info  
+            from domain.document.document_engine import IDocumentEngine
+            from domain.container.service_container import ServiceContainer
+            
+            # Type assertion for proper type checking
+            assert isinstance(service, ServiceContainer), "Service must be ServiceContainer instance"
+            document_engine = service.get(IDocumentEngine)
+            pdf_info_result = document_engine.get_pdf_info(str(temp_path))
 
             # Clean up
             with contextlib.suppress(Exception):
                 temp_path.unlink()
 
-            return jsonify({"total_pages": pdf_info.total_pages, "title": pdf_info.title, "author": pdf_info.author})
+            if pdf_info_result.is_success:
+                pdf_info = pdf_info_result.value
+                assert pdf_info is not None  # Type hint for mypy
+                return jsonify({"total_pages": pdf_info.total_pages, "title": pdf_info.title, "author": pdf_info.author})
+            else:
+                return jsonify({"error": f"Failed to get PDF info: {pdf_info_result.error}"}), 500
 
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -213,8 +223,8 @@ def register_routes(app: Flask) -> None:
     def upload_file() -> Union[str, tuple[str, int]]:
         """Regular upload WITHOUT timing data."""
         file, error = _validate_upload_request()
-        if error:
-            return error
+        if error or file is None:
+            return error or "No file provided"
 
         # Use unified processing logic WITHOUT timing
         result, original_filename, base_filename, error_message = process_upload_request(
@@ -238,8 +248,8 @@ def register_routes(app: Flask) -> None:
             return "Read-along mode is not available with Gemini TTS. Please use regular upload or switch to Piper TTS."
 
         file, error = _validate_upload_request()
-        if error:
-            return error
+        if error or file is None:
+            return error or "No file provided"
 
         # Use unified processing logic WITH timing
         result, original_filename, base_filename, error_message = process_upload_request(
@@ -464,7 +474,25 @@ def _process_uploaded_file(uploaded_file: FileStorage, request_form: object) -> 
     if not page_range.is_full_document():
         services = _configure_processing_services()
         document_engine = services.document_engine
-        validation = document_engine.validate_page_range(str(pdf_path), page_range)
+        # Type assertion for mypy
+        from domain.document.document_engine import IDocumentEngine
+        assert isinstance(document_engine, IDocumentEngine)
+        validation_result = document_engine.validate_page_range(str(pdf_path), page_range)
+        if validation_result.is_failure:
+            # Clean up file before returning error
+            with contextlib.suppress(Exception):
+                pdf_path.unlink()
+            return FileProcessingInfo(
+                original_filename=original_filename,
+                base_filename=base_filename_no_ext,
+                pdf_path=str(pdf_path),
+                page_range=page_range,
+                enable_plain_english=enable_plain_english,
+                error=f"Error: {validation_result.error}",
+            )
+        
+        validation = validation_result.value
+        assert validation is not None  # Type assertion for mypy
         if not validation.get("valid", False):
             # Clean up file before returning error
             with contextlib.suppress(Exception):
@@ -492,19 +520,23 @@ def _configure_processing_services() -> ProcessingServices:
     from domain.audio.audio_engine import IAudioEngine
     from domain.document.document_engine import IDocumentEngine
     from domain.text.text_pipeline import ITextPipeline
+    from domain.container.service_container import ServiceContainer
 
-    service = get_pdf_service()
+    service_container = get_pdf_service()
+    
+    # Type assertion for proper type checking
+    assert isinstance(service_container, ServiceContainer), "Service container must be ServiceContainer instance"
 
     # Debug: Log available services
     logger = get_logger("routes")
-    logger.info(f"Available services: {list(service._factories.keys())}")
+    logger.info(f"Available services: {list(service_container._factories.keys())}")
 
-    document_engine = service.get(IDocumentEngine)
-    audio_engine = service.get(IAudioEngine)
-    text_pipeline = service.get(ITextPipeline)
+    document_engine = service_container.get(IDocumentEngine)
+    audio_engine = service_container.get(IAudioEngine)
+    text_pipeline = service_container.get(ITextPipeline)
 
     return ProcessingServices(
-        service_container=service,
+        service_container=service_container,
         document_engine=document_engine,
         audio_engine=audio_engine,
         text_pipeline=text_pipeline,
@@ -550,11 +582,44 @@ def _execute_document_processing(
         get_logger("routes").info("Created custom TextPipeline with plain English conversion enabled")
 
     # Use document engine for complete processing
-    result = services.document_engine.process_document(
+    # Type assertions for mypy
+    from domain.document.document_engine import IDocumentEngine
+    from domain.audio.audio_engine import IAudioEngine
+    from domain.text.text_pipeline import ITextPipeline
+    assert isinstance(services.document_engine, IDocumentEngine)
+    assert isinstance(services.audio_engine, IAudioEngine)
+    assert isinstance(text_pipeline, ITextPipeline)
+    processing_result = services.document_engine.process_document(
         request_obj, services.audio_engine, text_pipeline, enable_timing, config.llm_chunk_size
     )
-    assert isinstance(result, ProcessingResult)
-    return result
+    
+    if processing_result.is_failure:
+        # Convert Result[T] error to ProcessingResult for backward compatibility
+        from domain.models import ProcessingResult
+        from domain.errors import ApplicationError, ErrorCode
+        error = ApplicationError(
+            code=ErrorCode.AUDIO_GENERATION_FAILED,
+            message=str(processing_result.error),
+            retryable=True
+        )
+        return ProcessingResult(
+            audio_files=None,
+            combined_mp3_file=None,
+            timing_data=None,
+            error=error,
+            debug_info={"processing_error": "Document engine processing failed"}
+        )
+    
+    # Convert TimedAudioResult to ProcessingResult for backward compatibility
+    audio_result = processing_result.value
+    assert audio_result is not None  # Type assertion for mypy
+    return ProcessingResult(
+        audio_files=audio_result.audio_files,
+        combined_mp3_file=audio_result.combined_mp3,
+        timing_data=audio_result.timing_data,
+        error=None,
+        debug_info={"audio_generation": "success"}
+    )
 
 
 def _handle_timing_data(

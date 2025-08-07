@@ -1,20 +1,24 @@
-# domain/document/document_engine.py - Unified Document Processing Engine
-"""Consolidated document engine that unifies PDF processing, text extraction, and coordination.
+# domain/document/document_engine.py - Document Processing Engine with Result[T] pattern
+"""Document engine using Result[T] pattern for type-safe error handling.
 
-Replaces: PDFProcessingService, complex text extraction logic.
+No exceptions thrown - all errors returned as Result[T].
 """
 
 from abc import ABC, abstractmethod
 from contextlib import suppress
 import io
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
 import pdfplumber
 
-from ..errors import audio_generation_error
+from ..errors import (
+    ErrorCode,
+    Result,
+    audio_generation_error,
+    text_extraction_error,
+)
 from ..interfaces import IFileManager, IOCRProvider
-from ..models import PageRange, PDFInfo, ProcessingRequest, ProcessingResult, TimedAudioResult
+from ..models import PageRange, PDFInfo, ProcessingRequest, TimedAudioResult
 
 if TYPE_CHECKING:
     from ..audio.audio_engine import IAudioEngine
@@ -22,18 +26,18 @@ if TYPE_CHECKING:
 
 
 class IDocumentEngine(ABC):
-    """Unified interface for document processing operations."""
+    """Interface for document processing operations using Result[T] pattern."""
 
     @abstractmethod
-    def get_pdf_info(self, pdf_path: str) -> PDFInfo:
+    def get_pdf_info(self, pdf_path: str) -> Result[PDFInfo]:
         """Get PDF metadata and information."""
 
     @abstractmethod
-    def validate_page_range(self, pdf_path: str, page_range: PageRange) -> dict[str, Any]:
+    def validate_page_range(self, pdf_path: str, page_range: PageRange) -> Result[dict[str, Any]]:
         """Validate requested page range."""
 
     @abstractmethod
-    def extract_text(self, pdf_path: str, pages: Optional[list[int]] = None) -> list[str]:
+    def extract_text(self, pdf_path: str, pages: Optional[list[int]] = None) -> Result[list[str]]:
         """Extract text from PDF with OCR fallback."""
 
     @abstractmethod
@@ -44,35 +48,42 @@ class IDocumentEngine(ABC):
         text_pipeline: "ITextPipeline",
         enable_timing: bool = False,
         llm_chunk_size: int = 50000,
-    ) -> ProcessingResult:
+    ) -> Result[TimedAudioResult]:
         """Complete document processing workflow."""
 
 
 class DocumentEngine(IDocumentEngine):
-    """Unified document engine that consolidates PDF processing.
+    """Document engine using Result[T] pattern for all operations.
 
-    High cohesion: All document operations in one place.
-    Low coupling: Depends only on abstractions (IOCRProvider, IFileManager).
+    Pure functions with no exceptions - all errors returned as Result[T].
     """
 
     def __init__(self, ocr_provider: IOCRProvider, file_manager: IFileManager, min_text_threshold: int = 100):
         self.ocr_provider = ocr_provider
         self.file_manager = file_manager
         self.min_text_threshold = min_text_threshold
-        print("DocumentEngine initialized and ready.")
+        print("DocumentEngine initialized with Result[T] pattern.")
 
-    def get_pdf_info(self, pdf_path: str) -> PDFInfo:
+    def get_pdf_info(self, pdf_path: str) -> Result[PDFInfo]:
         """Get PDF information - delegates to OCR provider."""
-        return self.ocr_provider.get_pdf_info(pdf_path)
+        try:
+            info = self.ocr_provider.get_pdf_info(pdf_path)
+            return Result.success(info)
+        except Exception as e:
+            return Result.from_exception(e, ErrorCode.TEXT_EXTRACTION_FAILED, retryable=True)
 
-    def validate_page_range(self, pdf_path: str, page_range: PageRange) -> dict[str, Any]:
+    def validate_page_range(self, pdf_path: str, page_range: PageRange) -> Result[dict[str, Any]]:
         """Validate page range - delegates to OCR provider."""
-        return self.ocr_provider.validate_range(pdf_path, page_range)
+        try:
+            validation = self.ocr_provider.validate_range(pdf_path, page_range)
+            return Result.success(validation)
+        except Exception as e:
+            return Result.from_exception(e, ErrorCode.INVALID_PAGE_RANGE, retryable=False)
 
-    def extract_text(self, pdf_path: str, pages: Optional[list[int]] = None) -> list[str]:
+    def extract_text(self, pdf_path: str, pages: Optional[list[int]] = None) -> Result[list[str]]:
         """Extract text from PDF with intelligent OCR fallback.
 
-        Uses direct text extraction first, falls back to OCR for poor quality pages.
+        Returns Result with extracted text or error.
         """
         extracted_text = []
 
@@ -85,16 +96,21 @@ class DocumentEngine(IDocumentEngine):
                         continue
 
                     page = pdf.pages[i]
-                    text = self._extract_page_text(page, i + 1)
+                    text_result = self._extract_page_text(page, i + 1)
 
-                    if text and text.strip():
-                        extracted_text.append(text.strip())
+                    if text_result.is_success and text_result.value:
+                        if text_result.value.strip():
+                            extracted_text.append(text_result.value.strip())
+                    # Continue on page errors - partial extraction is better than none
 
-            return extracted_text
+            if not extracted_text:
+                return Result.failure(text_extraction_error("No text could be extracted from the PDF"))
+
+            return Result.success(extracted_text)
 
         except Exception as e:
             print(f"DocumentEngine: Error extracting text from {pdf_path}: {e}")
-            return []
+            return Result.from_exception(e, ErrorCode.TEXT_EXTRACTION_FAILED, retryable=True)
 
     def process_document(
         self,
@@ -103,164 +119,190 @@ class DocumentEngine(IDocumentEngine):
         text_pipeline: "ITextPipeline",
         enable_timing: bool = False,
         llm_chunk_size: int = 50000,
-    ) -> ProcessingResult:
-        """Complete document processing workflow using new architecture components.
+    ) -> Result[TimedAudioResult]:
+        """Complete document processing workflow using Result[T] pattern.
 
-        Args:
-            request: ProcessingRequest with PDF path, output name, page range
-            audio_engine: AudioEngine for audio generation
-            text_pipeline: TextPipeline for text cleaning and enhancement
-            enable_timing: Whether to generate timing data
-            llm_chunk_size: Optimal chunk size for LLM processing
-
-        Returns:
-            ProcessingResult with success/failure and audio files
+        Returns Result with audio result or error - no exceptions thrown.
         """
-        try:
-            # Extract and validate text from PDF
-            text_chunks = self._extract_initial_text(request)
+        # Extract and validate text from PDF
+        text_result = self._extract_initial_text(request)
+        if text_result.is_failure:
+            return Result.failure(text_result.error)  # type: ignore[arg-type]
+        text_chunks = text_result.value
 
-            # Process text through LLM cleaning and optimization pipeline
-            processed_chunks = self._process_text_pipeline(text_chunks, text_pipeline, llm_chunk_size)
+        if text_chunks is None:
+            return Result.failure(text_extraction_error("Text extraction returned no chunks"))
 
-            # Generate audio using appropriate strategy
-            audio_result = self._generate_audio_output(
-                processed_chunks, request.output_name, enable_timing, audio_engine
-            )
+        # Process text through LLM cleaning and optimization pipeline
+        processed_result = self._process_text_pipeline(text_chunks, text_pipeline, llm_chunk_size)
+        if processed_result.is_failure:
+            return Result.failure(processed_result.error)  # type: ignore[arg-type]
+        processed_chunks = processed_result.value
 
-            # Assemble final result with debug information
-            return self._assemble_processing_result(audio_result, processed_chunks, text_chunks)
+        if processed_chunks is None:
+            return Result.failure(audio_generation_error("Text processing returned no chunks"))
 
-        except Exception as e:
-            print(f"DocumentEngine: Processing failed: {e}")
-            return ProcessingResult.failure_result(audio_generation_error(f"Document processing failed: {e!s}"))
+        # Generate audio using appropriate strategy
+        audio_result = self._generate_audio_output(processed_chunks, request.output_name, enable_timing, audio_engine)
+        if audio_result.is_failure:
+            return Result.failure(audio_result.error)  # type: ignore[arg-type]
 
-    def _extract_initial_text(self, request: ProcessingRequest) -> list[str]:
+        return audio_result
+
+    def _extract_initial_text(self, request: ProcessingRequest) -> Result[list[str]]:
         """Extract and validate text from PDF with page range conversion."""
         print(f"DocumentEngine: Starting processing for {request.pdf_path}")
 
         # Convert page range to page list
-        pages_list = self._convert_page_range_to_list(request.pdf_path, request.page_range)
+        pages_result = self._convert_page_range_to_list(request.pdf_path, request.page_range)
+        if pages_result.is_failure:
+            return Result.failure(pages_result.error)  # type: ignore[arg-type]
+        pages_list = pages_result.value
 
         # Extract text from PDF
-        text_chunks = self.extract_text(request.pdf_path, pages_list)
+        text_result = self.extract_text(request.pdf_path, pages_list)
+        if text_result.is_failure:
+            return text_result
 
+        text_chunks = text_result.value
         if not text_chunks:
             print("DocumentEngine: No text extracted from PDF")
-            raise ValueError("No text could be extracted from the PDF")
+            return Result.failure(text_extraction_error("No text could be extracted from the PDF"))
 
         print(f"DocumentEngine: Extracted {len(text_chunks)} text chunks")
-        return text_chunks
+        return Result.success(text_chunks)
 
     def _process_text_pipeline(
         self, text_chunks: list[str], text_pipeline: "ITextPipeline", llm_chunk_size: int
-    ) -> list[str]:
+    ) -> Result[list[str]]:
         """Process text through LLM cleaning and optimization pipeline."""
         print(f"🔬 DocumentEngine: Using optimized chunking strategy (LLM chunk size: {llm_chunk_size})")
 
-        # Step 1: Combine chunks for LLM processing
-        combined_chunks = self._combine_chunks_for_llm(text_chunks, llm_chunk_size)
-        print(f"   → Combined {len(text_chunks)} original chunks into {len(combined_chunks)} LLM chunks")
+        try:
+            # Step 1: Combine chunks for LLM processing
+            combined_chunks = self._combine_chunks_for_llm(text_chunks, llm_chunk_size)
+            print(f"   → Combined {len(text_chunks)} original chunks into {len(combined_chunks)} LLM chunks")
 
-        # Step 2: Process through LLM cleaning
-        cleaned_chunks = []
-        for i, combined_chunk in enumerate(combined_chunks, 1):
-            print(f"🔬 DocumentEngine: Processing LLM chunk {i}/{len(combined_chunks)} ({len(combined_chunk)} chars)")
-            print(f"   Combined text preview: '{combined_chunk[:100]}...'")
+            # Step 2: Process through LLM cleaning
+            cleaned_chunks = []
+            for i, combined_chunk in enumerate(combined_chunks, 1):
+                print(
+                    f"🔬 DocumentEngine: Processing LLM chunk {i}/{len(combined_chunks)} ({len(combined_chunk)} chars)"
+                )
+                print(f"   Combined text preview: '{combined_chunk[:100]}...'")
 
-            print("   → Calling text_pipeline.clean_text()...")
-            cleaned = text_pipeline.clean_text(combined_chunk)
-            print(f"   → Cleaned text ({len(cleaned)} chars): '{cleaned[:100]}...'")
+                print("   → Calling text_pipeline.clean_text()...")
+                clean_result = text_pipeline.clean_text(combined_chunk)
+                if clean_result.is_failure:
+                    return Result.failure(clean_result.error)  # type: ignore[arg-type]
 
-            cleaned_chunks.append(cleaned)
+                cleaned = clean_result.value
+                if cleaned is not None:
+                    print(f"   → Cleaned text ({len(cleaned)} chars): '{cleaned[:100]}...'")
+                    cleaned_chunks.append(cleaned)
+                else:
+                    print("   → Cleaning returned None, skipping chunk")
 
-        # Step 3: Re-combine all cleaned text and enhance with natural formatting
-        all_cleaned_text = " ".join(cleaned_chunks)
-        print(f"   → Combined all cleaned text: {len(all_cleaned_text)} chars total")
+            # Step 3: Re-combine all cleaned text and enhance with natural formatting
+            all_cleaned_text = " ".join(cleaned_chunks)
+            print(f"   → Combined all cleaned text: {len(all_cleaned_text)} chars total")
 
-        print("   → Calling text_pipeline.enhance_with_natural_formatting() on combined text...")
-        enhanced_text = text_pipeline.enhance_with_natural_formatting(all_cleaned_text)
-        print(f"   → Enhanced text ({len(enhanced_text)} chars): '{enhanced_text[:100]}...'")
+            print("   → Calling text_pipeline.enhance_with_natural_formatting() on combined text...")
+            enhance_result = text_pipeline.enhance_with_natural_formatting(all_cleaned_text)
+            if enhance_result.is_failure:
+                return Result.failure(enhance_result.error)  # type: ignore[arg-type]
 
-        # Step 4: Split enhanced text back into optimal chunks for TTS
-        processed_chunks = self._split_for_tts(enhanced_text)
-        print(f"   → Split enhanced text into {len(processed_chunks)} TTS-optimized chunks")
+            enhanced_text = enhance_result.value
+            if enhanced_text is None:
+                return Result.failure(text_extraction_error("Text enhancement returned None"))
+            print(f"   → Enhanced text ({len(enhanced_text)} chars): '{enhanced_text[:100]}...'")
 
-        print(
-            f"DocumentEngine: Processed through optimized pipeline: "
-            f"{len(text_chunks)} → {len(combined_chunks)} → {len(processed_chunks)} chunks"
-        )
+            # Step 4: Split enhanced text back into optimal chunks for TTS
+            processed_chunks = self._split_for_tts(enhanced_text)
+            print(f"   → Split enhanced text into {len(processed_chunks)} TTS-optimized chunks")
 
-        return processed_chunks
+            print(
+                f"DocumentEngine: Processed through optimized pipeline: "
+                f"{len(text_chunks)} → {len(combined_chunks)} → {len(processed_chunks)} chunks"
+            )
+
+            return Result.success(processed_chunks)
+
+        except Exception as e:
+            return Result.from_exception(e, ErrorCode.TEXT_CLEANING_FAILED, retryable=True)
 
     def _generate_audio_output(
         self, processed_chunks: list[str], output_name: str, enable_timing: bool, audio_engine: "IAudioEngine"
-    ) -> TimedAudioResult:
+    ) -> Result[TimedAudioResult]:
         """Generate audio using appropriate strategy based on timing requirements."""
-        if enable_timing:
-            print("DocumentEngine: Using timing-aware audio generation")
-            timed_result = audio_engine.generate_with_timing(processed_chunks, output_name)
-        else:
-            print("DocumentEngine: Using simple audio generation (no timing complexity)")
-            timed_result = audio_engine.generate_simple_audio(processed_chunks, output_name)
+        try:
+            if enable_timing:
+                print("DocumentEngine: Using timing-aware audio generation")
+                audio_result = audio_engine.generate_with_timing(processed_chunks, output_name)
+            else:
+                print("DocumentEngine: Using simple audio generation (no timing complexity)")
+                audio_result = audio_engine.generate_simple_audio(processed_chunks, output_name)
 
-        print(f"🔍 DEBUG: timed_result={timed_result}")
-        if timed_result:
-            print(f"🔍 DEBUG: timed_result.audio_files={timed_result.audio_files}")
+            print(f"🔍 DEBUG: audio_result={audio_result}")
 
-        if not timed_result or not timed_result.audio_files:
-            raise ValueError("Audio generation failed to produce files")
+            if audio_result.is_failure:
+                return audio_result
 
-        return timed_result
+            timed_result = audio_result.value
+            if timed_result:
+                print(f"🔍 DEBUG: timed_result.audio_files={timed_result.audio_files}")
 
-    def _assemble_processing_result(
-        self, audio_result: TimedAudioResult, processed_chunks: list[str], original_chunks: list[str]
-    ) -> ProcessingResult:
-        """Assemble final ProcessingResult with debug information."""
-        return ProcessingResult.success_result(
-            audio_files=[Path(f).name for f in audio_result.audio_files],
-            combined_mp3=Path(audio_result.combined_mp3).name if audio_result.combined_mp3 else None,
-            timing_data=audio_result.timing_data,
-            debug_info={
-                "text_chunks_count": len(original_chunks),
-                "processed_chunks_count": len(processed_chunks),
-                "audio_files_count": len(audio_result.audio_files),
-                "timing_data_available": audio_result.timing_data is not None,
-            },
-        )
+            if not timed_result or not timed_result.audio_files:
+                return Result.failure(audio_generation_error("Audio generation failed to produce files"))
 
-    def _convert_page_range_to_list(self, pdf_path: str, page_range: PageRange) -> Optional[list[int]]:
+            return Result.success(timed_result)
+
+        except Exception as e:
+            return Result.from_exception(e, ErrorCode.AUDIO_GENERATION_FAILED, retryable=True)
+
+    def _convert_page_range_to_list(self, pdf_path: str, page_range: PageRange) -> Result[Optional[list[int]]]:
         """Convert PageRange to 0-based page list."""
         if page_range.is_full_document():
-            return None
+            return Result.success(None)
 
         start = page_range.start_page or 1
         end = page_range.end_page
 
         if end is None:
             # Get total pages to determine end
-            pdf_info = self.get_pdf_info(pdf_path)
+            pdf_info_result = self.get_pdf_info(pdf_path)
+            if pdf_info_result.is_failure:
+                return Result.failure(pdf_info_result.error)  # type: ignore[arg-type]
+            pdf_info = pdf_info_result.value
+            if pdf_info is None:
+                return Result.failure(text_extraction_error("Could not get PDF info"))
             end = pdf_info.total_pages
 
-        return list(range(start - 1, end))  # Convert to 0-based indexing
+        return Result.success(list(range(start - 1, end)))  # Convert to 0-based indexing
 
-    def _extract_page_text(self, page: pdfplumber.page.Page, page_num: int) -> str:
+    def _extract_page_text(self, page: pdfplumber.page.Page, page_num: int) -> Result[str]:
         """Extract text from a single page with OCR fallback."""
-        # Try direct text extraction first
-        text = page.extract_text()
+        try:
+            # Try direct text extraction first
+            text = page.extract_text()
 
-        # If direct extraction is poor, try OCR fallback
-        if not text or len(text.strip()) < self.min_text_threshold:
-            print(f"DocumentEngine: Page {page_num} has low text quality, using OCR")
-            ocr_text = self._ocr_page(page)
+            # If direct extraction is poor, try OCR fallback
+            if not text or len(text.strip()) < self.min_text_threshold:
+                print(f"DocumentEngine: Page {page_num} has low text quality, using OCR")
+                ocr_result = self._ocr_page(page)
 
-            # Use whichever text is longer
-            if len(ocr_text) > len(text or ""):
-                text = ocr_text
+                if ocr_result.is_success and ocr_result.value is not None:
+                    ocr_text = ocr_result.value
+                    # Use whichever text is longer
+                    if len(ocr_text) > len(text or ""):
+                        text = ocr_text
 
-        return text or ""
+            return Result.success(text or "")
 
-    def _ocr_page(self, page: pdfplumber.page.Page) -> str:
+        except Exception as e:
+            return Result.from_exception(e, ErrorCode.TEXT_EXTRACTION_FAILED, retryable=True)
+
+    def _ocr_page(self, page: pdfplumber.page.Page) -> Result[str]:
         """Perform OCR on a single PDF page."""
         temp_image_path = None
 
@@ -278,14 +320,14 @@ class DocumentEngine(IDocumentEngine):
             # Perform OCR using the provider
             ocr_result = self.ocr_provider.perform_ocr(temp_image_path)
             if ocr_result.is_success:
-                return ocr_result.value or ""
+                return Result.success(ocr_result.value or "")
             else:
                 print(f"DocumentEngine: OCR provider failed: {ocr_result.error}")
-                return ""
+                return Result.success("")  # Return empty string on OCR failure, not an error
 
         except Exception as e:
             print(f"DocumentEngine: OCR failed for page: {e}")
-            return ""
+            return Result.success("")  # Return empty string on failure
 
         finally:
             # Clean up temporary file
@@ -297,12 +339,7 @@ class DocumentEngine(IDocumentEngine):
     def _combine_chunks_for_llm(self, text_chunks: list[str], llm_chunk_size: int) -> list[str]:
         """Combine small PDF chunks into larger chunks optimal for LLM processing.
 
-        Args:
-            text_chunks: Original PDF text chunks
-            llm_chunk_size: Target size for LLM chunks
-
-        Returns:
-            List of combined chunks optimized for LLM processing
+        Pure function - no exceptions thrown.
         """
         if not text_chunks:
             return []
@@ -332,12 +369,7 @@ class DocumentEngine(IDocumentEngine):
     def _split_for_tts(self, text: str, target_chunk_size: int = 4000) -> list[str]:
         """Split enhanced text into chunks optimal for TTS processing.
 
-        Args:
-            text: Enhanced text with SSML markup
-            target_chunk_size: Target size for TTS chunks
-
-        Returns:
-            List of chunks optimized for TTS processing
+        Pure function - no exceptions thrown.
         """
         if not text:
             return []
@@ -345,7 +377,6 @@ class DocumentEngine(IDocumentEngine):
         # Simple sentence-based splitting that handles SSML markup
         import re
 
-        # If splitting fails, fall back to simple character-based chunking
         # Split on sentence boundaries, being careful with SSML tags
         sentences = re.split(r"([.!?]+(?:\s*(?:<[^>]*>)?\s*))", text)
 

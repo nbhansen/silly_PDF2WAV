@@ -19,7 +19,7 @@ def create_text_pipeline(config: "SystemConfig") -> "ITextPipeline":
         # Uses language models like gemini-1.5-flash, NOT text-to-speech models
         llm_provider = GeminiLLMProvider(
             api_key=config.gemini_api_key,
-            model_name=config.llm_model_name,  # Language model, not TTS model
+            model_name=config.llm_model_name or "gemini-1.5-flash",  # Language model, not TTS model with fallback
             min_request_interval=config.llm_request_delay_seconds,
             max_concurrent_requests=config.llm_concurrent_requests,
             requests_per_minute=30,  # Default rate limit

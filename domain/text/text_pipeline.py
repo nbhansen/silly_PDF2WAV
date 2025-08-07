@@ -1,41 +1,43 @@
-# domain/text/text_pipeline.py - Unified Text Processing Pipeline
-"""Consolidated text processing pipeline that unifies text cleaning and SSML enhancement.
+# domain/text/text_pipeline.py - Text Processing Pipeline with Result[T] pattern
+"""Text processing pipeline using Result[T] pattern for error handling.
 
-Replaces: TextCleaningService, AcademicSSMLService (as separate concerns).
+No exceptions thrown - all errors returned as Result[T].
 """
 
 from abc import ABC, abstractmethod
 import re
 from typing import TYPE_CHECKING, Optional
 
+from ..errors import ApplicationError, ErrorCode, Result
+
 if TYPE_CHECKING:
     from ..interfaces import ILLMProvider
 
 
 class ITextPipeline(ABC):
-    """Unified interface for text processing operations."""
+    """Interface for text processing operations using Result[T] pattern."""
 
     @abstractmethod
-    def clean_text(self, raw_text: str) -> str:
+    def clean_text(self, raw_text: str) -> Result[str]:
         """Clean and prepare text for TTS."""
 
     @abstractmethod
-    async def clean_text_async(self, raw_text: str) -> str:
+    async def clean_text_async(self, raw_text: str) -> Result[str]:
         """Clean and prepare text for TTS asynchronously with rate limiting."""
 
     @abstractmethod
-    def enhance_with_natural_formatting(self, text: str) -> str:
+    def enhance_with_natural_formatting(self, text: str) -> Result[str]:
         """Add natural formatting enhancements to text."""
 
     @abstractmethod
-    def split_into_sentences(self, text: str) -> list[str]:
+    def split_into_sentences(self, text: str) -> Result[list[str]]:
         """Split text into sentences for processing."""
 
 
 class TextPipeline(ITextPipeline):
-    """Unified text processing pipeline with high cohesion.
+    """Text processing pipeline using Result[T] pattern.
 
-    Handles cleaning, SSML enhancement, and sentence splitting in one place.
+    Pure functions with no exceptions - all errors returned as Result[T].
     """
 
     def __init__(
@@ -50,24 +52,42 @@ class TextPipeline(ITextPipeline):
         self.enable_natural_formatting = enable_natural_formatting
         self.enable_plain_english = enable_plain_english
 
-    def clean_text(self, raw_text: str) -> str:
-        """Clean and prepare text for TTS processing."""
+    def clean_text(self, raw_text: str) -> Result[str]:
+        """Clean and prepare text for TTS processing.
+
+        Returns Result with cleaned text or error.
+        """
         print(f"🔬 TextPipeline.clean_text(): Input {len(raw_text)} chars")
 
-        if not self.enable_cleaning or not self.llm_provider:
-            llm_available = self.llm_provider is not None
-            print(f"   → Using basic cleanup (cleaning={self.enable_cleaning}, " f"llm_provider={llm_available})")
-            result = self._basic_text_cleanup(raw_text)
-            print(f"   → Basic cleanup result: {len(result)} chars")
-
-            # Stage 2: Apply plain English conversion if enabled
-            if self.enable_plain_english and self.llm_provider:
-                result = self._apply_plain_english_conversion(result)
-                print(f"   → Plain English applied: {len(result)} chars")
-
-            return result
+        if not raw_text:
+            return Result.failure(
+                ApplicationError(
+                    code=ErrorCode.TEXT_EXTRACTION_FAILED, message="Empty text provided for cleaning", retryable=False
+                )
+            )
 
         try:
+            if not self.enable_cleaning or not self.llm_provider:
+                llm_available = self.llm_provider is not None
+                print(f"   → Using basic cleanup (cleaning={self.enable_cleaning}, llm_provider={llm_available})")
+                result = self._basic_text_cleanup(raw_text)
+                print(f"   → Basic cleanup result: {len(result)} chars")
+
+                # Stage 2: Apply plain English conversion if enabled
+                if self.enable_plain_english and self.llm_provider:
+                    plain_result = self._apply_plain_english_conversion(result)
+                    if plain_result.is_failure:
+                        # Fall back to basic cleaned text if plain English fails
+                        return Result.success(result)
+                    plain_result_value = plain_result.value
+                    if plain_result_value is not None:
+                        result = plain_result_value
+                        print(f"   → Plain English applied: {len(result)} chars")
+                    else:
+                        print("   → Plain English returned None, keeping original result")
+
+                return Result.success(result)
+
             # Use LLM for advanced cleaning
             print(f"   → Using LLM cleaning (provider: {type(self.llm_provider).__name__})")
             cleaning_prompt = self._generate_cleaning_prompt(raw_text)
@@ -81,19 +101,19 @@ class TextPipeline(ITextPipeline):
                 cleaned_len = len(cleaned) if cleaned else 0
                 print(f"   → LLM success: {cleaned_len} chars returned")
                 # Basic validation of LLM output
-                if (
-                    cleaned and len(cleaned) > len(raw_text) * 0.05
-                ):  # At least 5% of original length (cleaning should reduce size)
+                if cleaned and len(cleaned) > len(raw_text) * 0.05:  # At least 5% of original length
                     print("   → LLM output valid, applying basic cleanup")
                     final_result = self._basic_text_cleanup(cleaned)
                     print(f"   → Basic cleanup complete: {len(final_result)} chars")
 
                     # Stage 2: Apply plain English conversion if enabled
                     if self.enable_plain_english:
-                        final_result = self._apply_plain_english_conversion(final_result)
+                        plain_result = self._apply_plain_english_conversion(final_result)
+                        if plain_result.is_success and plain_result.value is not None:
+                            final_result = plain_result.value
 
                     print(f"   → Final result: {len(final_result)} chars")
-                    return final_result
+                    return Result.success(final_result)
                 else:
                     cleaned_len = len(cleaned) if cleaned else 0
                     print(f"   → LLM output too short ({cleaned_len} chars), trying smaller chunks")
@@ -103,34 +123,9 @@ class TextPipeline(ITextPipeline):
             # If large chunk failed, try processing in smaller pieces
             if len(raw_text) > 15000:
                 print("   → Attempting retry with smaller chunks (15K chars each)")
-                chunk_size = 15000
-                cleaned_parts = []
-
-                for i in range(0, len(raw_text), chunk_size):
-                    chunk = raw_text[i : i + chunk_size]
-                    print(f"     → Processing sub-chunk {i//chunk_size + 1} ({len(chunk)} chars)")
-
-                    sub_prompt = self._generate_cleaning_prompt(chunk)
-                    sub_result = self.llm_provider.generate_content(sub_prompt)
-
-                    if sub_result.is_success and sub_result.value:
-                        cleaned_parts.append(sub_result.value)
-                        print(f"     → Sub-chunk success: {len(sub_result.value)} chars")
-                    else:
-                        # Use basic cleanup for failed sub-chunks
-                        cleaned_parts.append(self._basic_text_cleanup(chunk))
-                        print("     → Sub-chunk failed, using basic cleanup")
-
-                if cleaned_parts:
-                    combined_result = " ".join(cleaned_parts)
-                    print(f"   → Combined sub-chunks: {len(combined_result)} chars")
-                    final_result = self._basic_text_cleanup(combined_result)
-
-                    # Stage 2: Apply plain English conversion if enabled
-                    if self.enable_plain_english:
-                        final_result = self._apply_plain_english_conversion(final_result)
-
-                    return final_result
+                chunk_result = self._process_in_chunks(raw_text)
+                if chunk_result.is_success:
+                    return chunk_result
 
             # Final fallback to basic cleaning if all else fails
             print("   → All attempts failed, using basic cleanup")
@@ -139,75 +134,175 @@ class TextPipeline(ITextPipeline):
 
             # Stage 2: Apply plain English conversion if enabled
             if self.enable_plain_english:
-                fallback_result = self._apply_plain_english_conversion(fallback_result)
-                print(f"   → Plain English applied to fallback: {len(fallback_result)} chars")
+                plain_result = self._apply_plain_english_conversion(fallback_result)
+                if plain_result.is_success and plain_result.value is not None:
+                    fallback_result = plain_result.value
+                    print(f"   → Plain English applied to fallback: {len(fallback_result)} chars")
 
-            return fallback_result
+            return Result.success(fallback_result)
 
         except Exception as e:
-            print(f"   → TextPipeline: LLM cleaning exception: {e}")
-            fallback_result = self._basic_text_cleanup(raw_text)
-            print(f"   → Exception fallback result: {len(fallback_result)} chars")
+            print(f"   → TextPipeline: Exception during cleaning: {e}")
+            # Even on exception, try to return basic cleaned text
+            try:
+                fallback = self._basic_text_cleanup(raw_text)
+                return Result.success(fallback)
+            except:
+                return Result.from_exception(e, ErrorCode.TEXT_CLEANING_FAILED, retryable=True)
 
-            # Stage 2: Apply plain English conversion if enabled
-            if self.enable_plain_english:
-                try:
-                    fallback_result = self._apply_plain_english_conversion(fallback_result)
-                    print(f"   → Plain English applied to exception fallback: {len(fallback_result)} chars")
-                except Exception as pe:
-                    print(f"   → Plain English conversion failed in exception handler: {pe}")
+    async def clean_text_async(self, raw_text: str) -> Result[str]:
+        """Clean and prepare text for TTS processing asynchronously.
 
-            return fallback_result
-
-    async def clean_text_async(self, raw_text: str) -> str:
-        """Clean and prepare text for TTS processing asynchronously."""
-        if not self.enable_cleaning or not self.llm_provider:
-            return self._basic_text_cleanup(raw_text)
-
-        # Check if async method is available
-        if not hasattr(self.llm_provider, "generate_content_async"):
-            print("TextPipeline: Async cleaning not available, using sync method")
-            return self.clean_text(raw_text)
+        Returns Result with cleaned text or error.
+        """
+        if not raw_text:
+            return Result.failure(
+                ApplicationError(
+                    code=ErrorCode.TEXT_EXTRACTION_FAILED, message="Empty text provided for cleaning", retryable=False
+                )
+            )
 
         try:
+            if not self.enable_cleaning or not self.llm_provider:
+                cleaned = self._basic_text_cleanup(raw_text)
+                return Result.success(cleaned)
+
+            # Check if async method is available
+            if not hasattr(self.llm_provider, "generate_content_async"):
+                print("TextPipeline: Async cleaning not available, using sync method")
+                return self.clean_text(raw_text)
+
             # Use async LLM for advanced cleaning with rate limiting
             cleaning_prompt = self._generate_cleaning_prompt(raw_text)
             result = await self.llm_provider.generate_content_async(cleaning_prompt)
 
-            if result.is_success:
+            if result.is_success and result.value is not None:
                 cleaned = result.value
                 # Basic validation of LLM output
-                if cleaned and len(cleaned) > len(raw_text) * 0.3:  # At least 30% of original length
-                    return self._basic_text_cleanup(cleaned)
+                if len(cleaned) > len(raw_text) * 0.3:  # At least 30% of original length
+                    final = self._basic_text_cleanup(cleaned)
+                    return Result.success(final)
 
             # Fallback to basic cleaning if LLM fails
-            return self._basic_text_cleanup(raw_text)
+            fallback = self._basic_text_cleanup(raw_text)
+            return Result.success(fallback)
 
         except Exception as e:
             print(f"TextPipeline: Async LLM cleaning failed: {e}")
-            return self._basic_text_cleanup(raw_text)
+            try:
+                fallback = self._basic_text_cleanup(raw_text)
+                return Result.success(fallback)
+            except:
+                return Result.from_exception(e, ErrorCode.TEXT_CLEANING_FAILED, retryable=True)
 
-    def enhance_with_natural_formatting(self, text: str) -> str:
-        """Add natural formatting for better speech synthesis (Piper-optimized)."""
-        if not self.enable_natural_formatting:
-            return text
+    def enhance_with_natural_formatting(self, text: str) -> Result[str]:
+        """Add natural formatting for better speech synthesis.
 
-        return self._enhance_with_natural_formatting(text)
+        Returns Result with enhanced text or error.
+        """
+        if not text:
+            return Result.failure(
+                ApplicationError(
+                    code=ErrorCode.TEXT_EXTRACTION_FAILED,
+                    message="Empty text provided for enhancement",
+                    retryable=False,
+                )
+            )
 
-    def split_into_sentences(self, text: str) -> list[str]:
-        """Split text into sentences for individual processing."""
-        # Use text directly since we only generate natural formatting (no markup)
-        clean_text = text
+        try:
+            if not self.enable_natural_formatting:
+                return Result.success(text)
 
-        # Handle abbreviations better - don't split on Dr., Mr., etc.
-        # Basic sentence splitting with common edge cases
-        sentences = re.split(r"(?<!\bDr\.)(?<!\bMr\.)(?<!\bMs\.)(?<!\bProf\.)(?<=[.!?])\s+(?=[A-Z])", clean_text)
+            enhanced = self._enhance_with_natural_formatting(text)
+            return Result.success(enhanced)
 
-        # Filter out very short sentences and clean up (immutable)
-        return [sentence.strip() for sentence in sentences if sentence.strip() and len(sentence.strip()) > 10]
+        except Exception as e:
+            # On error, return original text
+            print(f"TextPipeline: Enhancement failed: {e}")
+            return Result.success(text)
+
+    def split_into_sentences(self, text: str) -> Result[list[str]]:
+        """Split text into sentences for individual processing.
+
+        Returns Result with sentence list or error.
+        """
+        if not text:
+            return Result.success([])
+
+        try:
+            # Use text directly since we only generate natural formatting (no markup)
+            clean_text = text
+
+            # Handle abbreviations better - don't split on Dr., Mr., etc.
+            # Basic sentence splitting with common edge cases
+            sentences = re.split(r"(?<!\bDr\.)(?<!\bMr\.)(?<!\bMs\.)(?<!\bProf\.)(?<=[.!?])\s+(?=[A-Z])", clean_text)
+
+            # Filter out very short sentences and clean up (immutable)
+            valid_sentences = [
+                sentence.strip() for sentence in sentences if sentence.strip() and len(sentence.strip()) > 10
+            ]
+
+            return Result.success(valid_sentences)
+
+        except Exception as e:
+            return Result.from_exception(e, ErrorCode.TEXT_EXTRACTION_FAILED, retryable=False)
+
+    def _process_in_chunks(self, raw_text: str) -> Result[str]:
+        """Process large text in smaller chunks.
+
+        Pure function returning Result.
+        """
+        try:
+            chunk_size = 15000
+            cleaned_parts = []
+
+            for i in range(0, len(raw_text), chunk_size):
+                chunk = raw_text[i : i + chunk_size]
+                print(f"     → Processing sub-chunk {i//chunk_size + 1} ({len(chunk)} chars)")
+
+                sub_prompt = self._generate_cleaning_prompt(chunk)
+                if self.llm_provider is not None:
+                    sub_result = self.llm_provider.generate_content(sub_prompt)
+
+                    if sub_result.is_success and sub_result.value is not None:
+                        cleaned_parts.append(sub_result.value)
+                        print(f"     → Sub-chunk success: {len(sub_result.value)} chars")
+                    else:
+                        # Use basic cleanup for failed sub-chunks
+                        cleaned_parts.append(self._basic_text_cleanup(chunk))
+                        print("     → Sub-chunk failed, using basic cleanup")
+                else:
+                    # No LLM provider available
+                    cleaned_parts.append(self._basic_text_cleanup(chunk))
+                    print("     → No LLM provider, using basic cleanup")
+
+            if cleaned_parts:
+                combined_result = " ".join(cleaned_parts)
+                print(f"   → Combined sub-chunks: {len(combined_result)} chars")
+                final_result = self._basic_text_cleanup(combined_result)
+
+                # Stage 2: Apply plain English conversion if enabled
+                if self.enable_plain_english:
+                    plain_result = self._apply_plain_english_conversion(final_result)
+                    if plain_result.is_success and plain_result.value is not None:
+                        final_result = plain_result.value
+
+                return Result.success(final_result)
+            else:
+                return Result.failure(
+                    ApplicationError(
+                        code=ErrorCode.TEXT_CLEANING_FAILED, message="Failed to process any chunks", retryable=True
+                    )
+                )
+
+        except Exception as e:
+            return Result.from_exception(e, ErrorCode.TEXT_CLEANING_FAILED, retryable=True)
 
     def _basic_text_cleanup(self, text: str) -> str:
-        """Basic text cleanup without LLM."""
+        """Basic text cleanup without LLM.
+
+        Pure function - no exceptions thrown.
+        """
         # Remove excessive whitespace
         text = re.sub(r"\s+", " ", text)
 
@@ -222,7 +317,10 @@ class TextPipeline(ITextPipeline):
         return text.strip()
 
     def _generate_cleaning_prompt(self, text: str) -> str:
-        """Generate LLM prompt for text cleaning (optimized for natural speech)."""
+        """Generate LLM prompt for text cleaning.
+
+        Pure function.
+        """
         pause_instruction = """Use natural punctuation for better speech rhythm:
 - Use "..." for medium pauses (between paragraphs or sections)
 - Use "...." or "....." for longer pauses (after major sections)
@@ -243,7 +341,10 @@ Text:
 {text}"""
 
     def _generate_plain_english_prompt(self, text: str) -> str:
-        """Generate LLM prompt for plain English conversion using established rules."""
+        """Generate LLM prompt for plain English conversion.
+
+        Pure function.
+        """
         return f"""Rewrite the following academic text using simpler language.
 IMPORTANT: Do NOT summarize or shorten the content. Keep ALL information, just make it easier to understand.
 
@@ -300,11 +401,14 @@ The output should be approximately the same length as the input, just with simpl
 Text to convert:
 {text}"""
 
-    def _apply_plain_english_conversion(self, text: str) -> str:
-        """Apply plain English conversion to already-cleaned text."""
+    def _apply_plain_english_conversion(self, text: str) -> Result[str]:
+        """Apply plain English conversion to already-cleaned text.
+
+        Returns Result with converted text or original on failure.
+        """
         if not self.llm_provider:
             print("   → Plain English: No LLM provider available, skipping conversion")
-            return text
+            return Result.success(text)
 
         print(f"   → Plain English: Converting {len(text)} chars")
 
@@ -333,7 +437,7 @@ Text to convert:
                 if converted_parts:
                     combined_result = " ".join(converted_parts)
                     print(f"   → Plain English: Combined chunks: {len(combined_result)} chars")
-                    return combined_result
+                    return Result.success(combined_result)
             else:
                 # Process whole text
                 plain_english_prompt = self._generate_plain_english_prompt(text)
@@ -343,7 +447,7 @@ Text to convert:
                     # Basic validation - converted text should be reasonable length
                     if len(result.value) > len(text) * 0.3:  # At least 30% of original
                         print(f"   → Plain English: Success: {len(result.value)} chars")
-                        return result.value
+                        return Result.success(result.value)
                     else:
                         print(f"   → Plain English: Result too short ({len(result.value)} chars), using original")
                 else:
@@ -352,14 +456,17 @@ Text to convert:
 
             # Fallback to original text if conversion fails
             print("   → Plain English: Using original text as fallback")
-            return text
+            return Result.success(text)
 
         except Exception as e:
             print(f"   → Plain English: Exception during conversion: {e}")
-            return text
+            return Result.success(text)
 
     def _enhance_with_natural_formatting(self, text: str) -> str:
-        """Apply natural formatting tricks for TTS engines without SSML support."""
+        """Apply natural formatting tricks for TTS engines.
+
+        Pure function - no exceptions thrown.
+        """
         enhanced = text
 
         # 1. Add natural emphasis (order matters)
@@ -374,17 +481,19 @@ Text to convert:
         return enhanced
 
     def _add_natural_emphasis(self, text: str) -> str:
-        """Add natural emphasis without SSML tags."""
+        """Add natural emphasis without SSML tags.
+
+        Pure function.
+        """
         # Already quoted text gets natural emphasis from quotes
         # No changes needed for quoted text as TTS engines naturally emphasize quotes
-
-        # For research papers, we could uppercase key transitional words
-        # But this might sound unnatural, so we'll rely on punctuation
-
         return text
 
     def _add_natural_academic_formatting(self, text: str) -> str:
-        """Add natural formatting for academic content without SSML."""
+        """Add natural formatting for academic content.
+
+        Pure function.
+        """
         # Add extra dots after section headers for longer pauses
         text = re.sub(
             r"(Abstract|Introduction|Conclusion|References)(\s*[:\.]?\s*)", r"\1\2... ", text, flags=re.IGNORECASE
@@ -399,7 +508,10 @@ Text to convert:
         return text
 
     def _enhance_punctuation_for_natural_speech(self, text: str) -> str:
-        """Enhance punctuation for better natural speech rhythm."""
+        """Enhance punctuation for better natural speech rhythm.
+
+        Pure function.
+        """
         # Add extra comma pauses where beneficial
         # After introductory phrases
         text = re.sub(

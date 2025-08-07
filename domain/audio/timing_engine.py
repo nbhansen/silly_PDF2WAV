@@ -1,7 +1,7 @@
-# domain/audio/timing_engine.py - Unified Timing Engine
-"""Consolidated timing engine that unifies all timing strategies.
+# domain/audio/timing_engine.py - Timing Engine with Result[T] pattern
+"""Timing engine using Result[T] pattern for type-safe error handling.
 
-Replaces: GeminiTimestampStrategy, SentenceMeasurementStrategy, EnhancedTimingStrategy, TimingCalculator.
+No exceptions thrown - all errors returned as Result[T].
 """
 
 from abc import ABC, abstractmethod
@@ -12,6 +12,7 @@ from pathlib import Path
 import time
 from typing import TYPE_CHECKING, Optional
 
+from ..errors import ErrorCode, Result, audio_generation_error
 from ..interfaces import IFileManager, ITTSEngine
 from ..models import TextSegment, TimedAudioResult, TimingMetadata
 
@@ -45,17 +46,17 @@ class TimingMode(Enum):
 
 
 class ITimingEngine(ABC):
-    """Unified interface for timing generation."""
+    """Interface for timing generation using Result[T] pattern."""
 
     @abstractmethod
-    def generate_with_timing(self, text_chunks: list[str], output_filename: str) -> TimedAudioResult:
+    def generate_with_timing(self, text_chunks: list[str], output_filename: str) -> Result[TimedAudioResult]:
         """Generate audio with timing information."""
 
 
 class TimingEngine(ITimingEngine):
-    """Unified timing engine that consolidates all timing strategies.
+    """Timing engine using Result[T] pattern for all operations.
 
-    Uses strategy pattern internally but presents unified interface.
+    Pure functions with no exceptions - all errors returned as Result[T].
     """
 
     def __init__(
@@ -78,49 +79,65 @@ class TimingEngine(ITimingEngine):
             print(f"✅ {tts_engine.__class__.__name__}: Using measurement mode for precise timestamps")
             self.mode = TimingMode.MEASUREMENT
 
-    def generate_with_timing(self, text_chunks: list[str], output_filename: str) -> TimedAudioResult:
-        """Main entry point - routes to appropriate timing strategy."""
-        if self.mode == TimingMode.ESTIMATION:
-            return self._generate_with_estimation(text_chunks, output_filename)
-        elif self.mode == TimingMode.MEASUREMENT:
-            return self._generate_with_measurement(text_chunks, output_filename)
+    def generate_with_timing(self, text_chunks: list[str], output_filename: str) -> Result[TimedAudioResult]:
+        """Main entry point - routes to appropriate timing strategy.
 
-        # This should never be reached with current enum values
-        raise ValueError(f"Unsupported timing mode: {self.mode}")
+        Returns Result with timing data or error.
+        """
+        try:
+            if self.mode == TimingMode.ESTIMATION:
+                return self._generate_with_estimation(text_chunks, output_filename)
+            else:  # self.mode == TimingMode.MEASUREMENT
+                return self._generate_with_measurement(text_chunks, output_filename)
+        except Exception as e:
+            return Result.from_exception(e, ErrorCode.AUDIO_GENERATION_FAILED, retryable=True)
 
-    def _generate_with_estimation(self, text_chunks: list[str], output_filename: str) -> TimedAudioResult:
-        """Fast timing using mathematical calculations (for engines without native timestamps)."""
+    def _generate_with_estimation(self, text_chunks: list[str], output_filename: str) -> Result[TimedAudioResult]:
+        """Fast timing using mathematical calculations.
+
+        Returns Result with timing data or error.
+        """
         if not hasattr(self.tts_engine, "generate_audio_with_timestamps"):
             # Engine doesn't support native timestamps, use measurement mode instead
             return self._generate_with_measurement(text_chunks, output_filename)
 
         print("TimingEngine: Using estimation mode with native engine timestamps")
 
-        # Process chunks individually to respect size limits
-        all_audio_files = []
-        all_text_segments = []
-        cumulative_time = 0.0
+        try:
+            # Process chunks individually to respect size limits
+            all_audio_files = []
+            all_text_segments = []
+            cumulative_time = 0.0
 
-        print(f"🔍 TimingEngine: Processing {len(text_chunks)} chunks individually")
+            print(f"🔍 TimingEngine: Processing {len(text_chunks)} chunks individually")
 
-        for i, chunk in enumerate(text_chunks):
-            # Enhance text with natural formatting if available
-            enhanced_chunk = self.text_pipeline.enhance_with_natural_formatting(chunk) if self.text_pipeline else chunk
+            for i, chunk in enumerate(text_chunks):
+                # Enhance text with natural formatting if available
+                if self.text_pipeline:
+                    enhance_result = self.text_pipeline.enhance_with_natural_formatting(chunk)
+                    if enhance_result.is_failure:
+                        print(f"TimingEngine: Enhancement failed for chunk {i+1}, using original")
+                        enhanced_chunk = chunk
+                    elif enhance_result.value is not None:
+                        enhanced_chunk = enhance_result.value
+                    else:
+                        enhanced_chunk = chunk
+                else:
+                    enhanced_chunk = chunk
 
-            print(f"🔍 TimingEngine: Processing chunk {i+1}/{len(text_chunks)} ({len(enhanced_chunk)} chars)")
+                print(f"🔍 TimingEngine: Processing chunk {i+1}/{len(text_chunks)} ({len(enhanced_chunk)} chars)")
 
-            # Check chunk size
-            if len(enhanced_chunk) > 3000:
-                print(
-                    f"🚨 TimingEngine: Chunk {i+1} too large ({len(enhanced_chunk)} chars), "
-                    f"falling back to measurement mode"
-                )
-                return self._generate_with_measurement(text_chunks, output_filename)
+                # Check chunk size
+                if len(enhanced_chunk) > 3000:
+                    print(
+                        f"🚨 TimingEngine: Chunk {i+1} too large ({len(enhanced_chunk)} chars), "
+                        f"falling back to measurement mode"
+                    )
+                    return self._generate_with_measurement(text_chunks, output_filename)
 
-            if not enhanced_chunk.strip():
-                continue
+                if not enhanced_chunk.strip():
+                    continue
 
-            try:
                 # Use engine's native timestamping for this chunk
                 result = self.tts_engine.generate_audio_with_timestamps(enhanced_chunk)
 
@@ -148,342 +165,285 @@ class TimingEngine(ITimingEngine):
                         ]
                         all_text_segments.extend(adjusted_segments)
 
-                        # Update cumulative time (using adjusted segments)
-                        chunk_duration = max(
-                            seg.start_time + seg.duration - cumulative_time for seg in adjusted_segments
-                        )
-                        cumulative_time += chunk_duration
+                        # Update cumulative time
+                        last_segment = text_segments[-1]
+                        cumulative_time += last_segment.end_time
 
-            except Exception as e:
-                print(f"TimingEngine: Failed to process chunk {i+1}: {e}")
-                continue
+            if not all_audio_files:
+                return Result.failure(audio_generation_error("No audio files generated in estimation mode"))
 
-        if not all_audio_files:
-            return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
+            # Create combined MP3
+            combined_filename = f"{output_filename}_timed.mp3"
+            combined_path = self._combine_audio_chunks(all_audio_files, combined_filename)
 
-        # Combine audio files if multiple chunks
-        combined_mp3 = None
-        if len(all_audio_files) > 1:
-            combined_mp3 = f"{output_filename}_combined.mp3"
-            # Note: Audio combination logic would go here
-            # For now, we'll just use the first file as combined
-            combined_mp3 = all_audio_files[0]
-        else:
-            combined_mp3 = all_audio_files[0]
+            if not combined_path:
+                return Result.failure(audio_generation_error("Failed to combine audio chunks"))
 
-        # Create timing metadata
-        timing_metadata = None
-        if all_text_segments:
-            total_duration = (
-                max(seg.start_time + seg.duration for seg in all_text_segments) if all_text_segments else 0.0
-            )
+            # Create timing metadata
             timing_metadata = TimingMetadata(
-                total_duration=total_duration, text_segments=all_text_segments, audio_files=all_audio_files
+                total_duration=cumulative_time,
+                text_segments=all_text_segments,
+                audio_files=all_audio_files,
             )
 
-        return TimedAudioResult(audio_files=all_audio_files, combined_mp3=combined_mp3, timing_data=timing_metadata)
-
-    def _generate_with_measurement(self, text_chunks: list[str], output_filename: str) -> TimedAudioResult:
-        """Precise timing by measuring actual audio duration (optimal for engines with timestamp support)."""
-        print("TimingEngine: Using measurement mode for precise audio timing")
-
-        if not self.text_pipeline:
-            print("Warning: No text pipeline available for measurement mode")
-            return TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None)
-
-        print(f"🔍 TimingEngine: Processing {len(text_chunks)} chunks in measurement mode")
-
-        all_temp_audio_files = []
-        all_text_segments = []
-        cumulative_time = 0.0
-
-        # Process each text chunk to create audio and timing data
-        for chunk_idx, chunk in enumerate(text_chunks):
-            chunk_result = self._process_text_chunk(chunk, chunk_idx, cumulative_time)
-
-            all_temp_audio_files.extend(chunk_result.temp_files)
-            all_text_segments.extend(chunk_result.text_segments)
-            cumulative_time = chunk_result.final_cumulative_time
-
-        # Finalize audio output and create timing metadata
-        return self._finalize_audio_output(all_temp_audio_files, all_text_segments, cumulative_time, output_filename)
-
-    def _process_text_chunk(self, chunk: str, chunk_idx: int, cumulative_time: float) -> ChunkProcessingResult:
-        """Process a single text chunk into audio and timing segments."""
-        print(f"🔍 TimingEngine: Processing chunk {chunk_idx+1} ({len(chunk)} chars)")
-
-        # Enhance chunk and split into sentences
-        if self.text_pipeline:
-            enhanced_chunk = self.text_pipeline.enhance_with_natural_formatting(chunk)
-            chunk_sentences = self.text_pipeline.split_into_sentences(enhanced_chunk)
-        else:
-            chunk_sentences = [chunk]
-
-        sentences = chunk_sentences
-        print(f"🔍 TimingEngine: Chunk has {len(sentences)} sentences")
-
-        if not sentences:
-            return ChunkProcessingResult(temp_files=[], text_segments=[], final_cumulative_time=cumulative_time)
-
-        # Smart batching for performance within this chunk
-        batch_size = min(15, max(5, len(sentences) // 10))
-        sentence_batches = [sentences[i : i + batch_size] for i in range(0, len(sentences), batch_size)]
-
-        print(f"  Processing {len(sentences)} sentences in {len(sentence_batches)} batches")
-
-        temp_audio_files = []
-        text_segments = []
-        current_cumulative_time = cumulative_time
-
-        # Process each batch of sentences
-        for batch_idx, sentence_batch in enumerate(sentence_batches):
-            batch_result = self._process_sentence_batch(
-                sentence_batch, batch_idx, batch_size, chunk_idx, current_cumulative_time
+            return Result.success(
+                TimedAudioResult(
+                    audio_files=all_audio_files,
+                    combined_mp3=combined_filename,
+                    timing_data=timing_metadata,
+                )
             )
-
-            if batch_result.temp_file:
-                temp_audio_files.append(batch_result.temp_file)
-
-            text_segments.extend(batch_result.text_segments)
-            current_cumulative_time = batch_result.final_cumulative_time
-
-        return ChunkProcessingResult(
-            temp_files=temp_audio_files, text_segments=text_segments, final_cumulative_time=current_cumulative_time
-        )
-
-    def _process_sentence_batch(
-        self, sentence_batch: list[str], batch_idx: int, batch_size: int, chunk_idx: int, cumulative_time: float
-    ) -> BatchProcessingResult:
-        """Process a batch of sentences into audio and create timing segments."""
-        try:
-            # Apply rate limiting
-            self._apply_rate_limit()
-
-            # Generate audio for batch
-            batch_text = " ".join(sentence_batch)
-            result = self.tts_engine.generate_audio_data(batch_text)
-
-            if result.is_success and result.value:
-                audio_data = result.value
-                temp_file = self.file_manager.save_temp_file(audio_data, suffix=".wav")
-
-                # Measure batch duration and distribute across sentences
-                batch_duration = self._measure_audio_duration(temp_file)
-                text_segments = self._distribute_batch_duration(
-                    sentence_batch, batch_duration, cumulative_time, chunk_idx, batch_idx, batch_size
-                )
-
-                final_cumulative_time = (
-                    text_segments[-1].start_time + text_segments[-1].duration if text_segments else cumulative_time
-                )
-
-                return BatchProcessingResult(
-                    temp_file=temp_file, text_segments=text_segments, final_cumulative_time=final_cumulative_time
-                )
 
         except Exception as e:
-            print(f"  Error processing batch {batch_idx + 1}: {e}")
+            return Result.from_exception(e, ErrorCode.AUDIO_GENERATION_FAILED, retryable=True)
 
-        return BatchProcessingResult(temp_file=None, text_segments=[], final_cumulative_time=cumulative_time)
+    def _generate_with_measurement(self, text_chunks: list[str], output_filename: str) -> Result[TimedAudioResult]:
+        """Precise timing through actual audio measurement.
 
-    def _distribute_batch_duration(
-        self,
-        sentence_batch: list[str],
-        batch_duration: float,
-        cumulative_time: float,
-        chunk_idx: int,
-        batch_idx: int,
-        batch_size: int,
-    ) -> list["TextSegment"]:
-        """Distribute batch duration across individual sentences based on word count."""
-        # Calculate total words in batch for proportional distribution
-        total_words = sum(len(self._strip_ssml(sent).split()) for sent in sentence_batch)
+        Returns Result with timing data or error.
+        """
+        print("TimingEngine: Using measurement mode for accurate timing extraction")
 
-        text_segments = []
-        current_time = cumulative_time
+        try:
+            all_temp_files = []
+            all_text_segments = []
+            cumulative_time = 0.0
 
-        for i, sentence_text in enumerate(sentence_batch):
-            clean_text = self._strip_ssml(sentence_text)
-            word_count = len(clean_text.split())
+            # Process each chunk
+            for i, chunk in enumerate(text_chunks):
+                chunk_result = self._process_chunk_with_measurement(chunk, i, cumulative_time)
 
-            # Calculate proportional duration based on word count
-            if total_words > 0:
-                sentence_duration = (word_count / total_words) * batch_duration
-            else:
-                sentence_duration = batch_duration / len(sentence_batch)
+                if chunk_result is None:
+                    continue
 
-            sentence_duration = max(sentence_duration, 0.3)  # Minimum duration
+                all_temp_files.extend(chunk_result.temp_files)
+                all_text_segments.extend(chunk_result.text_segments)
+                cumulative_time = chunk_result.final_cumulative_time
 
-            segment = TextSegment(
-                text=clean_text,
-                start_time=current_time,
-                duration=sentence_duration,
-                segment_type="sentence",
-                chunk_index=chunk_idx,
-                sentence_index=batch_idx * batch_size + i,
-            )
-            text_segments.append(segment)
-            current_time += sentence_duration
+            if not all_temp_files:
+                return Result.failure(audio_generation_error("No audio files generated in measurement mode"))
 
-        return text_segments
+            # Create final combined audio file
+            combined_filename = f"{output_filename}_timed.mp3"
+            combined_path = self._combine_audio_chunks(all_temp_files, combined_filename)
 
-    def _finalize_audio_output(
-        self,
-        all_temp_audio_files: list[str],
-        all_text_segments: list["TextSegment"],
-        cumulative_time: float,
-        output_filename: str,
-    ) -> "TimedAudioResult":
-        """Combine audio files and create final timing metadata."""
-        import shutil
+            # Clean up temporary files
+            for temp_file in all_temp_files:
+                with suppress(OSError, FileNotFoundError):
+                    temp_path = Path(self.file_manager.get_output_dir()) / temp_file
+                    if temp_path.exists():
+                        temp_path.unlink()
 
-        final_audio_files = []
-        print(f"🔍 DEBUG: all_temp_audio_files count: {len(all_temp_audio_files)}")
+            if not combined_path:
+                return Result.failure(audio_generation_error("Failed to combine audio files"))
 
-        if all_temp_audio_files:
-            if len(all_temp_audio_files) > 1:
-                print(f"🔍 DEBUG: Combining {len(all_temp_audio_files)} audio files")
-                combined_path = Path(self.file_manager.get_output_dir()) / f"{output_filename}_combined.mp3"
-                if self._combine_audio_files(all_temp_audio_files, str(combined_path)):
-                    final_audio_files = [Path(combined_path).name]
-                    print(f"🔍 DEBUG: Audio combination successful: {final_audio_files}")
-                else:
-                    print("🔍 DEBUG: Audio combination FAILED")
-            else:
-                print(f"🔍 DEBUG: Single file copy: {all_temp_audio_files[0]}")
-                output_path = Path(self.file_manager.get_output_dir()) / f"{output_filename}.wav"
-                try:
-                    shutil.copy2(all_temp_audio_files[0], output_path)
-                    final_audio_files = [Path(output_path).name]
-                    print(f"🔍 DEBUG: Single file copy successful: {final_audio_files}")
-                except Exception as e:
-                    print(f"🔍 DEBUG: Failed to copy audio file: {e}")
-        else:
-            print("🔍 DEBUG: No temp audio files to process!")
-
-        # Clean up temporary files
-        for temp_file in all_temp_audio_files:
-            try:
-                if Path(temp_file).exists():
-                    Path(temp_file).unlink()
-            except (OSError, FileNotFoundError):
-                pass
-
-        # Create timing metadata for read-along functionality
-        timing_metadata = None
-        if all_text_segments:
+            # Create timing metadata
             timing_metadata = TimingMetadata(
-                total_duration=cumulative_time, text_segments=all_text_segments, audio_files=final_audio_files
+                total_duration=cumulative_time,
+                text_segments=all_text_segments,
+                audio_files=[combined_filename],
             )
 
-        return TimedAudioResult(
-            audio_files=final_audio_files,
-            combined_mp3=final_audio_files[0] if final_audio_files else None,
-            timing_data=timing_metadata,
-        )
+            return Result.success(
+                TimedAudioResult(
+                    audio_files=[combined_filename],
+                    combined_mp3=combined_filename,
+                    timing_data=timing_metadata,
+                )
+            )
 
-    def _generate_with_hybrid(self, text_chunks: list[str], output_filename: str) -> TimedAudioResult:
-        """Smart combination of estimation and measurement."""
-        # Try estimation first, fall back to measurement if needed
-        result = self._generate_with_estimation(text_chunks, output_filename)
+        except Exception as e:
+            return Result.from_exception(e, ErrorCode.AUDIO_GENERATION_FAILED, retryable=True)
 
-        # If estimation failed or no timing data, use measurement
-        if not result.timing_data or not result.audio_files:
-            print("TimingEngine: Estimation failed, falling back to measurement")
-            return self._generate_with_measurement(text_chunks, output_filename)
+    def _process_chunk_with_measurement(
+        self, chunk: str, chunk_index: int, cumulative_time: float
+    ) -> Optional[ChunkProcessingResult]:
+        """Process a single chunk with measurement mode.
 
-        return result
+        Returns ChunkProcessingResult or None on failure.
+        """
+        try:
+            # Enhance text if pipeline is available
+            if self.text_pipeline:
+                enhance_result = self.text_pipeline.enhance_with_natural_formatting(chunk)
+                if enhance_result.is_success and enhance_result.value is not None:
+                    enhanced_chunk = enhance_result.value
+                else:
+                    enhanced_chunk = chunk
 
-    def _apply_rate_limit(self) -> None:
-        """Apply rate limiting between API calls."""
-        if self.measurement_interval <= 0:
-            return
+                # Split into sentences
+                sentences_result = self.text_pipeline.split_into_sentences(enhanced_chunk)
+                if sentences_result.is_success and sentences_result.value is not None:
+                    sentences = sentences_result.value
+                else:
+                    sentences = [enhanced_chunk]
+            else:
+                enhanced_chunk = chunk
+                sentences = [chunk]
 
+            print(f"TimingEngine: Chunk {chunk_index + 1} has {len(sentences)} sentences")
+
+            # Process in batches for efficiency
+            batch_size = 5
+            temp_files = []
+            text_segments = []
+
+            for batch_start in range(0, len(sentences), batch_size):
+                batch_end = min(batch_start + batch_size, len(sentences))
+                batch = sentences[batch_start:batch_end]
+
+                print(f"  Processing batch {batch_start//batch_size + 1} (sentences {batch_start+1}-{batch_end})")
+
+                batch_result = self._process_sentence_batch(batch, chunk_index, batch_start, cumulative_time)
+
+                if batch_result and batch_result.temp_file:
+                    temp_files.append(batch_result.temp_file)
+                    text_segments.extend(batch_result.text_segments)
+                    cumulative_time = batch_result.final_cumulative_time
+
+            return ChunkProcessingResult(
+                temp_files=temp_files,
+                text_segments=text_segments,
+                final_cumulative_time=cumulative_time,
+            )
+
+        except Exception as e:
+            print(f"TimingEngine: Error processing chunk {chunk_index}: {e}")
+            return None
+
+    def _process_sentence_batch(
+        self, sentences: list[str], chunk_index: int, batch_start: int, cumulative_time: float
+    ) -> Optional[BatchProcessingResult]:
+        """Process a batch of sentences for timing.
+
+        Returns BatchProcessingResult or None on failure.
+        """
+        try:
+            batch_text = " ".join(sentences)
+
+            # Rate limiting
+            self._apply_rate_limiting()
+
+            # Generate audio for batch
+            audio_result = self.tts_engine.generate_audio_data(batch_text)
+            if audio_result.is_failure or not audio_result.value:
+                print("    Failed to generate audio for batch")
+                return None
+
+            # Save temporary audio file
+            temp_filename = f"temp_chunk_{chunk_index}_batch_{batch_start}.wav"
+            temp_path = self.file_manager.save_output_file(audio_result.value, temp_filename)
+
+            if not temp_path:
+                return None
+
+            # Measure audio duration
+            from ..audio.audio_engine import AudioEngine
+
+            # Create a temporary minimal AudioEngine instance for processing
+            temp_audio_engine = AudioEngine(self.tts_engine, self.file_manager, self)
+            duration_result = temp_audio_engine.process_audio_file(temp_path)
+
+            if duration_result.is_failure or duration_result.value is None:
+                # Estimate duration fallback
+                duration = len(batch_text) * 0.06  # Rough estimate
+            else:
+                duration = duration_result.value
+
+            print(f"    Audio duration: {duration:.2f}s")
+
+            # Create timing segments for each sentence
+            text_segments = []
+            sentence_duration = duration / len(sentences) if sentences else 0
+
+            for i, sentence in enumerate(sentences):
+                segment = TextSegment(
+                    text=sentence,
+                    start_time=cumulative_time + (i * sentence_duration),
+                    duration=sentence_duration,
+                    segment_type="sentence",
+                    chunk_index=chunk_index,
+                    sentence_index=batch_start + i,
+                )
+                text_segments.append(segment)
+
+            return BatchProcessingResult(
+                temp_file=temp_filename,
+                text_segments=text_segments,
+                final_cumulative_time=cumulative_time + duration,
+            )
+
+        except Exception as e:
+            print(f"    Error processing batch: {e}")
+            return None
+
+    def _apply_rate_limiting(self) -> None:
+        """Apply rate limiting between API calls.
+
+        Pure function - no exceptions thrown.
+        """
         current_time = time.time()
         time_since_last = current_time - self.last_api_call
 
         if time_since_last < self.measurement_interval:
-            sleep_duration = self.measurement_interval - time_since_last
-            time.sleep(sleep_duration)
+            sleep_time = self.measurement_interval - time_since_last
+            print(f"    Rate limiting: sleeping {sleep_time:.2f}s")
+            time.sleep(sleep_time)
 
         self.last_api_call = time.time()
 
-    def _measure_audio_duration(self, file_path: str) -> float:
-        """Measure audio file duration."""
+    def _combine_audio_chunks(self, audio_files: list[str], output_filename: str) -> Optional[str]:
+        """Combine multiple audio files into one.
+
+        Returns output path or None on failure.
+        """
         try:
+            if not audio_files:
+                return None
+
+            # Get full paths
+            full_paths = []
+            for audio_file in audio_files:
+                full_path = Path(self.file_manager.get_output_dir()) / audio_file
+                if full_path.exists():
+                    full_paths.append(str(full_path))
+
+            if not full_paths:
+                return None
+
+            # Use audio engine's combine function
+            output_path = Path(self.file_manager.get_output_dir()) / output_filename
+
+            # Create a minimal audio engine just for combining
+            # This is a bit of a hack but avoids circular dependencies
             import subprocess
 
-            # Validate file path for security
-            if not Path(file_path).is_file() or Path(file_path).is_symlink():
-                return 1.0  # Default fallback for invalid paths
+            if len(full_paths) == 1:
+                # Just copy the single file
+                import shutil
 
-            cmd = ["ffprobe", "-v", "quiet", "-show_entries", "format=duration", "-of", "csv=p=0", file_path]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                shutil.copy2(full_paths[0], str(output_path))
+                return output_filename
 
-            if result.returncode == 0 and result.stdout.strip():
-                return float(result.stdout.strip())
-        except (subprocess.TimeoutExpired, subprocess.CalledProcessError, OSError, ValueError, FileNotFoundError):
-            # FFprobe failed or output parsing error
-            pass
+            # Use ffmpeg directly for combining
+            list_file = str(output_path) + ".list"
+            with open(list_file, "w") as f:
+                for path in full_paths:
+                    f.write(f"file '{path}'\n")
 
-        # Fallback to file size estimation
-        try:
-            file_size = Path(file_path).stat().st_size
-            return file_size / (22050 * 2)  # Rough estimation
-        except (OSError, FileNotFoundError):
-            return 1.0  # Default fallback
-
-    def _strip_ssml(self, text: str) -> str:
-        """Remove SSML tags from text for word counting."""
-        import re
-
-        # Remove all SSML tags like <speak>, <break>, <prosody>, etc.
-        clean_text = re.sub(r"<[^>]+>", "", text)
-        # Clean up extra whitespace
-        clean_text = re.sub(r"\s+", " ", clean_text).strip()
-        return clean_text
-
-    def _combine_audio_files(self, file_paths: list[str], output_path: str) -> bool:
-        """Combine audio files using ffmpeg."""
-        try:
-            import subprocess
-
-            print(f"🔍 DEBUG: Combining {len(file_paths)} files to {output_path}")
-            print(f"🔍 DEBUG: Input files: {file_paths}")
-
-            list_file = output_path + ".list"
-            with Path(list_file).open("w") as f:
-                for file_path in file_paths:
-                    f.write(f"file '{file_path}'\n")
-
-            # Convert from WAV to MP3 since we can't use -c copy with format change
-            cmd = [
-                "ffmpeg",
-                "-f",
-                "concat",
-                "-safe",
-                "0",
-                "-i",
-                list_file,
-                "-c:a",
-                "libmp3lame",
-                "-b:a",
-                "128k",
-                output_path,
-                "-y",
-            ]
-            print(f"🔍 DEBUG: Running ffmpeg command: {' '.join(cmd)}")
+            cmd = ["ffmpeg", "-f", "concat", "-safe", "0", "-i", list_file, "-c", "copy", str(output_path), "-y"]
             result = subprocess.run(cmd, capture_output=True, timeout=300)
 
-            print(f"🔍 DEBUG: ffmpeg return code: {result.returncode}")
-            if result.stderr:
-                print(f"🔍 DEBUG: ffmpeg stderr: {result.stderr.decode()}")
-
-            # Ignore file cleanup errors - temporary files may already be removed
+            # Clean up list file
             with suppress(OSError, FileNotFoundError):
                 Path(list_file).unlink()
 
-            return result.returncode == 0
+            if result.returncode == 0:
+                return output_filename
+            else:
+                print(f"ffmpeg combine failed: {result.stderr.decode()}")
+                return None
+
         except Exception as e:
-            print(f"🔍 DEBUG: Audio combination exception: {e}")
-            return False
+            print(f"TimingEngine: Error combining audio files: {e}")
+            return None

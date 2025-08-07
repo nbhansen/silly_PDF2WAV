@@ -20,11 +20,11 @@ def create_audio_engine(
 ) -> "IAudioEngine":
     """Create audio engine with chunking service."""
     from domain.audio.audio_engine import AudioEngine
-    from domain.text.chunking_strategy import ChunkingMode, create_chunking_service
+    from domain.text.chunking_strategy import ChunkingMode, create_chunking_strategy
 
-    # Create chunking service based on configuration
+    # Create chunking strategy based on configuration
     chunking_mode = ChunkingMode.SENTENCE_BASED  # Could be configurable
-    chunking_service = create_chunking_service(chunking_mode)
+    chunking_strategy = create_chunking_strategy(chunking_mode)
 
     print("🔍 AudioFactory: Creating AudioEngine with chunk sizes:")
     print(f"  - audio_target_chunk_size: {config.audio_target_chunk_size}")
@@ -37,7 +37,7 @@ def create_audio_engine(
         max_concurrent=config.audio_concurrent_chunks,
         audio_target_chunk_size=config.audio_target_chunk_size,
         audio_max_chunk_size=config.audio_max_chunk_size,
-        chunking_service=chunking_service,
+        chunking_strategy=chunking_strategy,
     )
 
 
