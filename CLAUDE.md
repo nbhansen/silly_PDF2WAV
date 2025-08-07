@@ -436,3 +436,201 @@ This refactoring has been successfully completed. All property mappings have bee
 - **Observability:** Blind - no logs, metrics, or monitoring
 
 This codebase is a **solid foundation** with great architecture patterns, but needs significant infrastructure work before it could serve real users reliably. The SystemConfig refactoring is genuinely well done, but that's like having a Formula 1 engine in a car with no dashboard, no brakes, and no seatbelts.
+
+## Single-User Home Application Fix Plan
+
+**CONTEXT CHANGE:** This is for a single user at home, NOT a production web service. This dramatically simplifies what's needed.
+
+### What Actually Matters for Home Use
+1. **Fix the crashes** - Can't have it breaking randomly
+2. **Show progress** - User needs to know it's working during 45+ second operations
+3. **Better error messages** - Help user understand what went wrong
+4. **Simple logging** - For debugging when things fail
+5. **Cancel button** - Let user abort if they made a mistake
+
+### What We DON'T Need (Overkill for Home Use)
+- ❌ Rate limiting (single user)
+- ❌ Load balancing (one person)
+- ❌ Concurrent user handling (it's just them)
+- ❌ Redis, Circuit breakers (unnecessary complexity)
+- ❌ Security hardening (it's their own machine)
+- ❌ Complex monitoring (just need logs)
+- ❌ Health checks, Metrics (who's checking?)
+- ❌ WebSockets (simple polling is fine)
+- ❌ Distributed tracing (single machine)
+
+### Revised Implementation Plan (Much Simpler!)
+
+### Phase 1: Fix the Crashes (2-3 hours)
+**Goal: Stop the app from breaking**
+
+Fix the 12 MyPy errors - these are real bugs:
+```python
+# infrastructure/tts/piper_tts_provider.py:245
+if model_path is None:
+    return Result.failure("Piper model not found")
+
+# infrastructure/ocr/tesseract_ocr_provider.py
+# Fix the convert_from_path argument types
+
+# infrastructure/llm/gemini_llm_provider.py:89
+if content and content.parts:
+    # safe to access parts
+```
+
+**Test:** Run `mypy .` - should be 0 errors
+
+### Phase 2: Add Progress Feedback (4-5 hours)
+**Goal: User knows it's not frozen**
+
+#### Simple Ajax Polling (no WebSockets needed)
+```javascript
+// static/progress.js
+function checkProgress(operationId) {
+    fetch(`/api/progress/${operationId}`)
+        .then(r => r.json())
+        .then(data => {
+            updateProgressBar(data.percentage);
+            updateStatusText(data.message);
+            if (!data.complete) {
+                setTimeout(() => checkProgress(operationId), 1000);
+            }
+        });
+}
+```
+
+```python
+# routes.py - Add progress endpoint
+@app.route('/api/progress/<operation_id>')
+def get_progress(operation_id):
+    progress = get_operation_progress(operation_id)
+    return jsonify({
+        'percentage': progress.percentage,
+        'message': f"Processing page {progress.current} of {progress.total}",
+        'complete': progress.is_complete
+    })
+```
+
+**Test:** Upload a PDF and see progress updates every second
+
+### Phase 3: Better Error Messages (2 hours)
+**Goal: User understands what went wrong**
+
+Replace generic errors with helpful ones:
+```python
+# Instead of: "Processing failed"
+# Use specific messages:
+
+if pdf_has_no_text:
+    return "PDF contains only images. Try using OCR or a different PDF."
+
+if file_too_large:
+    return f"PDF is {size}MB but max is 100MB. Try splitting or compressing it."
+
+if piper_model_missing:
+    return "Voice model not found. Check your internet connection and try again."
+
+if out_of_disk_space:
+    return f"Not enough disk space. Need {needed}GB, have {available}GB."
+```
+
+**Test:** Try various failure scenarios and check messages are helpful
+
+### Phase 4: Simple Logging (1 hour)
+**Goal: Debug when things break**
+
+Just log to a file - no fancy structured logging needed:
+```python
+# utils/simple_logger.py
+import logging
+from pathlib import Path
+
+def setup_logging():
+    log_file = Path.home() / ".pdf_to_audio" / "app.log"
+    log_file.parent.mkdir(exist_ok=True)
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_file),
+            logging.StreamHandler()  # Also print to console
+        ]
+    )
+
+# Then in routes.py:
+import logging
+logger = logging.getLogger(__name__)
+
+def process_pdf():
+    logger.info(f"Starting PDF processing: {filename}")
+    try:
+        result = do_processing()
+        logger.info(f"Processing complete: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"Processing failed: {e}", exc_info=True)
+        raise
+```
+
+**Test:** Check `~/.pdf_to_audio/app.log` has useful info
+
+### Phase 5: Cancel Button (2-3 hours)
+**Goal: Let user abort if needed**
+
+Add a simple cancel mechanism:
+```python
+# Use a global flag (it's single-user, this is fine)
+processing_cancelled = False
+
+def cancel_processing():
+    global processing_cancelled
+    processing_cancelled = True
+
+# In processing loops:
+if processing_cancelled:
+    cleanup_temp_files()
+    return Result.failure("Processing cancelled by user")
+```
+
+```javascript
+// Add to UI
+<button onclick="cancelProcessing()" id="cancelBtn" style="display:none">
+    Cancel Processing
+</button>
+
+function cancelProcessing() {
+    fetch('/api/cancel', {method: 'POST'})
+        .then(() => {
+            showMessage("Processing cancelled");
+            resetUI();
+        });
+}
+```
+
+**Test:** Start processing, click cancel, should stop gracefully
+
+### Success Criteria (Much Simpler!)
+
+After these 5 phases (~12 hours total):
+- ✅ No crashes from type errors
+- ✅ User sees progress during long operations
+- ✅ Clear error messages explain what went wrong
+- ✅ Log file helps debug issues
+- ✅ Can cancel operations that take too long
+
+### What This Achieves vs. The Enterprise Plan
+
+**Enterprise Plan Issues Fixed:**
+- ❌ Would take 22+ days
+- ❌ Added complexity user doesn't need
+- ❌ Over-engineered for single-user
+
+**Home User Plan Benefits:**
+- ✅ Takes ~12 hours total
+- ✅ Fixes the actual pain points
+- ✅ Keeps it simple and maintainable
+- ✅ User can debug their own issues
+- ✅ Much better UX without complexity
+
+This makes the app actually usable for a home user without turning it into an enterprise application.
