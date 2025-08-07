@@ -190,19 +190,31 @@ def register_routes(app: Flask) -> None:
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
-    @app.route("/upload", methods=["POST"])
-    def upload_file() -> Union[str, tuple[str, int]]:
-        """Regular upload WITHOUT timing data."""
+    def _validate_upload_request() -> tuple[Optional[FileStorage], Optional[str]]:
+        """Common validation for upload endpoints.
+
+        Returns:
+            (file, error_message) - file if valid, error message if invalid
+        """
         service = get_pdf_service()
         if not is_processor_available() or service is None:
-            return "Error: PDF Service is not available."
+            return None, "Error: PDF Service is not available."
 
         if "pdf_file" not in request.files:
-            return "No file part in the request."
+            return None, "No file part in the request."
 
         file = request.files["pdf_file"]
         if not file.filename or file.filename == "" or not allowed_file(file.filename):
-            return "No file selected or invalid file type."
+            return None, "No file selected or invalid file type."
+
+        return file, None
+
+    @app.route("/upload", methods=["POST"])
+    def upload_file() -> Union[str, tuple[str, int]]:
+        """Regular upload WITHOUT timing data."""
+        file, error = _validate_upload_request()
+        if error:
+            return error
 
         # Use unified processing logic WITHOUT timing
         result, original_filename, base_filename, error_message = process_upload_request(
@@ -225,16 +237,9 @@ def register_routes(app: Flask) -> None:
         if config.tts_engine.value == "gemini":
             return "Read-along mode is not available with Gemini TTS. Please use regular upload or switch to Piper TTS."
 
-        service = get_pdf_service()
-        if not is_processor_available() or service is None:
-            return "Error: PDF Service is not available."
-
-        if "pdf_file" not in request.files:
-            return "No file part in the request."
-
-        file = request.files["pdf_file"]
-        if not file.filename or file.filename == "" or not allowed_file(file.filename):
-            return "No file selected or invalid file type."
+        file, error = _validate_upload_request()
+        if error:
+            return error
 
         # Use unified processing logic WITH timing
         result, original_filename, base_filename, error_message = process_upload_request(
