@@ -340,11 +340,11 @@ class ServiceContainer:
 - [x] Remove redundant type casts in SystemConfig - DONE: Cleaned up unnecessary casts
 
 #### High Priority - Type Safety & Code Quality:
-- [ ] Fix remaining mypy errors in domain/audio modules (6 errors)
-- [ ] Add complete type coverage to all modules
+- [x] Fix remaining mypy errors in domain/audio modules - DONE: Added proper async type hints
+- [ ] Add complete type coverage to all modules (54 errors remaining in tests and infrastructure)
 
 #### Medium Priority - Architecture Improvements:
-- [ ] Break down SystemConfig into specialized configs (TTSConfig, LLMConfig, OCRConfig, FileConfig)
+- [x] Break down SystemConfig into specialized configs - DONE: Created 10 specialized configs with composition
 - [ ] Standardize error handling to Result[T] pattern throughout codebase
 - [ ] Extract rate limiting to shared abstraction layer
 - [ ] Implement complete service container immutability
