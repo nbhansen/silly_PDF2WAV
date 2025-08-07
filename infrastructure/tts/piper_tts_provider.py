@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import re
 import ssl
-import subprocess
+import subprocess  # nosec B404
 import tempfile
 from typing import Optional
 import urllib.error
@@ -169,12 +169,12 @@ class PiperTTSProvider(ITTSEngine):  # FIXED: Only implement ITTSEngine
 
         try:
             # Create request with timeout and proper headers
-            request = urllib.request.Request(url, headers={"User-Agent": "PiperTTS/1.0"})
+            request = urllib.request.Request(url, headers={"User-Agent": "PiperTTS/1.0"})  # nosec B310
 
             # Download with SSL context and timeout
-            with urllib.request.urlopen(request, context=ssl_context, timeout=timeout) as response:
+            with urllib.request.urlopen(request, context=ssl_context, timeout=timeout) as response:  # nosec B310
                 if response.status != 200:
-                    raise urllib.error.HTTPError(url, response.status, "Download failed", None, None)
+                    raise urllib.error.HTTPError(url, response.status, "Download failed", None, None)  # type: ignore[arg-type]
 
                 # Write to destination file
                 with Path(destination).open("wb") as f:

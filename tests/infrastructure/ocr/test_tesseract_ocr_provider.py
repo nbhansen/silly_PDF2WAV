@@ -500,7 +500,7 @@ class TestTesseractOCRProviderDirectExtraction:
         pages = []
         for i in range(10):
             mock_page = MagicMock()
-            mock_page.extract_text.return_value = f"Page {i+1} content"
+            mock_page.extract_text.return_value = f"Page {i + 1} content"
             pages.append(mock_page)
 
         mock_pdf = MagicMock()
@@ -522,7 +522,7 @@ class TestTesseractOCRProviderDirectExtraction:
         """Should validate and adjust page range boundaries."""
         pages = [MagicMock() for _ in range(5)]
         for i, page in enumerate(pages):
-            page.extract_text.return_value = f"Page {i+1} content"
+            page.extract_text.return_value = f"Page {i + 1} content"
 
         mock_pdf = MagicMock()
         mock_pdf.pages = pages

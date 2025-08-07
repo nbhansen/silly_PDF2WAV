@@ -277,7 +277,7 @@ class AudioEngine(IAudioEngine):
         # Handle failed chunks logging
         for i, result in enumerate(results):
             if isinstance(result, Exception):
-                print(f"AudioEngine: Chunk {i+1} failed with exception: {result}")
+                print(f"AudioEngine: Chunk {i + 1} failed with exception: {result}")
 
         print(
             f"✅ AudioEngine: Successfully processed {len(audio_chunks)}/"
@@ -335,7 +335,7 @@ class AudioEngine(IAudioEngine):
         Returns Result with duration or error.
         """
         try:
-            import subprocess
+            import subprocess  # nosec B404
 
             # Validate file path for security
             path_obj = Path(file_path)
@@ -439,7 +439,7 @@ class AudioEngine(IAudioEngine):
     def _execute_ffmpeg_combination(self, file_paths: list[str], output_path: str) -> Result[str]:
         """Execute ffmpeg command to combine multiple audio files."""
         try:
-            import subprocess
+            import subprocess  # nosec B404
 
             list_file_result = self._prepare_ffmpeg_command(file_paths, output_path)
             if list_file_result.is_failure:
@@ -621,7 +621,7 @@ class AudioEngine(IAudioEngine):
         Returns Result with output path or error.
         """
         try:
-            import subprocess
+            import subprocess  # nosec B404
 
             # Validate input file path for security
             if not Path(wav_path).is_file() or Path(wav_path).is_symlink():

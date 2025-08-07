@@ -116,7 +116,7 @@ class TimingEngine(ITimingEngine):
                 if self.text_pipeline:
                     enhance_result = self.text_pipeline.enhance_with_natural_formatting(chunk)
                     if enhance_result.is_failure:
-                        print(f"TimingEngine: Enhancement failed for chunk {i+1}, using original")
+                        print(f"TimingEngine: Enhancement failed for chunk {i + 1}, using original")
                         enhanced_chunk = chunk
                     elif enhance_result.value is not None:
                         enhanced_chunk = enhance_result.value
@@ -125,12 +125,12 @@ class TimingEngine(ITimingEngine):
                 else:
                     enhanced_chunk = chunk
 
-                print(f"🔍 TimingEngine: Processing chunk {i+1}/{len(text_chunks)} ({len(enhanced_chunk)} chars)")
+                print(f"🔍 TimingEngine: Processing chunk {i + 1}/{len(text_chunks)} ({len(enhanced_chunk)} chars)")
 
                 # Check chunk size
                 if len(enhanced_chunk) > 3000:
                     print(
-                        f"🚨 TimingEngine: Chunk {i+1} too large ({len(enhanced_chunk)} chars), "
+                        f"🚨 TimingEngine: Chunk {i + 1} too large ({len(enhanced_chunk)} chars), "
                         f"falling back to measurement mode"
                     )
                     return self._generate_with_measurement(text_chunks, output_filename)
@@ -142,7 +142,7 @@ class TimingEngine(ITimingEngine):
                 result = self.tts_engine.generate_audio_with_timestamps(enhanced_chunk)
 
                 if result.is_failure:
-                    print(f"TimingEngine: Engine failed for chunk {i+1}: {result.error}")
+                    print(f"TimingEngine: Engine failed for chunk {i + 1}: {result.error}")
                     continue
 
                 audio_data, text_segments = result.value
@@ -292,7 +292,7 @@ class TimingEngine(ITimingEngine):
                 batch_end = min(batch_start + batch_size, len(sentences))
                 batch = sentences[batch_start:batch_end]
 
-                print(f"  Processing batch {batch_start//batch_size + 1} (sentences {batch_start+1}-{batch_end})")
+                print(f"  Processing batch {batch_start // batch_size + 1} (sentences {batch_start + 1}-{batch_end})")
 
                 batch_result = self._process_sentence_batch(batch, chunk_index, batch_start, cumulative_time)
 
@@ -416,7 +416,7 @@ class TimingEngine(ITimingEngine):
 
             # Create a minimal audio engine just for combining
             # This is a bit of a hack but avoids circular dependencies
-            import subprocess
+            import subprocess  # nosec B404
 
             if len(full_paths) == 1:
                 # Just copy the single file
@@ -427,7 +427,7 @@ class TimingEngine(ITimingEngine):
 
             # Use ffmpeg directly for combining
             list_file = str(output_path) + ".list"
-            with open(list_file, "w") as f:
+            with Path(list_file).open("w") as f:
                 for path in full_paths:
                     f.write(f"file '{path}'\n")
 

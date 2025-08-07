@@ -147,7 +147,7 @@ class TextPipeline(ITextPipeline):
             try:
                 fallback = self._basic_text_cleanup(raw_text)
                 return Result.success(fallback)
-            except:
+            except Exception:
                 return Result.from_exception(e, ErrorCode.TEXT_CLEANING_FAILED, retryable=True)
 
     async def clean_text_async(self, raw_text: str) -> Result[str]:
@@ -192,7 +192,7 @@ class TextPipeline(ITextPipeline):
             try:
                 fallback = self._basic_text_cleanup(raw_text)
                 return Result.success(fallback)
-            except:
+            except Exception:
                 return Result.from_exception(e, ErrorCode.TEXT_CLEANING_FAILED, retryable=True)
 
     def enhance_with_natural_formatting(self, text: str) -> Result[str]:
@@ -258,7 +258,7 @@ class TextPipeline(ITextPipeline):
 
             for i in range(0, len(raw_text), chunk_size):
                 chunk = raw_text[i : i + chunk_size]
-                print(f"     → Processing sub-chunk {i//chunk_size + 1} ({len(chunk)} chars)")
+                print(f"     → Processing sub-chunk {i // chunk_size + 1} ({len(chunk)} chars)")
 
                 sub_prompt = self._generate_cleaning_prompt(chunk)
                 if self.llm_provider is not None:
@@ -421,7 +421,7 @@ Text to convert:
 
                 for i in range(0, len(text), chunk_size):
                     chunk = text[i : i + chunk_size]
-                    print(f"     → Plain English chunk {i//chunk_size + 1} ({len(chunk)} chars)")
+                    print(f"     → Plain English chunk {i // chunk_size + 1} ({len(chunk)} chars)")
 
                     chunk_prompt = self._generate_plain_english_prompt(chunk)
                     chunk_result = self.llm_provider.generate_content(chunk_prompt)

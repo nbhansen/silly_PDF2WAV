@@ -245,7 +245,7 @@ def assert_timing_accuracy():
                 prev_end = segments[i - 1].start_time + segments[i - 1].duration
                 current_start = segment.start_time
                 gap = abs(current_start - prev_end)
-                assert gap <= tolerance, f"Timing gap too large between segments {i-1} and {i}: {gap}s"
+                assert gap <= tolerance, f"Timing gap too large between segments {i - 1} and {i}: {gap}s"
 
     return _assert_timing_accuracy
 

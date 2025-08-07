@@ -177,10 +177,10 @@ def register_routes(app: Flask) -> None:
             temp_path = Path(app.config["UPLOAD_FOLDER"]) / f"temp_{original_filename}"
             file.save(str(temp_path))
 
-            # Use document engine to get PDF info  
-            from domain.document.document_engine import IDocumentEngine
+            # Use document engine to get PDF info
             from domain.container.service_container import ServiceContainer
-            
+            from domain.document.document_engine import IDocumentEngine
+
             # Type assertion for proper type checking
             assert isinstance(service, ServiceContainer), "Service must be ServiceContainer instance"
             document_engine = service.get(IDocumentEngine)
@@ -193,7 +193,9 @@ def register_routes(app: Flask) -> None:
             if pdf_info_result.is_success:
                 pdf_info = pdf_info_result.value
                 assert pdf_info is not None  # Type hint for mypy
-                return jsonify({"total_pages": pdf_info.total_pages, "title": pdf_info.title, "author": pdf_info.author})
+                return jsonify(
+                    {"total_pages": pdf_info.total_pages, "title": pdf_info.title, "author": pdf_info.author}
+                )
             else:
                 return jsonify({"error": f"Failed to get PDF info: {pdf_info_result.error}"}), 500
 
@@ -476,6 +478,7 @@ def _process_uploaded_file(uploaded_file: FileStorage, request_form: object) -> 
         document_engine = services.document_engine
         # Type assertion for mypy
         from domain.document.document_engine import IDocumentEngine
+
         assert isinstance(document_engine, IDocumentEngine)
         validation_result = document_engine.validate_page_range(str(pdf_path), page_range)
         if validation_result.is_failure:
@@ -490,7 +493,7 @@ def _process_uploaded_file(uploaded_file: FileStorage, request_form: object) -> 
                 enable_plain_english=enable_plain_english,
                 error=f"Error: {validation_result.error}",
             )
-        
+
         validation = validation_result.value
         assert validation is not None  # Type assertion for mypy
         if not validation.get("valid", False):
@@ -518,12 +521,12 @@ def _process_uploaded_file(uploaded_file: FileStorage, request_form: object) -> 
 def _configure_processing_services() -> ProcessingServices:
     """Configure and return all required processing services."""
     from domain.audio.audio_engine import IAudioEngine
+    from domain.container.service_container import ServiceContainer
     from domain.document.document_engine import IDocumentEngine
     from domain.text.text_pipeline import ITextPipeline
-    from domain.container.service_container import ServiceContainer
 
     service_container = get_pdf_service()
-    
+
     # Type assertion for proper type checking
     assert isinstance(service_container, ServiceContainer), "Service container must be ServiceContainer instance"
 
@@ -583,33 +586,33 @@ def _execute_document_processing(
 
     # Use document engine for complete processing
     # Type assertions for mypy
-    from domain.document.document_engine import IDocumentEngine
     from domain.audio.audio_engine import IAudioEngine
+    from domain.document.document_engine import IDocumentEngine
     from domain.text.text_pipeline import ITextPipeline
+
     assert isinstance(services.document_engine, IDocumentEngine)
     assert isinstance(services.audio_engine, IAudioEngine)
     assert isinstance(text_pipeline, ITextPipeline)
     processing_result = services.document_engine.process_document(
         request_obj, services.audio_engine, text_pipeline, enable_timing, config.llm_chunk_size
     )
-    
+
     if processing_result.is_failure:
         # Convert Result[T] error to ProcessingResult for backward compatibility
-        from domain.models import ProcessingResult
         from domain.errors import ApplicationError, ErrorCode
+        from domain.models import ProcessingResult
+
         error = ApplicationError(
-            code=ErrorCode.AUDIO_GENERATION_FAILED,
-            message=str(processing_result.error),
-            retryable=True
+            code=ErrorCode.AUDIO_GENERATION_FAILED, message=str(processing_result.error), retryable=True
         )
         return ProcessingResult(
             audio_files=None,
             combined_mp3_file=None,
             timing_data=None,
             error=error,
-            debug_info={"processing_error": "Document engine processing failed"}
+            debug_info={"processing_error": "Document engine processing failed"},
         )
-    
+
     # Convert TimedAudioResult to ProcessingResult for backward compatibility
     audio_result = processing_result.value
     assert audio_result is not None  # Type assertion for mypy
@@ -618,7 +621,7 @@ def _execute_document_processing(
         combined_mp3_file=audio_result.combined_mp3,
         timing_data=audio_result.timing_data,
         error=None,
-        debug_info={"audio_generation": "success"}
+        debug_info={"audio_generation": "success"},
     )
 
 

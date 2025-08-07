@@ -361,7 +361,7 @@ class TestGeminiLLMProviderSyncContentGeneration:
             # Verify prompt truncation in logs
             expected_preview = long_prompt[:100] + "..."
             expected_call = (
-                f"🔬 LLM API Call: Model=gemini-1.5-flash, " f"prompt='{expected_preview}' ({len(long_prompt)} chars)"
+                f"🔬 LLM API Call: Model=gemini-1.5-flash, prompt='{expected_preview}' ({len(long_prompt)} chars)"
             )
             mock_print.assert_any_call(expected_call)
 
@@ -882,11 +882,10 @@ class TestGeminiLLMProviderIntegration:
 
             # Verify logging for both calls
             mock_print.assert_any_call(
-                "🔬 LLM API Call: Model=gemini-1.5-pro, " "prompt='Raw text content that needs enhancement' (39 chars)"
+                "🔬 LLM API Call: Model=gemini-1.5-pro, prompt='Raw text content that needs enhancement' (39 chars)"
             )
             mock_print.assert_any_call("✅ LLM API Success: 1.20s for 'Raw text content that needs enhancement'")
             mock_print.assert_any_call(
-                "🔬 LLM API Call: Model=gemini-1.5-pro, "
-                "prompt='Generate new content based on this prompt' (41 chars)"
+                "🔬 LLM API Call: Model=gemini-1.5-pro, prompt='Generate new content based on this prompt' (41 chars)"
             )
             mock_print.assert_any_call("✅ LLM API Success: 1.80s for 'Generate new content based on this prompt'")

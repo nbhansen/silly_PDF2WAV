@@ -50,7 +50,8 @@ class TestChunkingPerformance:
         chunker = SentenceBasedChunking()
 
         def chunk_text() -> list[str]:
-            return chunker.chunk_text(large_text_chunks, max_chunk_size=1500)
+            result = chunker.chunk_text(large_text_chunks, max_chunk_size=1500)
+            return result.value or []
 
         result = benchmark(chunk_text)
         assert len(result) >= len(large_text_chunks)  # Should create at least as many chunks
@@ -60,7 +61,8 @@ class TestChunkingPerformance:
         chunker = WordBasedChunking()
 
         def chunk_text() -> list[str]:
-            return chunker.chunk_text(large_text_chunks, max_chunk_size=1200)
+            result = chunker.chunk_text(large_text_chunks, max_chunk_size=1200)
+            return result.value or []
 
         result = benchmark(chunk_text)
         assert len(result) >= len(large_text_chunks)

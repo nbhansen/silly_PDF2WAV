@@ -73,7 +73,7 @@ def setup_logging(config: LoggingConfig) -> logging.Logger:
 
                 return json.dumps(log_entry)
 
-        formatter = JSONFormatter()
+        formatter: logging.Formatter = JSONFormatter()
     else:
         formatter = logging.Formatter(config.format)
 
@@ -142,4 +142,5 @@ def get_app_logger() -> logging.Logger:
         fallback_config = LoggingConfig()
         configure_application_logging(fallback_config)
 
+    assert _app_logger is not None  # Should be set by fallback if None
     return _app_logger

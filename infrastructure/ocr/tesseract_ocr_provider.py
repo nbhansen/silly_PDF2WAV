@@ -29,9 +29,9 @@ class TesseractOCRProvider(IOCRProvider):
 
         # Configure OCR settings with type safety
         if config:
-            self.ocr_dpi = getattr(config, 'ocr_dpi', 300)
-            self.ocr_threshold = getattr(config, 'ocr_threshold', 180)
-            self.ocr_language = getattr(config, 'ocr_language', 'eng')
+            self.ocr_dpi = getattr(config, "ocr_dpi", 300)
+            self.ocr_threshold = getattr(config, "ocr_threshold", 180)
+            self.ocr_language = getattr(config, "ocr_language", "eng")
         else:
             # Default settings
             self.ocr_dpi = 300

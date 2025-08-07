@@ -387,7 +387,7 @@ class SystemConfig:
         if self.tts_engine == TTSEngine.GEMINI:
             if not self.gemini_api_key:
                 raise ValueError(
-                    "GOOGLE_AI_API_KEY is required when TTS_ENGINE=gemini. " "Please set this environment variable."
+                    "GOOGLE_AI_API_KEY is required when TTS_ENGINE=gemini. Please set this environment variable."
                 )
             if self.gemini_api_key == "YOUR_GOOGLE_AI_API_KEY":
                 raise ValueError("Please set a valid GOOGLE_AI_API_KEY (not the placeholder value)")

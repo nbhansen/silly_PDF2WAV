@@ -98,9 +98,8 @@ class DocumentEngine(IDocumentEngine):
                     page = pdf.pages[i]
                     text_result = self._extract_page_text(page, i + 1)
 
-                    if text_result.is_success and text_result.value:
-                        if text_result.value.strip():
-                            extracted_text.append(text_result.value.strip())
+                    if text_result.is_success and text_result.value and text_result.value.strip():
+                        extracted_text.append(text_result.value.strip())
                     # Continue on page errors - partial extraction is better than none
 
             if not extracted_text:
