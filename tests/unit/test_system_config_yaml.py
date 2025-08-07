@@ -6,7 +6,8 @@ from typing import Any
 import pytest
 import yaml
 
-from application.config.system_config import SystemConfig, TTSEngine
+from application.config.system_config import SystemConfig
+from domain.config.tts_config import TTSEngine
 
 
 class TestSystemConfigYAMLLoading:
@@ -25,10 +26,10 @@ class TestSystemConfigYAMLLoading:
         config_file = self.create_yaml_config(config_data)
         try:
             config = SystemConfig.from_yaml(config_file)
-            assert config.tts_engine == TTSEngine.PIPER
+            assert config.tts.engine == TTSEngine.PIPER
             # Check defaults are applied
-            assert config.enable_text_cleaning is True
-            assert config.max_file_size_mb == 20
+            assert config.text_processing.enable_cleaning is True
+            assert config.files.max_file_size_mb == 100
         finally:
             Path(config_file).unlink()
 
@@ -61,25 +62,26 @@ class TestSystemConfigYAMLLoading:
             config = SystemConfig.from_yaml(config_file)
 
             # TTS settings
-            assert config.tts_engine == TTSEngine.GEMINI
-            assert config.gemini_model_name == "test-model"
-            assert config.gemini_voice_name == "Aoede"
-            assert config.tts_request_delay_seconds == 1.5
-            assert config.gemini_use_measurement_mode is True
-            assert config.gemini_api_key == "test-api-key-123"
+            assert config.tts.engine == TTSEngine.GEMINI
+            assert config.gemini is not None
+            assert config.gemini.model_name == "test-model"
+            assert config.gemini.voice_name == "Aoede"
+            assert config.tts.request_delay_seconds == 1.5
+            assert config.gemini.use_measurement_mode is True
+            assert config.gemini.api_key == "test-api-key-123"
 
             # Text processing
-            assert config.enable_text_cleaning is False
-            assert config.enable_natural_formatting is False
-            assert config.chunk_size == 5000
+            assert config.text_processing.enable_cleaning is False
+            assert config.text_processing.enable_natural_formatting is False
+            assert config.text_processing.chunk_size == 5000
 
             # File settings
-            assert config.upload_folder == "test_uploads"
-            assert config.audio_folder == "test_audio"
-            assert config.max_file_size_mb == 50
-            assert config.allowed_extensions == frozenset({"pdf", "txt"})
-            assert config.enable_file_cleanup is False
-            assert config.max_file_age_hours == 48.0
+            assert config.files.upload_folder == "test_uploads"
+            assert config.files.audio_folder == "test_audio"
+            assert config.files.max_file_size_mb == 50
+            assert config.files.allowed_extensions == frozenset({"pdf", "txt"})
+            assert config.cleanup.enabled is False
+            assert config.cleanup.max_file_age_hours == 48.0
 
         finally:
             Path(config_file).unlink()
@@ -127,23 +129,24 @@ class TestSystemConfigYAMLLoading:
             config = SystemConfig.from_yaml(config_file)
 
             # Boolean conversions
-            assert config.enable_text_cleaning is True
-            assert config.enable_natural_formatting is True
-            assert config.enable_file_cleanup is True
+            assert config.text_processing.enable_cleaning is True
+            assert config.text_processing.enable_natural_formatting is True
+            assert config.cleanup.enabled is True
 
             # Integer conversions
-            assert config.chunk_size == 6000
-            assert isinstance(config.chunk_size, int)
-            assert config.max_file_size_mb == 30
-            assert isinstance(config.max_file_size_mb, int)
+            assert config.text_processing.chunk_size == 6000
+            assert isinstance(config.text_processing.chunk_size, int)
+            assert config.files.max_file_size_mb == 30
+            assert isinstance(config.files.max_file_size_mb, int)
 
             # Float conversions
-            assert config.max_file_age_hours == 36.5
-            assert isinstance(config.max_file_age_hours, float)
-            assert config.auto_cleanup_interval_hours == 8.0
-            assert isinstance(config.auto_cleanup_interval_hours, float)
-            assert config.piper_length_scale == 1.5
-            assert isinstance(config.piper_length_scale, float)
+            assert config.cleanup.max_file_age_hours == 36.5
+            assert isinstance(config.cleanup.max_file_age_hours, float)
+            assert config.cleanup.auto_cleanup_interval_hours == 8.0
+            assert isinstance(config.cleanup.auto_cleanup_interval_hours, float)
+            assert config.piper is not None
+            assert config.piper.length_scale == 1.5
+            assert isinstance(config.piper.length_scale, float)
 
         finally:
             Path(config_file).unlink()
@@ -176,7 +179,7 @@ class TestSystemConfigYAMLLoading:
             config_file = self.create_yaml_config(config_data)
             try:
                 config = SystemConfig.from_yaml(config_file)
-                assert config.enable_text_cleaning is expected, f"Failed for value: {value}"
+                assert config.text_processing.enable_cleaning is expected, f"Failed for value: {value}"
             finally:
                 Path(config_file).unlink()
 
@@ -211,7 +214,7 @@ class TestSystemConfigYAMLLoading:
         try:
             config = SystemConfig.from_yaml(config_file)
             # Should use default value
-            assert config.tts_engine == TTSEngine.PIPER
+            assert config.tts.engine == TTSEngine.PIPER
         finally:
             Path(config_file).unlink()
 
@@ -237,8 +240,8 @@ class TestSystemConfigYAMLLoading:
         config_file = self.create_yaml_config(config_data)
         try:
             config = SystemConfig.from_yaml(config_file)
-            assert config.allowed_extensions == frozenset({"pdf", "txt", "doc"})
-            assert config.audio_extensions == frozenset({"wav", "mp3", "ogg"})
+            assert config.files.allowed_extensions == frozenset({"pdf", "txt", "doc"})
+            assert config.files.audio_extensions == frozenset({"wav", "mp3", "ogg"})
         finally:
             Path(config_file).unlink()
 
@@ -251,8 +254,8 @@ class TestSystemConfigYAMLLoading:
         config_file = self.create_yaml_config(config_data)
         try:
             config = SystemConfig.from_yaml(config_file)
-            assert config.allowed_extensions == frozenset({"pdf", "txt", "doc"})
-            assert config.audio_extensions == frozenset({"wav", "mp3", "ogg"})
+            assert config.files.allowed_extensions == frozenset({"pdf", "txt", "doc"})
+            assert config.files.audio_extensions == frozenset({"wav", "mp3", "ogg"})
         finally:
             Path(config_file).unlink()
 
@@ -284,8 +287,8 @@ class TestSystemConfigYAMLLoading:
         config_file = self.create_yaml_config(config_data)
         try:
             config = SystemConfig.from_yaml(config_file)
-            assert config.enable_text_cleaning is True  # Default value
-            assert config.chunk_size == 4000  # Default value
+            assert config.text_processing.enable_cleaning is True  # Default value
+            assert config.text_processing.chunk_size == 20000  # Default value
         finally:
             Path(config_file).unlink()
 
@@ -299,7 +302,7 @@ class TestSystemConfigYAMLLoading:
             config_file = self.create_yaml_config(config_data)
             try:
                 config = SystemConfig.from_yaml(config_file)
-                assert config.tts_engine == TTSEngine.PIPER
+                assert config.tts.engine == TTSEngine.PIPER
             finally:
                 Path(config_file).unlink()
 
@@ -309,7 +312,7 @@ class TestSystemConfigYAMLLoading:
         if example_file.exists():
             config = SystemConfig.from_yaml(str(example_file))
             # Verify it loads without errors and has expected defaults
-            assert config.tts_engine == TTSEngine.PIPER
-            assert isinstance(config.enable_text_cleaning, bool)
-            assert isinstance(config.max_file_size_mb, int)
-            assert isinstance(config.tts_request_delay_seconds, float)
+            assert config.tts.engine == TTSEngine.PIPER
+            assert isinstance(config.text_processing.enable_cleaning, bool)
+            assert isinstance(config.files.max_file_size_mb, int)
+            assert isinstance(config.tts.request_delay_seconds, float)

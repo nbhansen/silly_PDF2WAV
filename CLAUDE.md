@@ -218,5 +218,86 @@ When in doubt, we choose clarity over cleverness.
 
 ## Architectural Memory
 
-### Codebase Refactoring Priorities
-- **Ensure the entire codebase uses Result[T] fix if you run into places where it doesnt**
+### Current Major Work In Progress
+
+#### ❌ SystemConfig Architecture Refactoring (INCOMPLETE - CRITICAL)
+**STATUS: PARTIALLY COMPLETE** - Migration from monolithic to composed configuration architecture is UNFINISHED.
+
+**BLOCKING ISSUE**: Integration tests and other features cannot be properly committed because the SystemConfig refactoring is incomplete, causing mypy failures across the entire codebase.
+
+**What is done:**
+- ✅ `domain/config/tts_config.py` - Unified TTS configuration classes created
+- ✅ `application/config/system_config.py` - New composition pattern structure created
+- ✅ Some files updated to new property access patterns
+
+**What is MISSING (CRITICAL):**
+
+### PHASE 1: Fix All Property Access Patterns
+**Files that MUST be updated to use new composition pattern:**
+
+**REQUIRED PROPERTY MAPPING:**
+```
+OLD PATTERN                    → NEW PATTERN
+config.enable_text_cleaning    → config.text_processing.enable_cleaning
+config.max_file_size_mb        → config.files.max_file_size_mb
+config.upload_folder           → config.files.upload_folder
+config.audio_folder            → config.files.audio_folder
+config.gemini_api_key          → config.gemini.api_key (if config.gemini)
+config.tts_engine              → config.tts.engine
+config.enable_async_audio      → config.performance.enable_async_audio
+config.audio_concurrent_chunks → config.performance.audio_concurrent_chunks
+config.tts_concurrent_requests → config.tts.concurrent_requests
+config.tts_request_delay_seconds → config.tts.request_delay_seconds
+config.enable_natural_formatting → config.text_processing.enable_natural_formatting
+config.gemini_model_name       → config.gemini.model_name (if config.gemini)
+config.gemini_voice_name       → config.gemini.voice_name (if config.gemini)
+config.audio_target_chunk_size → config.text_processing.audio_target_chunk_size
+config.audio_max_chunk_size    → config.text_processing.audio_max_chunk_size
+config.gemini_use_measurement_mode → config.gemini.use_measurement_mode (if config.gemini)
+config.gemini_measurement_mode_interval → config.gemini.measurement_mode_interval (if config.gemini)
+config.piper_model_repository_url → config.piper.model_repository_url (if config.piper)
+```
+
+**FILES REQUIRING UPDATES:**
+- `utils.py` - Some property access patterns
+- `domain/container/service_container.py` - Multiple property access patterns
+- `domain/factories/*.py` - Factory files with old property access
+- `tests/unit/*.py` - Test files with old SystemConfig usage
+- `tests/benchmarks/*.py` - Benchmark files with old patterns
+- `tests/integration/*.py` - Integration tests with old patterns
+- `routes.py` - Route handlers with old property access
+- Any other files with `config.{old_property}` patterns
+
+### PHASE 2: Update All SystemConfig Constructors
+**Every SystemConfig constructor call must use composition pattern:**
+```python
+# OLD (WRONG):
+SystemConfig(tts_engine=TTSEngine.PIPER, upload_folder="/path", ...)
+
+# NEW (CORRECT):
+SystemConfig(
+    tts=TTSConfig(engine=TTSEngine.PIPER, ...),
+    files=FileConfig(upload_folder="/path", ...),
+    cleanup=FileCleanupConfig(...),
+    text_processing=TextProcessingConfig(...),
+    performance=PerformanceConfig(...),
+    flask=FlaskConfig(...),
+    ocr=OCRConfig(...),
+    llm=LLMConfig(...),
+    gemini=GeminiConfig(...) if needed,
+    piper=PiperConfig(...) if needed,
+)
+```
+
+### PHASE 3: Clean Up File References
+- Remove any imports or references to deleted `system_config_refactored.py`
+- Remove any imports or references to deleted `tts_configs.py`
+
+### PHASE 4: Complete Validation
+- Run `mypy .` - MUST pass with zero errors on SystemConfig
+- Run all tests - MUST pass completely
+- Ensure integration tests can be committed without SKIP flags
+
+**CRITICAL**: This refactoring affects ~15-20 files and must be completed systematically. NO SHORTCUTS. Every single SystemConfig property access must be updated to use the composition pattern.
+
+**PRIORITY**: This is BLOCKING work that must be completed before any other features can be properly committed.

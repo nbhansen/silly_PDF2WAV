@@ -21,7 +21,7 @@ from .tts_factory import create_tts_engine
 def create_complete_audio_engine(config: SystemConfig) -> IAudioEngine:
     """Create audio engine with all dependencies using focused factories."""
     # Create dependencies in order
-    file_manager = FileManager(upload_folder=config.upload_folder, output_folder=config.audio_folder)
+    file_manager = FileManager(upload_folder=config.files.upload_folder, output_folder=config.files.audio_folder)
 
     # Create TTS engine and text pipeline (no dependency order required)
     tts_engine = create_tts_engine(config)
@@ -36,7 +36,7 @@ def create_complete_audio_engine(config: SystemConfig) -> IAudioEngine:
 
 def create_document_engine(config: SystemConfig) -> IDocumentEngine:
     """Create document engine with dependencies."""
-    file_manager = FileManager(upload_folder=config.upload_folder, output_folder=config.audio_folder)
+    file_manager = FileManager(upload_folder=config.files.upload_folder, output_folder=config.files.audio_folder)
 
     ocr_provider = TesseractOCRProvider(config=config)
 
@@ -46,7 +46,7 @@ def create_document_engine(config: SystemConfig) -> IDocumentEngine:
 def create_complete_service_set(config: SystemConfig) -> dict[str, Any]:
     """Create complete set of consolidated services using focused factories."""
     # Create shared file manager
-    file_manager = FileManager(upload_folder=config.upload_folder, output_folder=config.audio_folder)
+    file_manager = FileManager(upload_folder=config.files.upload_folder, output_folder=config.files.audio_folder)
 
     # Create TTS engine and text pipeline (no dependency order required)
     tts_engine = create_tts_engine(config)

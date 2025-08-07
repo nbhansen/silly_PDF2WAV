@@ -26,7 +26,8 @@ class TestFileManagerInitialization:
         assert manager.upload_folder == str(Path(upload_path).resolve())
         assert manager.output_folder == str(Path(output_path).resolve())
         assert Path(manager.upload_folder).exists()
-        assert Path(manager.output_folder).is_absolute().exists()
+        assert Path(manager.output_folder).is_absolute()
+        assert Path(manager.output_folder).exists()
 
     def test_init_converts_relative_paths_to_absolute(self, temp_dir):
         """Should convert relative paths to absolute paths."""

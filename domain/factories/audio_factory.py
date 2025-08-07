@@ -27,16 +27,16 @@ def create_audio_engine(
     chunking_strategy = create_chunking_strategy(chunking_mode)
 
     print("🔍 AudioFactory: Creating AudioEngine with chunk sizes:")
-    print(f"  - audio_target_chunk_size: {config.audio_target_chunk_size}")
-    print(f"  - audio_max_chunk_size: {config.audio_max_chunk_size}")
+    print(f"  - audio_target_chunk_size: {config.text_processing.audio_target_chunk_size}")
+    print(f"  - audio_max_chunk_size: {config.text_processing.audio_max_chunk_size}")
 
     return AudioEngine(
         tts_engine=tts_engine,
         file_manager=file_manager,
         timing_engine=timing_engine,
-        max_concurrent=config.audio_concurrent_chunks,
-        audio_target_chunk_size=config.audio_target_chunk_size,
-        audio_max_chunk_size=config.audio_max_chunk_size,
+        max_concurrent=config.performance.audio_concurrent_chunks,
+        audio_target_chunk_size=config.text_processing.audio_target_chunk_size,
+        audio_max_chunk_size=config.text_processing.audio_max_chunk_size,
         chunking_strategy=chunking_strategy,
     )
 
@@ -49,12 +49,12 @@ def create_timing_engine(
 
     # IMPORTANT: This uses TTS engine timing capabilities, NOT LLM models
     # gemini_use_measurement_mode refers to TTS timing measurement, not text processing
-    mode = TimingMode.MEASUREMENT if config.gemini_use_measurement_mode else TimingMode.ESTIMATION
+    mode = TimingMode.MEASUREMENT if config.gemini and config.gemini.use_measurement_mode else TimingMode.ESTIMATION
 
     return TimingEngine(
         tts_engine=tts_engine,  # This is Gemini TTS, not Gemini LLM
         file_manager=file_manager,
         text_pipeline=text_pipeline,
         mode=mode,
-        measurement_interval=config.gemini_measurement_mode_interval,
+        measurement_interval=config.gemini.measurement_mode_interval if config.gemini else 0.8,
     )

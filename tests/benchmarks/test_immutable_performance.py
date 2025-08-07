@@ -9,17 +9,30 @@ import types
 
 import pytest
 
-from application.config.system_config import SystemConfig, TTSEngine
+from application.config.app_configs import FlaskConfig
+from application.config.file_configs import FileCleanupConfig, FileConfig
+from application.config.processing_configs import LLMConfig, OCRConfig, PerformanceConfig, TextProcessingConfig
+from application.config.system_config import SystemConfig
+from domain.config.tts_config import TTSConfig, TTSEngine
 from domain.container.service_container import ServiceContainer, create_service_container_builder
 from domain.models import TextSegment
-from domain.text.chunking_strategy import ChunkingService, SentenceBasedChunking, WordBasedChunking
+from domain.text.chunking_strategy import SentenceBasedChunking, WordBasedChunking
 
 
 # Test Data Setup
 @pytest.fixture
 def test_config():
     """Create a test configuration."""
-    return SystemConfig(tts_engine=TTSEngine.PIPER, llm_model_name="test-model", gemini_model_name="test-gemini-model")
+    return SystemConfig(
+        tts=TTSConfig(engine=TTSEngine.PIPER),
+        files=FileConfig(),
+        cleanup=FileCleanupConfig(),
+        text_processing=TextProcessingConfig(),
+        performance=PerformanceConfig(),
+        flask=FlaskConfig(),
+        ocr=OCRConfig(),
+        llm=LLMConfig(model_name="test-model"),
+    )
 
 
 @pytest.fixture
@@ -98,7 +111,9 @@ class TestChunkingStrategyPerformance:
         chunker = SentenceBasedChunking()
 
         def chunk_large_text() -> list[str]:
-            return chunker.chunk_text(large_text_chunks, max_chunk_size=2000)
+            chunk_result = chunker.chunk_text(large_text_chunks, max_chunk_size=2000)
+            assert chunk_result.is_success
+            return chunk_result.value
 
         result = benchmark(chunk_large_text)
         assert len(result) > 0
@@ -108,17 +123,20 @@ class TestChunkingStrategyPerformance:
         chunker = WordBasedChunking()
 
         def chunk_large_text() -> list[str]:
-            return chunker.chunk_text(large_text_chunks, max_chunk_size=1500)
+            chunk_result = chunker.chunk_text(large_text_chunks, max_chunk_size=1500)
+            assert chunk_result.is_success
+            return chunk_result.value
 
         result = benchmark(chunk_large_text)
         assert len(result) > 0
 
     def test_chunking_service_performance(self, benchmark, large_text_chunks):
         """Benchmark chunking service with strategy pattern."""
-        service = ChunkingService()
+        chunker = SentenceBasedChunking()
 
         def process_chunks() -> list[str]:
-            return service.process_chunks(large_text_chunks, max_chunk_size=2000)
+            result = chunker.chunk_text(large_text_chunks, max_chunk_size=2000)
+            return result.value if result.is_success else []
 
         result = benchmark(process_chunks)
         assert len(result) > 0

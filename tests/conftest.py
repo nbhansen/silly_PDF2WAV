@@ -11,7 +11,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from application.config.system_config import SystemConfig, TTSEngine
+from application.config.app_configs import FlaskConfig
+from application.config.file_configs import FileCleanupConfig, FileConfig
+from application.config.processing_configs import LLMConfig, OCRConfig, PerformanceConfig, TextProcessingConfig
+from application.config.system_config import SystemConfig
+from domain.config.tts_config import PiperConfig, TTSConfig, TTSEngine
 from domain.errors import Result
 from domain.models import PageRange, PDFInfo, ProcessingRequest, TextSegment, TimedAudioResult, TimingMetadata
 
@@ -29,15 +33,23 @@ def temp_dir():
 def test_config(temp_dir):
     """Standard test configuration with safe defaults."""
     return SystemConfig(
-        tts_engine=TTSEngine.PIPER,
-        llm_model_name="test-llm-model",
-        gemini_model_name="test-gemini-model",
-        upload_folder=str(temp_dir / "uploads"),
-        audio_folder=str(temp_dir / "audio"),
-        enable_text_cleaning=False,  # Fast tests
-        enable_natural_formatting=False,  # Fast tests
-        enable_file_cleanup=False,  # Don't interfere with tests
-        gemini_api_key=None,  # No external dependencies
+        tts=TTSConfig(engine=TTSEngine.PIPER, concurrent_requests=4, request_delay_seconds=2.0),
+        files=FileConfig(
+            upload_folder=str(temp_dir / "uploads"),
+            audio_folder=str(temp_dir / "audio"),
+            max_file_size_mb=100,
+        ),
+        cleanup=FileCleanupConfig(enabled=False),  # Don't interfere with tests
+        text_processing=TextProcessingConfig(
+            enable_cleaning=False,  # Fast tests
+            enable_natural_formatting=False,  # Fast tests
+        ),
+        performance=PerformanceConfig(),
+        flask=FlaskConfig(),
+        ocr=OCRConfig(),
+        llm=LLMConfig(model_name="test-llm-model"),
+        piper=PiperConfig(model_name="test-piper-model"),
+        gemini=None,  # No external dependencies
     )
 
 

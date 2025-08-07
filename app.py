@@ -68,9 +68,9 @@ if __name__ == "__main__":
     # Only log startup info once
     if not is_flask_reloader():
         logger.info("Starting Flask development server...")
-        logger.info("TTS Engine: %s", context.config.tts_engine.value)
-        logger.info("Text Cleaning: %s", "Enabled" if context.config.enable_text_cleaning else "Disabled")
-        logger.info("File Cleanup: %s", "Enabled" if context.config.enable_file_cleanup else "Disabled")
+        logger.info("TTS Engine: %s", context.config.tts.engine.value)
+        logger.info("Text Cleaning: %s", "Enabled" if context.config.text_processing.enable_cleaning else "Disabled")
+        logger.info("File Cleanup: %s", "Enabled" if context.config.cleanup.enabled else "Disabled")
 
     # Run Flask app
-    app.run(debug=context.config.flask_debug, host=context.config.flask_host, port=context.config.flask_port)
+    app.run(debug=context.config.flask.debug, host=context.config.flask.host, port=context.config.flask.port)

@@ -13,11 +13,13 @@ def create_tts_engine(config: "SystemConfig") -> "ITTSEngine":
     from domain.config.tts_config import PiperConfig
     from infrastructure.tts.piper_tts_provider import PiperTTSProvider
 
-    piper_config = config.get_piper_config()
+    piper_config = config.piper
     # Type narrowing: get_piper_config should return PiperConfig in normal cases
-    if not isinstance(piper_config, PiperConfig):
-        raise TypeError("Expected PiperConfig but got dict fallback")
+    if piper_config is None:
+        from domain.config.tts_config import PiperConfig
+
+        piper_config = PiperConfig()  # Use default config
 
     return PiperTTSProvider(
-        config=piper_config, repository_url=config.piper_model_repository_url, project_root=config.project_root
+        config=piper_config, repository_url=piper_config.model_repository_url, project_root=config.project_root
     )

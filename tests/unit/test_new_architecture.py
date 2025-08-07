@@ -7,9 +7,13 @@ Focuses on testing the high-cohesion, low-coupling design.
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from application.config.system_config import SystemConfig, TTSEngine
+from application.config.app_configs import FlaskConfig
+from application.config.file_configs import FileCleanupConfig, FileConfig
+from application.config.processing_configs import LLMConfig, OCRConfig, PerformanceConfig, TextProcessingConfig
+from application.config.system_config import SystemConfig
 from domain.audio.audio_engine import AudioEngine, IAudioEngine
 from domain.audio.timing_engine import ITimingEngine, TimingEngine, TimingMode
+from domain.config.tts_config import GeminiConfig, TTSConfig, TTSEngine
 from domain.container.service_container import ServiceContainer, create_service_container_builder
 from domain.errors import Result
 from domain.models import TextSegment, TimedAudioResult
@@ -19,7 +23,15 @@ from domain.text.text_pipeline import ITextPipeline, TextPipeline
 def create_test_config(tts_engine: str = "piper") -> SystemConfig:
     """Create a minimal SystemConfig for testing."""
     return SystemConfig(
-        tts_engine=TTSEngine(tts_engine), llm_model_name="test-llm-model", gemini_model_name="test-gemini-model"
+        tts=TTSConfig(engine=TTSEngine(tts_engine)),
+        files=FileConfig(),
+        cleanup=FileCleanupConfig(),
+        text_processing=TextProcessingConfig(),
+        performance=PerformanceConfig(),
+        flask=FlaskConfig(),
+        ocr=OCRConfig(),
+        llm=LLMConfig(model_name="test-llm-model"),
+        gemini=GeminiConfig(api_key=None),  # Provide gemini config even if no API key
     )
 
 
@@ -160,10 +172,11 @@ class TestTextPipeline:
         dirty_text = "This   has    extra   spaces\nand\tsome\tother\fissues."
         cleaned = pipeline.clean_text(dirty_text)
 
-        assert "  " not in cleaned  # No double spaces
-        assert "\n" not in cleaned
-        assert "\t" not in cleaned
-        assert "\f" not in cleaned
+        assert cleaned.is_success
+        assert "  " not in cleaned.value  # No double spaces
+        assert "\n" not in cleaned.value
+        assert "\t" not in cleaned.value
+        assert "\f" not in cleaned.value
 
     def test_text_pipeline_sentence_splitting(self):
         """TextPipeline should split text into sentences correctly."""
@@ -172,11 +185,12 @@ class TestTextPipeline:
         text = "This is sentence one. This is sentence two! Is this sentence three? This is a longer sentence."
         sentences = pipeline.split_into_sentences(text)
 
-        assert len(sentences) == 4
-        assert sentences[0] == "This is sentence one."
-        assert sentences[1] == "This is sentence two!"
-        assert sentences[2] == "Is this sentence three?"
-        assert sentences[3] == "This is a longer sentence."
+        assert sentences.is_success
+        assert len(sentences.value) == 4
+        assert sentences.value[0] == "This is sentence one."
+        assert sentences.value[1] == "This is sentence two!"
+        assert sentences.value[2] == "Is this sentence three?"
+        assert sentences.value[3] == "This is a longer sentence."
 
     def test_text_pipeline_handles_markup_text(self):
         """TextPipeline should handle text with markup correctly."""
@@ -186,9 +200,10 @@ class TestTextPipeline:
         sentences = pipeline.split_into_sentences(markup_text)
 
         # Should split into sentences naturally
-        assert len(sentences) == 1
-        assert "emphasized" in sentences[0]
-        assert "pauses" in sentences[0]
+        assert sentences.is_success
+        assert len(sentences.value) == 1
+        assert "emphasized" in sentences.value[0]
+        assert "pauses" in sentences.value[0]
 
     def test_text_pipeline_natural_enhancement(self):
         """TextPipeline should add natural formatting when enabled."""
@@ -198,8 +213,9 @@ class TestTextPipeline:
         enhanced = pipeline.enhance_with_natural_formatting(text)
 
         # Should contain natural formatting (dots, not SSML)
-        assert "..." in enhanced
-        assert len(enhanced) >= len(text)  # Should be longer with formatting
+        assert enhanced.is_success
+        assert "..." in enhanced.value
+        assert len(enhanced.value) >= len(text)  # Should be longer with formatting
 
 
 class TestServiceContainer:
@@ -298,9 +314,17 @@ class TestArchitectureIntegration:
         raw_text = "This is raw text that needs cleaning and enhancement."
 
         # Test the full pipeline
-        cleaned = pipeline.clean_text(raw_text)
-        enhanced = pipeline.enhance_with_natural_formatting(cleaned)
-        sentences = pipeline.split_into_sentences(enhanced)
+        cleaned_result = pipeline.clean_text(raw_text)
+        assert cleaned_result.is_success
+        cleaned = cleaned_result.value
+
+        enhanced_result = pipeline.enhance_with_natural_formatting(cleaned)
+        assert enhanced_result.is_success
+        enhanced = enhanced_result.value
+
+        sentences_result = pipeline.split_into_sentences(enhanced)
+        assert sentences_result.is_success
+        sentences = sentences_result.value
 
         assert isinstance(cleaned, str)
         assert isinstance(enhanced, str)

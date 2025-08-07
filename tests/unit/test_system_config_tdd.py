@@ -8,7 +8,11 @@ from unittest.mock import patch
 
 import pytest
 
-from application.config.system_config import SystemConfig, TTSEngine
+from application.config.app_configs import FlaskConfig
+from application.config.file_configs import FileCleanupConfig, FileConfig
+from application.config.processing_configs import LLMConfig, OCRConfig, PerformanceConfig, TextProcessingConfig
+from application.config.system_config import SystemConfig
+from domain.config.tts_config import GeminiConfig, PiperConfig, TTSConfig, TTSEngine
 
 
 class TestTTSEngineEnum:
@@ -43,72 +47,99 @@ class TestSystemConfigCreation:
     def test_system_config_minimal_creation(self):
         """Should create SystemConfig with minimal required parameters."""
         config = SystemConfig(
-            tts_engine=TTSEngine.PIPER,
-            llm_model_name="gemini-1.5-flash",
-            gemini_model_name="gemini-1.5-flash",
+            tts=TTSConfig(engine=TTSEngine.PIPER),
+            files=FileConfig(),
+            cleanup=FileCleanupConfig(),
+            text_processing=TextProcessingConfig(),
+            performance=PerformanceConfig(),
+            flask=FlaskConfig(),
+            ocr=OCRConfig(),
+            llm=LLMConfig(model_name="gemini-1.5-flash"),
         )
 
-        assert config.tts_engine == TTSEngine.PIPER
-        assert config.upload_folder == "uploads"
-        assert config.audio_folder == "audio_outputs"
-        assert config.enable_text_cleaning is True
-        assert config.enable_natural_formatting is True
+        assert config.tts.engine == TTSEngine.PIPER
+        assert config.files.upload_folder == "uploads"
+        assert config.files.audio_folder == "audio_outputs"
+        assert config.text_processing.enable_cleaning is True
+        assert config.text_processing.enable_natural_formatting is True
 
     def test_system_config_with_custom_values(self):
         """Should create SystemConfig with custom values."""
         config = SystemConfig(
-            tts_engine=TTSEngine.GEMINI,
-            llm_model_name="gemini-1.5-flash",
-            gemini_model_name="gemini-1.5-flash",
-            upload_folder="custom_uploads",
-            audio_folder="custom_audio",
-            enable_text_cleaning=False,
-            enable_natural_formatting=False,
+            tts=TTSConfig(engine=TTSEngine.GEMINI),
+            files=FileConfig(
+                upload_folder="custom_uploads",
+                audio_folder="custom_audio",
+            ),
+            cleanup=FileCleanupConfig(),
+            text_processing=TextProcessingConfig(
+                enable_cleaning=False,
+                enable_natural_formatting=False,
+            ),
+            performance=PerformanceConfig(),
+            flask=FlaskConfig(),
+            ocr=OCRConfig(),
+            llm=LLMConfig(model_name="gemini-1.5-flash"),
+            gemini=GeminiConfig(api_key="test-key"),
         )
 
-        assert config.tts_engine == TTSEngine.GEMINI
-        assert config.upload_folder == "custom_uploads"
-        assert config.audio_folder == "custom_audio"
-        assert config.enable_text_cleaning is False
-        assert config.enable_natural_formatting is False
+        assert config.tts.engine == TTSEngine.GEMINI
+        assert config.files.upload_folder == "custom_uploads"
+        assert config.files.audio_folder == "custom_audio"
+        assert config.text_processing.enable_cleaning is False
+        assert config.text_processing.enable_natural_formatting is False
 
     def test_system_config_post_init_sets_default_extensions(self):
-        """Should set default file extensions in __post_init__."""
+        """Should set default file extensions in FileConfig."""
         config = SystemConfig(
-            tts_engine=TTSEngine.PIPER,
-            llm_model_name="gemini-1.5-flash",
-            gemini_model_name="gemini-1.5-flash",
+            tts=TTSConfig(engine=TTSEngine.PIPER),
+            files=FileConfig(),  # Should use defaults
+            cleanup=FileCleanupConfig(),
+            text_processing=TextProcessingConfig(),
+            performance=PerformanceConfig(),
+            flask=FlaskConfig(),
+            ocr=OCRConfig(),
+            llm=LLMConfig(model_name="gemini-1.5-flash"),
         )
 
-        # __post_init__ should be called automatically
-        assert config.allowed_extensions == frozenset({"pdf"})
-        assert config.audio_extensions == frozenset({"wav", "mp3"})
+        # FileConfig should have default extensions
+        assert config.files.allowed_extensions == frozenset({"pdf"})
+        assert config.files.audio_extensions == frozenset({"wav", "mp3"})
 
     def test_system_config_post_init_uses_provided_extensions(self):
-        """Should use provided extensions or set defaults if None."""
+        """Should use provided extensions in FileConfig."""
         # Test with provided extensions
         config = SystemConfig(
-            tts_engine=TTSEngine.PIPER,
-            llm_model_name="gemini-1.5-flash",
-            gemini_model_name="gemini-1.5-flash",
-            allowed_extensions=frozenset({"pdf", "docx", "txt"}),
-            audio_extensions=frozenset({"wav", "mp3", "ogg"}),
+            tts=TTSConfig(engine=TTSEngine.PIPER),
+            files=FileConfig(
+                allowed_extensions=frozenset({"pdf", "docx", "txt"}),
+                audio_extensions=frozenset({"wav", "mp3", "ogg"}),
+            ),
+            cleanup=FileCleanupConfig(),
+            text_processing=TextProcessingConfig(),
+            performance=PerformanceConfig(),
+            flask=FlaskConfig(),
+            ocr=OCRConfig(),
+            llm=LLMConfig(model_name="gemini-1.5-flash"),
         )
 
-        assert config.allowed_extensions == frozenset({"pdf", "docx", "txt"})
-        assert config.audio_extensions == frozenset({"wav", "mp3", "ogg"})
+        assert config.files.allowed_extensions == frozenset({"pdf", "docx", "txt"})
+        assert config.files.audio_extensions == frozenset({"wav", "mp3", "ogg"})
 
-        # Test with None (should set defaults)
+        # Test with defaults
         config2 = SystemConfig(
-            tts_engine=TTSEngine.PIPER,
-            llm_model_name="gemini-1.5-flash",
-            gemini_model_name="gemini-1.5-flash",
-            allowed_extensions=None,
-            audio_extensions=None,
+            tts=TTSConfig(engine=TTSEngine.PIPER),
+            files=FileConfig(),  # Uses defaults
+            cleanup=FileCleanupConfig(),
+            text_processing=TextProcessingConfig(),
+            performance=PerformanceConfig(),
+            flask=FlaskConfig(),
+            ocr=OCRConfig(),
+            llm=LLMConfig(model_name="gemini-1.5-flash"),
         )
 
-        assert config2.allowed_extensions == frozenset({"pdf"})
-        assert config2.audio_extensions == frozenset({"wav", "mp3"})
+        assert config2.files.allowed_extensions == frozenset({"pdf"})
+        assert config2.files.audio_extensions == frozenset({"wav", "mp3"})
 
 
 class TestSystemConfigValidationTDD:
@@ -117,10 +148,15 @@ class TestSystemConfigValidationTDD:
     def test_validate_gemini_requires_api_key(self):
         """Should require API key for Gemini TTS engine."""
         config = SystemConfig(
-            tts_engine=TTSEngine.GEMINI,
-            llm_model_name="gemini-1.5-flash",
-            gemini_model_name="gemini-1.5-flash",
-            gemini_api_key=None,
+            tts=TTSConfig(engine=TTSEngine.GEMINI),
+            files=FileConfig(),
+            cleanup=FileCleanupConfig(),
+            text_processing=TextProcessingConfig(),
+            performance=PerformanceConfig(),
+            flask=FlaskConfig(),
+            ocr=OCRConfig(),
+            llm=LLMConfig(model_name="gemini-1.5-flash"),
+            gemini=GeminiConfig(api_key=None),
         )
 
         with pytest.raises(ValueError, match="GOOGLE_AI_API_KEY is required when TTS_ENGINE=gemini"):
@@ -129,10 +165,15 @@ class TestSystemConfigValidationTDD:
     def test_validate_gemini_rejects_placeholder_api_key(self):
         """Should reject placeholder API key for Gemini."""
         config = SystemConfig(
-            tts_engine=TTSEngine.GEMINI,
-            llm_model_name="gemini-1.5-flash",
-            gemini_model_name="gemini-1.5-flash",
-            gemini_api_key="YOUR_GOOGLE_AI_API_KEY",
+            tts=TTSConfig(engine=TTSEngine.GEMINI),
+            files=FileConfig(),
+            cleanup=FileCleanupConfig(),
+            text_processing=TextProcessingConfig(),
+            performance=PerformanceConfig(),
+            flask=FlaskConfig(),
+            ocr=OCRConfig(),
+            llm=LLMConfig(model_name="gemini-1.5-flash"),
+            gemini=GeminiConfig(api_key="YOUR_GOOGLE_AI_API_KEY"),
         )
 
         with pytest.raises(ValueError, match="Please set a valid GOOGLE_AI_API_KEY"):
@@ -141,10 +182,16 @@ class TestSystemConfigValidationTDD:
     def test_validate_gemini_accepts_valid_api_key(self):
         """Should accept valid API key for Gemini."""
         config = SystemConfig(
-            tts_engine=TTSEngine.GEMINI,
-            llm_model_name="gemini-1.5-flash",
-            gemini_model_name="gemini-1.5-flash",
-            gemini_api_key="valid_api_key_12345",
+            tts=TTSConfig(engine=TTSEngine.GEMINI),
+            files=FileConfig(),
+            cleanup=FileCleanupConfig(),
+            text_processing=TextProcessingConfig(),
+            performance=PerformanceConfig(),
+            flask=FlaskConfig(),
+            ocr=OCRConfig(),
+            llm=LLMConfig(model_name="gemini-1.5-flash"),
+            gemini=GeminiConfig(api_key="valid_api_key_12345"),
+            piper=PiperConfig(),
         )
 
         # Should not raise exception
@@ -153,10 +200,16 @@ class TestSystemConfigValidationTDD:
     def test_validate_piper_requires_model_name(self):
         """Should require model name for Piper TTS engine."""
         config = SystemConfig(
-            tts_engine=TTSEngine.PIPER,
-            llm_model_name="gemini-1.5-flash",
-            gemini_model_name="gemini-1.5-flash",
-            piper_model_name="",
+            tts=TTSConfig(engine=TTSEngine.PIPER),
+            files=FileConfig(),
+            cleanup=FileCleanupConfig(),
+            text_processing=TextProcessingConfig(),
+            performance=PerformanceConfig(),
+            flask=FlaskConfig(),
+            ocr=OCRConfig(),
+            llm=LLMConfig(model_name="gemini-1.5-flash"),
+            gemini=GeminiConfig(),
+            piper=PiperConfig(model_name=""),
         )
 
         with pytest.raises(ValueError, match="PIPER_MODEL_NAME cannot be empty when using Piper TTS"):
@@ -165,88 +218,186 @@ class TestSystemConfigValidationTDD:
     def test_validate_piper_accepts_valid_model_name(self):
         """Should accept valid model name for Piper."""
         config = SystemConfig(
-            tts_engine=TTSEngine.PIPER,
-            llm_model_name="gemini-1.5-flash",
-            gemini_model_name="gemini-1.5-flash",
-            piper_model_name="en_US-lessac-medium",
+            tts=TTSConfig(engine=TTSEngine.PIPER),
+            files=FileConfig(),
+            cleanup=FileCleanupConfig(),
+            text_processing=TextProcessingConfig(),
+            performance=PerformanceConfig(),
+            flask=FlaskConfig(),
+            ocr=OCRConfig(),
+            llm=LLMConfig(model_name="gemini-1.5-flash"),
+            gemini=GeminiConfig(),
+            piper=PiperConfig(model_name="en_US-lessac-medium"),
         )
 
         # Should not raise exception
         config.validate()
 
     def test_validate_folder_paths_cannot_be_empty(self):
-        """Should reject empty folder paths at creation time (immutable design)."""
-        test_cases = [
-            ("upload_folder", ""),
-            ("audio_folder", ""),
-            ("piper_models_dir", ""),
+        """Should test that validation works with whitespace-only paths but allows empty paths."""
+        # Test whitespace-only paths that should fail validation
+        whitespace_test_cases = [
             ("upload_folder", "   "),  # whitespace only
             ("audio_folder", "\t\n"),  # whitespace only
+            ("models_dir", "  "),  # whitespace only for piper models_dir
         ]
 
-        for folder_attr, invalid_path in test_cases:
+        for folder_attr, invalid_path in whitespace_test_cases:
             # Test creation with invalid path should be allowed but validation should fail
-            config_kwargs = {
-                "tts_engine": TTSEngine.PIPER,
-                "llm_model_name": "gemini-1.5-flash",
-                "gemini_model_name": "gemini-1.5-flash",
-                folder_attr: invalid_path,
-            }
-            config = SystemConfig(**config_kwargs)  # type: ignore[arg-type]
+            if folder_attr == "models_dir":
+                config = SystemConfig(
+                    tts=TTSConfig(engine=TTSEngine.PIPER),
+                    files=FileConfig(),
+                    cleanup=FileCleanupConfig(),
+                    text_processing=TextProcessingConfig(),
+                    performance=PerformanceConfig(),
+                    flask=FlaskConfig(),
+                    ocr=OCRConfig(),
+                    llm=LLMConfig(model_name="gemini-1.5-flash"),
+                    gemini=GeminiConfig(),
+                    piper=PiperConfig(models_dir=invalid_path),
+                )
+            else:
+                # For file config attributes - create explicit FileConfig based on folder_attr
+                if folder_attr == "upload_folder":
+                    file_config = FileConfig(upload_folder=invalid_path)
+                elif folder_attr == "audio_folder":
+                    file_config = FileConfig(audio_folder=invalid_path)
+                else:
+                    raise ValueError(f"Unknown folder attribute: {folder_attr}")
 
-            # Validation should catch empty/whitespace paths
+                config = SystemConfig(
+                    tts=TTSConfig(engine=TTSEngine.PIPER),
+                    files=file_config,
+                    cleanup=FileCleanupConfig(),
+                    text_processing=TextProcessingConfig(),
+                    performance=PerformanceConfig(),
+                    flask=FlaskConfig(),
+                    ocr=OCRConfig(),
+                    llm=LLMConfig(model_name="gemini-1.5-flash"),
+                    gemini=GeminiConfig(),
+                    piper=PiperConfig(),
+                )
+
+            # Validation should catch whitespace-only paths
             with pytest.raises(ValueError, match="cannot be empty or whitespace"):
                 config.validate()
+
+        # Test that empty strings are allowed (validation skips them)
+        empty_test_cases = [
+            ("upload_folder", ""),
+            ("audio_folder", ""),
+            ("models_dir", ""),  # Test piper models_dir
+        ]
+
+        for folder_attr, empty_path in empty_test_cases:
+            if folder_attr == "models_dir":
+                config = SystemConfig(
+                    tts=TTSConfig(engine=TTSEngine.PIPER),
+                    files=FileConfig(),
+                    cleanup=FileCleanupConfig(),
+                    text_processing=TextProcessingConfig(),
+                    performance=PerformanceConfig(),
+                    flask=FlaskConfig(),
+                    ocr=OCRConfig(),
+                    llm=LLMConfig(model_name="gemini-1.5-flash"),
+                    gemini=GeminiConfig(),
+                    piper=PiperConfig(models_dir=empty_path),
+                )
+            else:
+                # For file config attributes - create explicit FileConfig based on folder_attr
+                if folder_attr == "upload_folder":
+                    file_config = FileConfig(upload_folder=empty_path)
+                elif folder_attr == "audio_folder":
+                    file_config = FileConfig(audio_folder=empty_path)
+                else:
+                    raise ValueError(f"Unknown folder attribute: {folder_attr}")
+
+                config = SystemConfig(
+                    tts=TTSConfig(engine=TTSEngine.PIPER),
+                    files=file_config,
+                    cleanup=FileCleanupConfig(),
+                    text_processing=TextProcessingConfig(),
+                    performance=PerformanceConfig(),
+                    flask=FlaskConfig(),
+                    ocr=OCRConfig(),
+                    llm=LLMConfig(model_name="gemini-1.5-flash"),
+                    gemini=GeminiConfig(),
+                    piper=PiperConfig(),
+                )
+
+            # Empty paths should pass validation (they are skipped)
+            config.validate()  # Should not raise
 
     def test_validate_file_cleanup_settings_when_enabled(self):
         """Should validate file cleanup settings when cleanup is enabled."""
         # Test valid file cleanup settings
         config = SystemConfig(
-            tts_engine=TTSEngine.PIPER,
-            llm_model_name="gemini-1.5-flash",
-            gemini_model_name="gemini-1.5-flash",
-            enable_file_cleanup=True,
-            max_file_age_hours=24.0,
-            auto_cleanup_interval_hours=6.0,
-            max_disk_usage_mb=1000,
+            tts=TTSConfig(engine=TTSEngine.PIPER),
+            files=FileConfig(),
+            cleanup=FileCleanupConfig(
+                enabled=True, max_file_age_hours=24.0, auto_cleanup_interval_hours=6.0, max_disk_usage_mb=1000
+            ),
+            text_processing=TextProcessingConfig(),
+            performance=PerformanceConfig(),
+            flask=FlaskConfig(),
+            ocr=OCRConfig(),
+            llm=LLMConfig(model_name="gemini-1.5-flash"),
+            gemini=GeminiConfig(),
+            piper=PiperConfig(),
         )
         config.validate()  # Should not raise
 
         # Test invalid max_file_age_hours - create new config with invalid value
         config_invalid_age = SystemConfig(
-            tts_engine=TTSEngine.PIPER,
-            llm_model_name="gemini-1.5-flash",
-            gemini_model_name="gemini-1.5-flash",
-            enable_file_cleanup=True,
-            max_file_age_hours=0.0,
-            auto_cleanup_interval_hours=6.0,
-            max_disk_usage_mb=1000,
+            tts=TTSConfig(engine=TTSEngine.PIPER),
+            files=FileConfig(),
+            cleanup=FileCleanupConfig(
+                enabled=True, max_file_age_hours=0.0, auto_cleanup_interval_hours=6.0, max_disk_usage_mb=1000
+            ),
+            text_processing=TextProcessingConfig(),
+            performance=PerformanceConfig(),
+            flask=FlaskConfig(),
+            ocr=OCRConfig(),
+            llm=LLMConfig(model_name="gemini-1.5-flash"),
+            gemini=GeminiConfig(),
+            piper=PiperConfig(),
         )
         with pytest.raises(ValueError, match="MAX_FILE_AGE_HOURS must be positive"):
             config_invalid_age.validate()
 
         # Test invalid auto_cleanup_interval_hours - create new config with invalid value
         config_invalid_interval = SystemConfig(
-            tts_engine=TTSEngine.PIPER,
-            llm_model_name="gemini-1.5-flash",
-            gemini_model_name="gemini-1.5-flash",
-            enable_file_cleanup=True,
-            max_file_age_hours=24.0,
-            auto_cleanup_interval_hours=-1.0,
-            max_disk_usage_mb=1000,
+            tts=TTSConfig(engine=TTSEngine.PIPER),
+            files=FileConfig(),
+            cleanup=FileCleanupConfig(
+                enabled=True, max_file_age_hours=24.0, auto_cleanup_interval_hours=-1.0, max_disk_usage_mb=1000
+            ),
+            text_processing=TextProcessingConfig(),
+            performance=PerformanceConfig(),
+            flask=FlaskConfig(),
+            ocr=OCRConfig(),
+            llm=LLMConfig(model_name="gemini-1.5-flash"),
+            gemini=GeminiConfig(),
+            piper=PiperConfig(),
         )
         with pytest.raises(ValueError, match="AUTO_CLEANUP_INTERVAL_HOURS must be positive"):
             config_invalid_interval.validate()
 
         # Test invalid max_disk_usage_mb - create new config with invalid value
         config_invalid_disk = SystemConfig(
-            tts_engine=TTSEngine.PIPER,
-            llm_model_name="gemini-1.5-flash",
-            gemini_model_name="gemini-1.5-flash",
-            enable_file_cleanup=True,
-            max_file_age_hours=24.0,
-            auto_cleanup_interval_hours=6.0,
-            max_disk_usage_mb=0,
+            tts=TTSConfig(engine=TTSEngine.PIPER),
+            files=FileConfig(),
+            cleanup=FileCleanupConfig(
+                enabled=True, max_file_age_hours=24.0, auto_cleanup_interval_hours=6.0, max_disk_usage_mb=0
+            ),
+            text_processing=TextProcessingConfig(),
+            performance=PerformanceConfig(),
+            flask=FlaskConfig(),
+            ocr=OCRConfig(),
+            llm=LLMConfig(model_name="gemini-1.5-flash"),
+            gemini=GeminiConfig(),
+            piper=PiperConfig(),
         )
         with pytest.raises(ValueError, match="MAX_DISK_USAGE_MB must be positive"):
             config_invalid_disk.validate()
@@ -254,13 +405,21 @@ class TestSystemConfigValidationTDD:
     def test_validate_file_cleanup_settings_when_disabled(self):
         """Should skip file cleanup validation when cleanup is disabled."""
         config = SystemConfig(
-            tts_engine=TTSEngine.PIPER,
-            llm_model_name="gemini-1.5-flash",
-            gemini_model_name="gemini-1.5-flash",
-            enable_file_cleanup=False,
-            max_file_age_hours=0.0,  # Invalid values
-            auto_cleanup_interval_hours=-1.0,
-            max_disk_usage_mb=0,
+            tts=TTSConfig(engine=TTSEngine.PIPER),
+            files=FileConfig(),
+            cleanup=FileCleanupConfig(
+                enabled=False,
+                max_file_age_hours=0.0,  # Invalid values
+                auto_cleanup_interval_hours=-1.0,
+                max_disk_usage_mb=0,
+            ),
+            text_processing=TextProcessingConfig(),
+            performance=PerformanceConfig(),
+            flask=FlaskConfig(),
+            ocr=OCRConfig(),
+            llm=LLMConfig(model_name="gemini-1.5-flash"),
+            gemini=GeminiConfig(),
+            piper=PiperConfig(),
         )
 
         # Should not raise exception since cleanup is disabled
@@ -273,17 +432,22 @@ class TestSystemConfigHelperMethodsTDD:
     def test_get_gemini_config_creates_correct_config(self):
         """Should create proper Gemini configuration object."""
         config = SystemConfig(
-            tts_engine=TTSEngine.GEMINI,
-            llm_model_name="gemini-1.5-flash",
-            gemini_model_name="gemini-1.5-flash",
-            gemini_api_key="test_key_123",
-            gemini_voice_name="Aoede",
-            tts_request_delay_seconds=1.5,
+            tts=TTSConfig(engine=TTSEngine.GEMINI),
+            files=FileConfig(),
+            cleanup=FileCleanupConfig(),
+            text_processing=TextProcessingConfig(),
+            performance=PerformanceConfig(),
+            flask=FlaskConfig(),
+            ocr=OCRConfig(),
+            llm=LLMConfig(model_name="gemini-1.5-flash"),
+            gemini=GeminiConfig(api_key="test_key_123", voice_name="Aoede", min_request_interval=1.5),
+            piper=PiperConfig(),
         )
 
-        result = config.get_gemini_config()
+        result = config.gemini  # Direct access to gemini config
 
         # Should return a config object with correct values
+        assert result is not None
         assert hasattr(result, "voice_name")
         assert hasattr(result, "api_key")
         assert hasattr(result, "min_request_interval")
@@ -294,17 +458,22 @@ class TestSystemConfigHelperMethodsTDD:
     def test_get_piper_config_creates_correct_config(self):
         """Should create proper Piper configuration object."""
         config = SystemConfig(
-            tts_engine=TTSEngine.PIPER,
-            llm_model_name="gemini-1.5-flash",
-            gemini_model_name="gemini-1.5-flash",
-            piper_model_name="en_US-amy-high",
-            piper_models_dir="/custom/models",
-            piper_length_scale=1.2,
+            tts=TTSConfig(engine=TTSEngine.PIPER),
+            files=FileConfig(),
+            cleanup=FileCleanupConfig(),
+            text_processing=TextProcessingConfig(),
+            performance=PerformanceConfig(),
+            flask=FlaskConfig(),
+            ocr=OCRConfig(),
+            llm=LLMConfig(model_name="gemini-1.5-flash"),
+            gemini=GeminiConfig(),
+            piper=PiperConfig(model_name="en_US-amy-high", download_dir="/custom/models", length_scale=1.2),
         )
 
-        result = config.get_piper_config()
+        result = config.piper  # Direct access to piper config
 
         # Should return a config object with correct values
+        assert result is not None
         assert hasattr(result, "model_name")
         assert hasattr(result, "download_dir")
         assert hasattr(result, "length_scale")
@@ -315,21 +484,18 @@ class TestSystemConfigHelperMethodsTDD:
     def test_print_summary_displays_configuration_info(self):
         """Should print comprehensive configuration summary."""
         config = SystemConfig(
-            tts_engine=TTSEngine.GEMINI,
-            llm_model_name="gemini-1.5-flash",
-            gemini_model_name="gemini-1.5-flash",
-            enable_text_cleaning=True,
-            enable_natural_formatting=False,
-            enable_async_audio=True,
-            audio_concurrent_chunks=8,
-            upload_folder="test_uploads",
-            audio_folder="test_audio",
-            enable_file_cleanup=True,
-            max_file_age_hours=48.0,
-            auto_cleanup_interval_hours=12.0,
-            max_disk_usage_mb=2000,
-            gemini_api_key="test_key",
-            gemini_voice_name="Charon",
+            tts=TTSConfig(engine=TTSEngine.GEMINI),
+            files=FileConfig(upload_folder="test_uploads", audio_folder="test_audio"),
+            cleanup=FileCleanupConfig(
+                enabled=True, max_file_age_hours=48.0, auto_cleanup_interval_hours=12.0, max_disk_usage_mb=2000
+            ),
+            text_processing=TextProcessingConfig(enable_cleaning=True, enable_natural_formatting=False),
+            performance=PerformanceConfig(enable_async_audio=True, audio_concurrent_chunks=8),
+            flask=FlaskConfig(),
+            ocr=OCRConfig(),
+            llm=LLMConfig(model_name="gemini-1.5-flash"),
+            gemini=GeminiConfig(api_key="test_key", voice_name="Charon"),
+            piper=PiperConfig(),
         )
 
         # Capture print output
@@ -354,10 +520,16 @@ class TestSystemConfigHelperMethodsTDD:
     def test_print_summary_handles_missing_api_key(self):
         """Should show 'Missing' for unset API key."""
         config = SystemConfig(
-            tts_engine=TTSEngine.GEMINI,
-            llm_model_name="gemini-1.5-flash",
-            gemini_model_name="gemini-1.5-flash",
-            gemini_api_key=None,
+            tts=TTSConfig(engine=TTSEngine.GEMINI),
+            files=FileConfig(),
+            cleanup=FileCleanupConfig(),
+            text_processing=TextProcessingConfig(),
+            performance=PerformanceConfig(),
+            flask=FlaskConfig(),
+            ocr=OCRConfig(),
+            llm=LLMConfig(model_name="gemini-1.5-flash"),
+            gemini=GeminiConfig(api_key=None),
+            piper=PiperConfig(),
         )
 
         with patch("builtins.print") as mock_print:
@@ -369,11 +541,19 @@ class TestSystemConfigHelperMethodsTDD:
     def test_print_summary_shows_piper_specific_info(self):
         """Should show Piper-specific configuration when using Piper."""
         config = SystemConfig(
-            tts_engine=TTSEngine.PIPER,
-            llm_model_name="gemini-1.5-flash",
-            gemini_model_name="gemini-1.5-flash",
-            piper_model_name="en_US-lessac-high",
-            piper_models_dir="/custom/piper/models",
+            tts=TTSConfig(engine=TTSEngine.PIPER),
+            files=FileConfig(),
+            cleanup=FileCleanupConfig(),
+            text_processing=TextProcessingConfig(),
+            performance=PerformanceConfig(),
+            flask=FlaskConfig(),
+            ocr=OCRConfig(),
+            llm=LLMConfig(model_name="gemini-1.5-flash"),
+            gemini=GeminiConfig(),
+            piper=PiperConfig(
+                model_name="en_US-lessac-high",
+                models_dir="/custom/piper/models",  # Use models_dir, not download_dir
+            ),
         )
 
         with patch("builtins.print") as mock_print:

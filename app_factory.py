@@ -58,11 +58,11 @@ def create_app(config_path: Optional[Path] = None) -> Flask:
 
     # Create cleanup scheduler if enabled
     cleanup_scheduler = None
-    if app_config.enable_file_cleanup:
-        file_manager = FileManager(app_config.upload_folder, app_config.audio_folder)
+    if app_config.cleanup.enabled:
+        file_manager = FileManager(app_config.files.upload_folder, app_config.files.audio_folder)
         cleanup_scheduler = FileCleanupScheduler(
             file_manager=file_manager,
-            max_file_age_seconds=int(app_config.max_file_age_hours * 3600),
+            max_file_age_seconds=int(app_config.cleanup.max_file_age_hours * 3600),
             check_interval_seconds=300,
         )
 
@@ -78,16 +78,16 @@ def create_app(config_path: Optional[Path] = None) -> Flask:
     app = Flask(__name__)
 
     # Configure Flask
-    app.config["UPLOAD_FOLDER"] = app_config.upload_folder
-    app.config["AUDIO_FOLDER"] = app_config.audio_folder
-    app.config["MAX_CONTENT_LENGTH"] = app_config.max_file_size_mb * 1024 * 1024
+    app.config["UPLOAD_FOLDER"] = app_config.files.upload_folder
+    app.config["AUDIO_FOLDER"] = app_config.files.audio_folder
+    app.config["MAX_CONTENT_LENGTH"] = app_config.files.max_file_size_mb * 1024 * 1024
 
     # Inject application context (no global state!)
     app.config["APP_CONTEXT"] = app_context
 
     # Create directories
-    Path(app_config.upload_folder).mkdir(parents=True, exist_ok=True)
-    Path(app_config.audio_folder).mkdir(parents=True, exist_ok=True)
+    Path(app_config.files.upload_folder).mkdir(parents=True, exist_ok=True)
+    Path(app_config.files.audio_folder).mkdir(parents=True, exist_ok=True)
 
     # Register error handlers
     register_error_handlers(app, app_context)
@@ -102,7 +102,7 @@ def register_error_handlers(app: Flask, context: ApplicationContext) -> None:
 
     @app.errorhandler(413)
     def too_large(e: object) -> tuple[str, int]:
-        max_size = context.config.max_file_size_mb
+        max_size = context.config.files.max_file_size_mb
         return f"File is too large. Maximum file size is {max_size}MB.", 413
 
     @app.errorhandler(Exception)

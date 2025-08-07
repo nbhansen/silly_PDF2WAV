@@ -92,7 +92,7 @@ def _get_retry_suggestion(error: ApplicationError, config: SystemConfig) -> str:
         elif error.code == ErrorCode.LLM_PROVIDER_ERROR:
             return "Please try again in a few moments, or disable text cleaning in your configuration."
         elif error.code == ErrorCode.TEXT_CLEANING_FAILED:
-            if config.enable_text_cleaning:
+            if config.text_processing.enable_cleaning:
                 return "Try again or consider disabling text cleaning if the problem persists."
             else:
                 return "Text cleaning is already disabled. This might be a temporary issue - please try again."
@@ -102,7 +102,7 @@ def _get_retry_suggestion(error: ApplicationError, config: SystemConfig) -> str:
         if error.code == ErrorCode.TEXT_EXTRACTION_FAILED:
             return "Try a different PDF file, or ensure the PDF is not password-protected or image-only."
         elif error.code == ErrorCode.FILE_SIZE_ERROR:
-            return f"Please use a smaller PDF file (maximum {config.max_file_size_mb}MB)."
+            return f"Please use a smaller PDF file (maximum {config.files.max_file_size_mb}MB)."
         elif error.code == ErrorCode.INVALID_PAGE_RANGE:
             return "Please check the page numbers and try again."
 

@@ -93,33 +93,37 @@ class ServiceContainer(IServiceContainer):
         factories: dict[ServiceKey, ServiceFactory] = {
             # File Manager
             FileManager: lambda: FileManager(
-                upload_folder=self.config.upload_folder, output_folder=self.config.audio_folder
+                upload_folder=self.config.files.upload_folder, output_folder=self.config.files.audio_folder
             ),
             # TTS Engine (factory method)
             "tts_engine": lambda: self._create_tts_engine(),
             # Text Pipeline
             ITextPipeline: lambda: TextPipeline(
-                llm_provider=self.get(GeminiLLMProvider) if self.config.gemini_api_key else None,
-                enable_cleaning=self.config.enable_text_cleaning,
-                enable_natural_formatting=self.config.enable_natural_formatting,
+                llm_provider=self.get(GeminiLLMProvider) if self.config.gemini and self.config.gemini.api_key else None,
+                enable_cleaning=self.config.text_processing.enable_cleaning,
+                enable_natural_formatting=self.config.text_processing.enable_natural_formatting,
             ),
             # Timing Engine
             ITimingEngine: lambda: TimingEngine(
                 tts_engine=self.get("tts_engine"),
                 file_manager=self.get(FileManager),
                 text_pipeline=self.get(ITextPipeline),
-                mode=TimingMode.MEASUREMENT if self.config.gemini_use_measurement_mode else TimingMode.ESTIMATION,
-                measurement_interval=self.config.gemini_measurement_mode_interval,
+                mode=(
+                    TimingMode.MEASUREMENT
+                    if self.config.gemini and self.config.gemini.use_measurement_mode
+                    else TimingMode.ESTIMATION
+                ),
+                measurement_interval=self.config.gemini.measurement_mode_interval if self.config.gemini else 10.0,
             ),
             # Audio Engine
             IAudioEngine: lambda: AudioEngine(
                 tts_engine=self.get("tts_engine"),
                 file_manager=self.get(FileManager),
                 timing_engine=self.get(ITimingEngine),
-                max_concurrent=self.config.audio_concurrent_chunks,
-                audio_target_chunk_size=self.config.audio_target_chunk_size,
-                audio_max_chunk_size=self.config.audio_max_chunk_size,
-                enable_async=self.config.enable_async_audio,
+                max_concurrent=self.config.performance.audio_concurrent_chunks,
+                audio_target_chunk_size=self.config.text_processing.audio_target_chunk_size,
+                audio_max_chunk_size=self.config.text_processing.audio_max_chunk_size,
+                enable_async=self.config.performance.enable_async_audio,
             ),
             # Document Engine
             IDocumentEngine: lambda: DocumentEngine(
@@ -131,11 +135,11 @@ class ServiceContainer(IServiceContainer):
         }
 
         # Add LLM Provider only if configured
-        if self.config.gemini_api_key:
-            api_key = self.config.gemini_api_key
+        if self.config.gemini and self.config.gemini.api_key:
+            api_key = self.config.gemini.api_key
             if api_key is not None:  # Type guard for mypy
                 factories[GeminiLLMProvider] = lambda: GeminiLLMProvider(
-                    model_name=self.config.gemini_model_name, api_key=api_key
+                    model_name=self.config.gemini.model_name, api_key=api_key
                 )
 
         return factories
@@ -145,53 +149,29 @@ class ServiceContainer(IServiceContainer):
         from infrastructure.tts.gemini_tts_provider import GeminiTTSProvider
         from infrastructure.tts.piper_tts_provider import PiperTTSProvider
 
-        if self.config.tts_engine.value == "gemini":
-            if not self.config.gemini_api_key:
+        if self.config.tts.engine.value == "gemini":
+            if not self.config.gemini or not self.config.gemini.api_key:
                 raise ValueError("Gemini API key is required for Gemini TTS engine")
             return GeminiTTSProvider(
-                model_name=self.config.gemini_model_name,
-                api_key=self.config.gemini_api_key,
-                voice_name=self.config.gemini_voice_name,
-                min_request_interval=self.config.tts_request_delay_seconds,
-                max_concurrent_requests=self.config.tts_concurrent_requests,
+                model_name=self.config.gemini.model_name,
+                api_key=self.config.gemini.api_key,
+                voice_name=self.config.gemini.voice_name,
+                min_request_interval=self.config.tts.request_delay_seconds,
+                max_concurrent_requests=self.config.tts.concurrent_requests,
                 requests_per_minute=30,  # Default rate limit for Flash TTS
             )
         else:
-            piper_config = self.config.get_piper_config()
-            # Ensure we have a proper PiperConfig object, not a dict fallback
-            if isinstance(piper_config, dict):
-                # Create PiperConfig from dict if needed
-                # Explicitly map dict fields to avoid **dict unpacking type error
-                from typing import cast
-
+            piper_config = self.config.piper
+            if piper_config is None:
                 from domain.config.tts_config import PiperConfig
 
-                piper_config = PiperConfig(
-                    model_name=str(piper_config.get("model_name", "en_US-lessac-medium")),
-                    model_path=cast(str, piper_config.get("model_path")) if piper_config.get("model_path") else None,
-                    config_path=cast(str, piper_config.get("config_path")) if piper_config.get("config_path") else None,
-                    speaker_id=int(piper_config["speaker_id"]) if piper_config.get("speaker_id") is not None else None,
-                    length_scale=float(piper_config.get("length_scale", 1.0)),
-                    noise_scale=float(piper_config.get("noise_scale", 0.667)),
-                    noise_w=float(piper_config.get("noise_w", 0.8)),
-                    sentence_silence=float(piper_config.get("sentence_silence", 0.2)),
-                    download_dir=str(piper_config.get("download_dir", "piper_models")),
-                    use_gpu=bool(piper_config.get("use_gpu", True)),
-                )
-            # Handle both the full PiperTTSProvider and the fallback version
-            try:
-                return PiperTTSProvider(
-                    config=piper_config,
-                    repository_url=self.config.piper_model_repository_url,
-                    project_root=self.config.project_root,
-                )
-            except TypeError:
-                # Fallback version only takes config parameter
-                try:
-                    return PiperTTSProvider(config=piper_config, project_root=self.config.project_root)
-                except TypeError:
-                    # Ultimate fallback - config only
-                    return PiperTTSProvider(config=piper_config)
+                piper_config = PiperConfig()
+
+            return PiperTTSProvider(
+                config=piper_config,
+                repository_url=piper_config.model_repository_url,
+                project_root=self.config.project_root,
+            )
 
 
 class ImmutableServiceContainerBuilder:

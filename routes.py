@@ -600,7 +600,7 @@ def _execute_document_processing(
     # Import needed for both success and failure cases
     from domain.errors import ApplicationError, ErrorCode
     from domain.models import ProcessingResult
-    
+
     if processing_result.is_failure:
         # Convert Result[T] error to ProcessingResult for backward compatibility
         error = ApplicationError(

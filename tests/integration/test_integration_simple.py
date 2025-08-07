@@ -4,7 +4,11 @@
 import tempfile
 from unittest.mock import patch
 
-from application.config.system_config import SystemConfig, TTSEngine
+from application.config.app_configs import FlaskConfig
+from application.config.file_configs import FileCleanupConfig, FileConfig
+from application.config.processing_configs import LLMConfig, OCRConfig, PerformanceConfig, TextProcessingConfig
+from application.config.system_config import SystemConfig
+from domain.config.tts_config import GeminiConfig, TTSConfig, TTSEngine
 from domain.factories.service_factory import create_pdf_service_from_env
 from domain.models import PageRange, ProcessingRequest
 
@@ -12,24 +16,30 @@ from domain.models import PageRange, ProcessingRequest
 def create_test_config() -> SystemConfig:
     """Create a minimal SystemConfig for testing."""
     return SystemConfig(
-        tts_engine=TTSEngine.PIPER,
-        llm_model_name="test-llm-model",
-        gemini_model_name="test-gemini-model",
-        enable_text_cleaning=False,
-        enable_natural_formatting=False,
-        enable_file_cleanup=False,
+        tts=TTSConfig(engine=TTSEngine.PIPER),
+        files=FileConfig(),
+        cleanup=FileCleanupConfig(enabled=False),
+        text_processing=TextProcessingConfig(
+            enable_cleaning=False,
+            enable_natural_formatting=False,
+        ),
+        performance=PerformanceConfig(),
+        flask=FlaskConfig(),
+        ocr=OCRConfig(),
+        llm=LLMConfig(model_name="test-llm-model"),
+        gemini=GeminiConfig(api_key=None),  # Provide gemini config even if no API key
     )
 
 
 def test_configuration_loading():
     """Test that configuration can be loaded with minimal setup."""
     config = create_test_config()
-    assert config.tts_engine == TTSEngine.PIPER
-    assert config.enable_text_cleaning is False
-    assert config.enable_natural_formatting is False
-    assert config.enable_file_cleanup is False
-    # Test new Gemini model configuration
-    assert config.gemini_model_name == "test-gemini-model"
+    assert config.tts.engine == TTSEngine.PIPER
+    assert config.text_processing.enable_cleaning is False
+    assert config.text_processing.enable_natural_formatting is False
+    assert config.cleanup.enabled is False
+    # Test LLM model configuration
+    assert config.llm.model_name == "test-llm-model"
 
 
 def test_service_factory_creation():
