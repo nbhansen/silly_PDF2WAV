@@ -27,7 +27,7 @@ from routes import register_routes
 # === Flask App Test Fixtures ===
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def flask_test_config(temp_dir: Path) -> SystemConfig:
     """Test configuration optimized for Flask integration testing."""
     upload_dir = temp_dir / "uploads"
@@ -61,7 +61,7 @@ def flask_test_config(temp_dir: Path) -> SystemConfig:
     )
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def test_app(flask_test_config: SystemConfig) -> Generator[Flask, None, None]:
     """Flask app configured for integration testing."""
     # Mock external dependencies to focus on integration flow
@@ -86,13 +86,13 @@ def test_app(flask_test_config: SystemConfig) -> Generator[Flask, None, None]:
         yield app
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def client(test_app: Flask) -> FlaskClient:
     """Flask test client for making HTTP requests."""
     return test_app.test_client()
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def sample_pdf_content() -> bytes:
     """Load real test PDF content."""
     test_pdf_path = Path(__file__).parent.parent / "testdata" / "testpdf.pdf"

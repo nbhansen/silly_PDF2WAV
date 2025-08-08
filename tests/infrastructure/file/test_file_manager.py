@@ -39,7 +39,7 @@ class TestFileManagerInitialization:
             manager = FileManager("./uploads", "./outputs")
 
             assert Path(manager.upload_folder).is_absolute()
-            assert Path(manager.output_folder).is_absolute().is_absolute()
+            assert Path(manager.output_folder).is_absolute()
             assert manager.upload_folder.endswith("uploads")
             assert manager.output_folder.endswith("outputs")
         finally:

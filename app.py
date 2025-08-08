@@ -65,6 +65,10 @@ if __name__ == "__main__":
     context = app.config["APP_CONTEXT"]
     logger = context.get_logger(__name__)
 
+    # Suppress noisy Flask HTTP request logs (keeps our app logs clean)
+    import logging
+    logging.getLogger('werkzeug').setLevel(logging.ERROR)
+
     # Only log startup info once
     if not is_flask_reloader():
         logger.info("Starting Flask development server...")

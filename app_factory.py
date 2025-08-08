@@ -47,8 +47,12 @@ def create_app(config_path: Optional[Path] = None) -> Flask:
     else:
         app_config = SystemConfig.from_yaml()
 
-    # Create logger factory (no global state)
-    logging_config = LoggingConfig(level="INFO", console_output=True)
+    # Create logger factory (no global state) with file logging for home user debugging
+    log_dir = Path.home() / ".pdf_to_audio"
+    log_dir.mkdir(exist_ok=True)
+    log_file = log_dir / "app.log"
+    
+    logging_config = LoggingConfig(level="INFO", console_output=True, file_path=str(log_file))
     logger_factory = ThreadSafeLoggerFactory(logging_config)
     logger = logger_factory.get_logger(__name__)
 

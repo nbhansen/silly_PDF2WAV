@@ -15,13 +15,16 @@ from domain.config import PiperConfig
 from domain.errors import Result, tts_engine_error
 from domain.interfaces import ITTSEngine  # FIXED: Removed ISSMLProcessor
 
+# Import logger for debugging home user issues
+import logging
+logger = logging.getLogger("piper_tts")
+
 # Optional imports - handle gracefully at runtime
 try:
     from piper.voice import PiperVoice
-
     PIPER_VOICE_AVAILABLE = True
 except ImportError:
-    PiperVoice = None
+    PiperVoice = None  # type: ignore[assignment,misc]
     PIPER_VOICE_AVAILABLE = False
 
 
@@ -85,20 +88,26 @@ class PiperTTSProvider(ITTSEngine):  # FIXED: Only implement ITTSEngine
 
     def generate_audio_data(self, text_to_speak: str) -> Result[bytes]:
         """Generate audio data using Piper TTS."""
+        logger.info(f"Starting Piper TTS generation for {len(text_to_speak)} characters")
+        
         if not text_to_speak or text_to_speak.strip() == "":
+            logger.warning("Empty text provided to Piper TTS")
             return Result.failure(tts_engine_error("Empty text provided"))
 
         # Skip error messages
         if text_to_speak.startswith(("LLM cleaning skipped", "Error:", "Could not convert")):
+            logger.warning("Skipping TTS generation for error message")
             return Result.failure(tts_engine_error("Cannot generate audio from error message"))
 
         # Strip ALL SSML tags for Piper (it doesn't support any SSML)
         processed_text = self._process_text_for_piper(text_to_speak)
         if not processed_text.strip():
+            logger.error("Text processing resulted in empty content after SSML removal")
             return Result.failure(tts_engine_error("Text processing resulted in empty content"))
 
         # Check if Piper is available at all
         if not hasattr(self, "piper_method") or not self.piper_method:
+            logger.error("Piper TTS not available - neither python library nor command line found")
             return Result.failure(
                 tts_engine_error(
                     "Piper TTS not available. Install with: pip install piper-tts or install piper command"
@@ -107,22 +116,25 @@ class PiperTTSProvider(ITTSEngine):  # FIXED: Only implement ITTSEngine
 
         try:
             if self.piper_method == "python_library" and self.voice_instance is not None:
-                audio_data = self._generate_with_python_lib(processed_text)  # type: ignore[unreachable]
+                logger.info("Using Piper Python library for TTS generation")  # type: ignore[unreachable]
+                audio_data = self._generate_with_python_lib(processed_text)
             else:
+                logger.info("Using Piper command line for TTS generation")
                 audio_data = self._generate_with_command_line(processed_text)
 
             if not audio_data:
+                logger.error("TTS engine returned no audio data")
                 return Result.failure(tts_engine_error("TTS engine returned no audio data"))
 
+            logger.info(f"Piper TTS generation successful - produced {len(audio_data)} bytes of audio")
             return Result.success(audio_data)
         except subprocess.TimeoutExpired as timeout_ex:
             timeout_duration = getattr(timeout_ex, "timeout", 30)
             cmd_info = "piper command"
-            print(f"🔍 PIPER TIMEOUT: Command timed out after {timeout_duration} seconds")
-            print(f"🔍 PIPER TIMEOUT CMD: {cmd_info}")
+            logger.error(f"Piper command timed out after {timeout_duration} seconds")
             return Result.failure(tts_engine_error(f"Piper command timed out after {timeout_duration} seconds"))
         except Exception as e:
-            print(f"🔍 PIPER EXCEPTION: {type(e).__name__}: {e}")
+            logger.error(f"Piper TTS generation failed: {type(e).__name__}: {e}", exc_info=True)
             return Result.failure(tts_engine_error(f"Audio generation failed: {e!s}"))
 
     async def generate_audio_data_async(self, text_to_speak: str) -> Result[bytes]:
@@ -153,13 +165,17 @@ class PiperTTSProvider(ITTSEngine):  # FIXED: Only implement ITTSEngine
 
     def _secure_download(self, url: str, destination: str, timeout: int = 30) -> None:
         """Securely download a file with SSL verification and URL validation."""
+        logger.info(f"Starting secure download from {url} to {destination}")
+        
         # Validate URL structure
         parsed_url = urlparse(url)
         if not parsed_url.scheme or not parsed_url.netloc:
+            logger.error(f"Invalid URL format: {url}")
             raise ValueError(f"Invalid URL format: {url}")
 
         # Only allow HTTPS for security
         if parsed_url.scheme != "https":
+            logger.error(f"Non-HTTPS URL rejected for security: {url}")
             raise ValueError(f"Only HTTPS URLs are allowed: {url}")
 
         # Create SSL context with certificate verification
@@ -174,17 +190,23 @@ class PiperTTSProvider(ITTSEngine):  # FIXED: Only implement ITTSEngine
             # Download with SSL context and timeout
             with urllib.request.urlopen(request, context=ssl_context, timeout=timeout) as response:  # nosec B310
                 if response.status != 200:
+                    logger.error(f"Download failed with HTTP {response.status}: {url}")
                     raise urllib.error.HTTPError(url, response.status, "Download failed", None, None)  # type: ignore[arg-type]
 
                 # Write to destination file
+                total_bytes = 0
                 with Path(destination).open("wb") as f:
                     while True:
                         chunk = response.read(8192)  # Read in 8KB chunks
                         if not chunk:
                             break
                         f.write(chunk)
+                        total_bytes += len(chunk)
+                
+                logger.info(f"Download completed successfully - {total_bytes:,} bytes written to {destination}")
 
         except urllib.error.URLError as e:
+            logger.error(f"Network error downloading {url}: {e}")
             raise Exception(f"Network error downloading {url}: {e}") from e
         except ssl.SSLError as e:
             raise Exception(f"SSL verification failed for {url}: {e}") from e
@@ -242,6 +264,8 @@ class PiperTTSProvider(ITTSEngine):  # FIXED: Only implement ITTSEngine
         try:
             if PiperVoice is None:
                 raise ImportError("PiperVoice not available")
+            if self.model_path is None:
+                raise ValueError("Piper model path is not configured")
             self.voice_instance = PiperVoice.load(self.model_path, config_path=self.config_path)
         except Exception:
             self.voice_instance = None

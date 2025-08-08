@@ -13,6 +13,10 @@ from domain.errors import Result, text_extraction_error
 from domain.interfaces import IOCRProvider
 from domain.models import PageRange, PDFInfo
 
+# Import logger for debugging home user issues
+import logging
+logger = logging.getLogger("ocr")
+
 
 class TesseractOCRProvider(IOCRProvider):
     """OCR provider using Tesseract with PDF text extraction and validation capabilities."""
@@ -50,9 +54,12 @@ class TesseractOCRProvider(IOCRProvider):
 
     def extract_text(self, pdf_path: str, page_range: PageRange) -> str:
         """Extract text from PDF with optional page range."""
+        logger.info(f"Starting text extraction from {pdf_path}")
         if not page_range.is_full_document():
+            logger.info(f"Extracting pages {page_range.start_page}-{page_range.end_page}")
             return self._extract_with_page_range(pdf_path, page_range.start_page, page_range.end_page)
         else:
+            logger.info("Extracting full PDF document")
             return self._extract_full_pdf(pdf_path)
 
     def _extract_with_page_range(
@@ -75,11 +82,14 @@ class TesseractOCRProvider(IOCRProvider):
     def _extract_full_pdf(self, pdf_path: str) -> str:
         """Extract from entire PDF."""
         # Try direct extraction first
+        logger.info("Attempting direct text extraction from PDF")
         direct_text = self._extract_direct(pdf_path)
         if direct_text and len(direct_text) > 100:
+            logger.info(f"Direct extraction successful - extracted {len(direct_text):,} characters")
             return direct_text
 
         # Fall back to OCR
+        logger.info("Direct extraction failed or insufficient, falling back to OCR")
         return self._extract_ocr(pdf_path)
 
     def _extract_direct_with_range(
@@ -148,7 +158,7 @@ class TesseractOCRProvider(IOCRProvider):
                 return "Error: Invalid page range for OCR"
 
             # Convert specified page range to images
-            convert_kwargs = {
+            convert_kwargs: dict[str, Any] = {
                 "dpi": self.ocr_dpi,
                 "grayscale": True,
                 "first_page": actual_start,
@@ -175,21 +185,36 @@ class TesseractOCRProvider(IOCRProvider):
     def _extract_ocr(self, pdf_path: str) -> str:
         """Extract text using OCR from entire PDF."""
         try:
-            convert_kwargs = {"dpi": self.ocr_dpi, "grayscale": True}
+            logger.info(f"Starting OCR processing for PDF with DPI={self.ocr_dpi}, language={self.ocr_language}")
+            convert_kwargs: dict[str, Any] = {"dpi": self.ocr_dpi, "grayscale": True}
             if self.poppler_path_custom:
                 convert_kwargs["poppler_path"] = self.poppler_path_custom
             images = convert_from_path(pdf_path, **convert_kwargs)
+            
+            page_count = len(images)
+            logger.info(f"PDF converted to {page_count} images for OCR processing")
 
             full_text = ""
             for i, image in enumerate(images):
+                logger.info(f"Processing OCR for page {i + 1}/{page_count}")
                 processed_image = image.convert("L")
                 processed_image = processed_image.point(lambda p: 0 if p < self.ocr_threshold else 255)
                 page_text = pytesseract.image_to_string(processed_image, lang=self.ocr_language)
+                if page_text.strip():
+                    logger.info(f"Page {i + 1} OCR extracted {len(page_text)} characters")
+                else:
+                    logger.warning(f"Page {i + 1} OCR yielded no text")
                 full_text += page_text + f"\n\n--- Page {i + 1} End (OCR) ---\n\n"
 
-            return full_text if full_text.strip() else "OCR process yielded no text."
+            if full_text.strip():
+                logger.info(f"OCR processing complete - extracted {len(full_text):,} total characters")
+                return full_text
+            else:
+                logger.warning("OCR processing complete but no text was extracted")
+                return "OCR process yielded no text."
 
         except Exception as e:
+            logger.error(f"OCR processing failed: {e}", exc_info=True)
             return f"Error during OCR: {e!s}"
 
     def get_pdf_info(self, pdf_path: str) -> PDFInfo:

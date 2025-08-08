@@ -85,7 +85,7 @@ class GeminiLLMProvider(ILLMProvider):
                         print(f"📊 Response finish_reason: {finish_reason}")
 
                         # Try to get text content
-                        if hasattr(candidate, "content") and hasattr(candidate.content, "parts"):
+                        if hasattr(candidate, "content") and candidate.content is not None and hasattr(candidate.content, "parts"):
                             parts = candidate.content.parts
                             if parts and hasattr(parts[0], "text"):
                                 text_content = parts[0].text
