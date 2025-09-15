@@ -101,9 +101,10 @@ def run_tests(test_type: str = "all") -> bool:
 
     # Ensure we're in the virtual environment
     if "VIRTUAL_ENV" not in os.environ:
-        print("⚠️  Warning: Not in virtual environment. Run 'source venv/bin/activate' first.")
-        print("   Continuing anyway...")
-        print()
+        print("❌ Error: Not in a virtual environment.")
+        print("Please activate the virtual environment before running the tests.")
+        print("You can do this by running: source venv/bin/activate")
+        return False
 
     try:
         result = subprocess.run(cmd)
@@ -123,14 +124,14 @@ def main() -> None:
     if len(sys.argv) > 1 and sys.argv[1] in ["-h", "--help", "help"]:
         print("📋 PDF to Audio Converter - Test Runner")
         print("=" * 50)
-        print("\nUsage: python run_tests.py [test_type]")
+        print("\nUsage: python test_runner.py [test_type]")
         print("\nFor TDD development workflow:")
-        print("  python run_tests.py tdd       # All TDD tests")
-        print("  python run_tests.py tdd-fast  # Fast feedback")
-        print("  python run_tests.py commit    # Pre-commit check")
+        print("  python test_runner.py tdd       # All TDD tests")
+        print("  python test_runner.py tdd-fast  # Fast feedback")
+        print("  python test_runner.py commit    # Pre-commit check")
         print("\nFor component testing:")
-        print("  python run_tests.py models    # Domain models")
-        print("  python run_tests.py pipeline  # Text processing")
+        print("  python test_runner.py models    # Domain models")
+        print("  python test_runner.py pipeline  # Text processing")
         print("\nRun without arguments to see all options.")
         sys.exit(0)
 

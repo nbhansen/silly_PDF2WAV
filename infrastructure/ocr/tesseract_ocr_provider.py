@@ -3,6 +3,8 @@
 Combines direct text extraction with OCR fallback for reliable text extraction.
 """
 
+# Import logger for debugging home user issues
+import logging
 from typing import Any, Optional
 
 from pdf2image import convert_from_path
@@ -13,8 +15,6 @@ from domain.errors import Result, text_extraction_error
 from domain.interfaces import IOCRProvider
 from domain.models import PageRange, PDFInfo
 
-# Import logger for debugging home user issues
-import logging
 logger = logging.getLogger("ocr")
 
 
@@ -190,7 +190,7 @@ class TesseractOCRProvider(IOCRProvider):
             if self.poppler_path_custom:
                 convert_kwargs["poppler_path"] = self.poppler_path_custom
             images = convert_from_path(pdf_path, **convert_kwargs)
-            
+
             page_count = len(images)
             logger.info(f"PDF converted to {page_count} images for OCR processing")
 

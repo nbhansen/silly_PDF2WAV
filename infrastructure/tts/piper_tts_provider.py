@@ -1,5 +1,8 @@
 # infrastructure/tts/piper_tts_provider.py - Fixed imports
 from contextlib import suppress
+
+# Import logger for debugging home user issues
+import logging
 import os
 from pathlib import Path
 import re
@@ -15,16 +18,15 @@ from domain.config import PiperConfig
 from domain.errors import Result, tts_engine_error
 from domain.interfaces import ITTSEngine  # FIXED: Removed ISSMLProcessor
 
-# Import logger for debugging home user issues
-import logging
 logger = logging.getLogger("piper_tts")
 
 # Optional imports - handle gracefully at runtime
 try:
     from piper.voice import PiperVoice
+
     PIPER_VOICE_AVAILABLE = True
 except ImportError:
-    PiperVoice = None  # type: ignore[assignment,misc]
+    PiperVoice = None  # type: ignore[assignment, misc]
     PIPER_VOICE_AVAILABLE = False
 
 
@@ -89,7 +91,7 @@ class PiperTTSProvider(ITTSEngine):  # FIXED: Only implement ITTSEngine
     def generate_audio_data(self, text_to_speak: str) -> Result[bytes]:
         """Generate audio data using Piper TTS."""
         logger.info(f"Starting Piper TTS generation for {len(text_to_speak)} characters")
-        
+
         if not text_to_speak or text_to_speak.strip() == "":
             logger.warning("Empty text provided to Piper TTS")
             return Result.failure(tts_engine_error("Empty text provided"))
@@ -130,7 +132,6 @@ class PiperTTSProvider(ITTSEngine):  # FIXED: Only implement ITTSEngine
             return Result.success(audio_data)
         except subprocess.TimeoutExpired as timeout_ex:
             timeout_duration = getattr(timeout_ex, "timeout", 30)
-            cmd_info = "piper command"
             logger.error(f"Piper command timed out after {timeout_duration} seconds")
             return Result.failure(tts_engine_error(f"Piper command timed out after {timeout_duration} seconds"))
         except Exception as e:
@@ -166,7 +167,7 @@ class PiperTTSProvider(ITTSEngine):  # FIXED: Only implement ITTSEngine
     def _secure_download(self, url: str, destination: str, timeout: int = 30) -> None:
         """Securely download a file with SSL verification and URL validation."""
         logger.info(f"Starting secure download from {url} to {destination}")
-        
+
         # Validate URL structure
         parsed_url = urlparse(url)
         if not parsed_url.scheme or not parsed_url.netloc:
@@ -202,7 +203,7 @@ class PiperTTSProvider(ITTSEngine):  # FIXED: Only implement ITTSEngine
                             break
                         f.write(chunk)
                         total_bytes += len(chunk)
-                
+
                 logger.info(f"Download completed successfully - {total_bytes:,} bytes written to {destination}")
 
         except urllib.error.URLError as e:

@@ -67,7 +67,8 @@ if __name__ == "__main__":
 
     # Suppress noisy Flask HTTP request logs (keeps our app logs clean)
     import logging
-    logging.getLogger('werkzeug').setLevel(logging.ERROR)
+
+    logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
     # Only log startup info once
     if not is_flask_reloader():

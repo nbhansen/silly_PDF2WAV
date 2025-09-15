@@ -29,6 +29,6 @@ vulture>=2.10
 
 # Type stubs for better type checking
 types-PyYAML>=6.0.12
-types-requests>=2.31.0
+
 
 # piper-tts might need binary install on some platforms like Fedora

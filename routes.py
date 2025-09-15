@@ -12,7 +12,7 @@ import os
 from pathlib import Path
 import threading
 import time
-from typing import Any, Dict, Optional, Union
+from typing import Any, Optional, Union
 import uuid
 
 from flask import Flask, Response, current_app, jsonify, render_template, request, send_from_directory, url_for
@@ -25,8 +25,6 @@ from domain.container.service_container import ServiceContainer
 from domain.models import PageRange, ProcessingResult, TimingMetadata
 from infrastructure.file.file_manager import FileManager
 from utils import (
-    _get_retry_suggestion,
-    _get_user_friendly_error_message,
     allowed_file,
     clean_text_for_display,
     get_contextual_error_message,
@@ -61,7 +59,7 @@ class ProcessingServices:
 @dataclass(frozen=True)
 class ProgressStatus:
     """Progress tracking for long-running operations."""
-    
+
     operation_id: str
     stage: str
     percentage: int
@@ -69,18 +67,25 @@ class ProgressStatus:
     is_complete: bool = False
     is_error: bool = False
     error_message: Optional[str] = None
-    result_data: Optional[Dict[str, Any]] = None
+    result_data: Optional[dict[str, Any]] = None
     cancelled: bool = False
 
 
 # Simple in-memory storage for progress tracking (fine for single-user home app)
-progress_storage: Dict[str, ProgressStatus] = {}
-cancellation_flags: Dict[str, bool] = {}
+progress_storage: dict[str, ProgressStatus] = {}
+cancellation_flags: dict[str, bool] = {}
 
 
-def update_progress(operation_id: str, stage: str, percentage: int, message: str, 
-                   is_complete: bool = False, is_error: bool = False, 
-                   error_message: Optional[str] = None, result_data: Optional[Dict[str, Any]] = None) -> None:
+def update_progress(
+    operation_id: str,
+    stage: str,
+    percentage: int,
+    message: str,
+    is_complete: bool = False,
+    is_error: bool = False,
+    error_message: Optional[str] = None,
+    result_data: Optional[dict[str, Any]] = None,
+) -> None:
     """Update progress for an operation."""
     progress_storage[operation_id] = ProgressStatus(
         operation_id=operation_id,
@@ -91,7 +96,7 @@ def update_progress(operation_id: str, stage: str, percentage: int, message: str
         is_error=is_error,
         error_message=error_message,
         result_data=result_data,
-        cancelled=cancellation_flags.get(operation_id, False)
+        cancelled=cancellation_flags.get(operation_id, False),
     )
 
 
@@ -112,7 +117,7 @@ def cancel_operation(operation_id: str) -> None:
             message="Processing cancelled by user",
             is_complete=True,
             is_error=False,
-            cancelled=True
+            cancelled=True,
         )
 
 
@@ -121,10 +126,17 @@ def is_operation_cancelled(operation_id: str) -> bool:
     return cancellation_flags.get(operation_id, False)
 
 
-def background_process_document(operation_id: str, request_form: dict, saved_file_path: str, original_filename: str,
-                               enable_timing: bool, app_context: ApplicationContext, app: Flask) -> None:
+def background_process_document(
+    operation_id: str,
+    request_form: dict,
+    saved_file_path: str,
+    original_filename: str,
+    enable_timing: bool,
+    app_context: ApplicationContext,
+    app: Flask,
+) -> None:
     """Background processing function that reports progress.
-    
+
     Args:
         operation_id: Unique ID for this operation
         request_form: Form data as dict (not Flask object)
@@ -136,36 +148,40 @@ def background_process_document(operation_id: str, request_form: dict, saved_fil
     """
     # Use standard logging module directly to avoid Flask context issues in threads
     import logging
+
     logger = logging.getLogger("pdf_to_audio.routes")
-    
+
     # Use the Flask app context for this thread
     with app.app_context():
         # Store context in Flask app for access in helper functions
         app.config["APP_CONTEXT"] = app_context
-        
+
         try:
             logger.info(f"Starting background processing for operation {operation_id}, file: {original_filename}")
             update_progress(operation_id, "starting", 5, "Initializing document processing...")
-            
+
             if is_operation_cancelled(operation_id):
                 logger.info(f"Operation {operation_id} cancelled during initialization")
                 return
-                
+
             # Process and validate uploaded file (10%)
             logger.info(f"Validating uploaded file: {original_filename}")
             update_progress(operation_id, "validating", 10, "Validating uploaded file...")
             file_info = _process_saved_file(saved_file_path, original_filename, request_form, app_context.config)
             if file_info.error:
-                logger.error(f"File validation failed for {filename}: {file_info.error}")
-                enhanced_error = get_processing_stage_error("file_validation", Exception(file_info.error), file_info.original_filename)
-                update_progress(operation_id, "error", 0, "File validation failed", 
-                              is_error=True, error_message=enhanced_error)
+                logger.error(f"File validation failed for {original_filename}: {file_info.error}")
+                enhanced_error = get_processing_stage_error(
+                    "file_validation", Exception(file_info.error), file_info.original_filename
+                )
+                update_progress(
+                    operation_id, "error", 0, "File validation failed", is_error=True, error_message=enhanced_error
+                )
                 return
 
             if is_operation_cancelled(operation_id):
                 logger.info(f"Operation {operation_id} cancelled after file validation")
                 return
-                
+
             # Configure processing services (15%)
             logger.info("Setting up processing services (TTS, OCR, LLM)")
             update_progress(operation_id, "configuring", 15, "Setting up processing services...")
@@ -173,7 +189,7 @@ def background_process_document(operation_id: str, request_form: dict, saved_fil
 
             if is_operation_cancelled(operation_id):
                 return
-                
+
             # Execute document processing with progress updates (20-95%)
             update_progress(operation_id, "processing", 20, "Starting document processing...")
             processing_result = _execute_document_processing_with_progress(
@@ -188,25 +204,35 @@ def background_process_document(operation_id: str, request_form: dict, saved_fil
 
             if is_operation_cancelled(operation_id):
                 return
-                
+
             if processing_result is None:
-                enhanced_error = get_processing_stage_error("audio_generation", Exception("Processing returned no results"), file_info.original_filename)
-                update_progress(operation_id, "error", 0, "Document processing failed", 
-                              is_error=True, error_message=enhanced_error)
+                enhanced_error = get_processing_stage_error(
+                    "audio_generation", Exception("Processing returned no results"), file_info.original_filename
+                )
+                update_progress(
+                    operation_id, "error", 0, "Document processing failed", is_error=True, error_message=enhanced_error
+                )
                 return
 
             # Complete (100%)
-            update_progress(operation_id, "complete", 100, "Processing complete!", 
-                           is_complete=True, result_data={
-                               "base_filename": file_info.base_filename,
-                               "original_filename": file_info.original_filename,
-                               "processing_result": processing_result
-                           })
-                           
+            update_progress(
+                operation_id,
+                "complete",
+                100,
+                "Processing complete!",
+                is_complete=True,
+                result_data={
+                    "base_filename": file_info.base_filename,
+                    "original_filename": file_info.original_filename,
+                    "processing_result": processing_result,
+                },
+            )
+
         except Exception as e:
             enhanced_error = get_processing_stage_error("processing", e, original_filename)
-            update_progress(operation_id, "error", 0, "Processing failed unexpectedly", 
-                           is_error=True, error_message=enhanced_error)
+            update_progress(
+                operation_id, "error", 0, "Processing failed unexpectedly", is_error=True, error_message=enhanced_error
+            )
 
 
 def _execute_document_processing_with_progress(
@@ -221,7 +247,7 @@ def _execute_document_processing_with_progress(
     """Execute document processing with progress updates."""
     try:
         update_progress(operation_id, "text_extraction", 25, "Extracting text from PDF...")
-        
+
         # Override timing for Gemini TTS
         config = get_app_config()
         enable_timing = enable_timing and config.tts.engine.value != "gemini"
@@ -237,7 +263,7 @@ def _execute_document_processing_with_progress(
 
         if is_operation_cancelled(operation_id):
             return None
-            
+
         update_progress(operation_id, "text_processing", 40, "Processing and cleaning text...")
 
         # Create custom text pipeline if plain English is requested
@@ -258,7 +284,7 @@ def _execute_document_processing_with_progress(
 
         if is_operation_cancelled(operation_id):
             return None
-            
+
         update_progress(operation_id, "audio_generation", 60, "Generating audio from text...")
 
         # Use document engine for complete processing
@@ -270,7 +296,7 @@ def _execute_document_processing_with_progress(
         assert isinstance(services.document_engine, IDocumentEngine)
         assert isinstance(services.audio_engine, IAudioEngine)
         assert isinstance(text_pipeline, ITextPipeline)
-        
+
         # The actual heavy processing happens here
         processing_result = services.document_engine.process_document(
             request_obj, services.audio_engine, text_pipeline, enable_timing, config.text_processing.llm_chunk_size
@@ -278,7 +304,7 @@ def _execute_document_processing_with_progress(
 
         if is_operation_cancelled(operation_id):
             return None
-            
+
         update_progress(operation_id, "finalizing", 85, "Creating final audio file...")
 
         # Import needed for both success and failure cases
@@ -304,7 +330,7 @@ def _execute_document_processing_with_progress(
         assert audio_result is not None  # Type assertion for mypy
 
         update_progress(operation_id, "combining", 95, "Finalizing output...")
-        
+
         result = ProcessingResult(
             audio_files=audio_result.audio_files if audio_result.audio_files else {},
             combined_mp3_file=audio_result.combined_mp3,
@@ -312,9 +338,9 @@ def _execute_document_processing_with_progress(
             error=None,
             debug_info={},
         )
-        
+
         return result
-        
+
     except Exception as e:
         get_logger("routes").error(f"Document processing failed: {e}", exc_info=True)
         return None
@@ -430,18 +456,20 @@ def register_routes(app: Flask) -> None:
         progress = get_progress(operation_id)
         if progress is None:
             return jsonify({"error": "Operation not found"}), 404
-            
-        return jsonify({
-            "operation_id": progress.operation_id,
-            "stage": progress.stage,
-            "percentage": progress.percentage,
-            "message": progress.message,
-            "complete": progress.is_complete,
-            "error": progress.is_error,
-            "error_message": progress.error_message,
-            "cancelled": progress.cancelled,
-            "result_data": progress.result_data
-        })
+
+        return jsonify(
+            {
+                "operation_id": progress.operation_id,
+                "stage": progress.stage,
+                "percentage": progress.percentage,
+                "message": progress.message,
+                "complete": progress.is_complete,
+                "error": progress.is_error,
+                "error_message": progress.error_message,
+                "cancelled": progress.cancelled,
+                "result_data": progress.result_data,
+            }
+        )
 
     @app.route("/api/cancel/<operation_id>", methods=["POST"])
     def cancel_processing_operation(operation_id: str) -> Union[Response, tuple[Response, int]]:
@@ -449,10 +477,10 @@ def register_routes(app: Flask) -> None:
         progress = get_progress(operation_id)
         if progress is None:
             return jsonify({"error": "Operation not found"}), 404
-            
+
         if progress.is_complete:
             return jsonify({"message": "Operation already completed", "cancelled": False}), 200
-            
+
         cancel_operation(operation_id)
         return jsonify({"message": "Cancellation requested", "cancelled": True})
 
@@ -462,35 +490,36 @@ def register_routes(app: Flask) -> None:
         progress = get_progress(operation_id)
         if progress is None:
             return "Operation not found", 404
-            
+
         if not progress.is_complete:
             return "Operation not yet complete", 400
-            
+
         if progress.is_error or progress.error_message:
             return f"Processing failed: {progress.error_message or 'Unknown error'}", 500
-            
+
         if progress.cancelled:
             return "Operation was cancelled", 400
-            
+
         if not progress.result_data:
             return "No result data available", 500
-            
+
         # Extract result data
         result_data = progress.result_data
         base_filename = result_data.get("base_filename", "unknown")
         original_filename = result_data.get("original_filename", "unknown")
         processing_result = result_data.get("processing_result")
-        
+
         if not processing_result:
             return "No processing result available", 500
-            
+
         # We need to reconstruct the page range - for now use default
         from domain.models import PageRange
+
         page_range = PageRange(start_page=None, end_page=None)  # Default to all pages
-        
+
         # Check if this was a timing-enabled operation
         enable_timing = progress.stage in ["complete"] and processing_result.timing_data is not None
-        
+
         # Render the result using the existing function
         return render_upload_result(processing_result, original_filename, base_filename, page_range, enable_timing)
 
@@ -498,14 +527,22 @@ def register_routes(app: Flask) -> None:
     def get_pdf_info() -> Union[Response, tuple[Response, int]]:
         service = get_pdf_service()
         if not is_processor_available() or service is None:
-            return jsonify({"error": "PDF processing service is not available. Please check system configuration and try again."}), 500
+            return (
+                jsonify(
+                    {
+                        "error": "PDF processing service is not available. Please check system "
+                        "configuration and try again."
+                    }
+                ),
+                500,
+            )
 
         if "pdf_file" not in request.files:
             return jsonify({"error": "No file was uploaded. Please select a PDF file and try again."}), 400
 
         file = request.files["pdf_file"]
         if not file.filename or file.filename == "" or not allowed_file(file.filename):
-            filename = getattr(file, 'filename', 'unknown')
+            filename = getattr(file, "filename", "unknown")
             return jsonify({"error": f"Invalid file '{filename}'. Only PDF files are supported for processing."}), 400
 
         try:
@@ -537,7 +574,7 @@ def register_routes(app: Flask) -> None:
                 return jsonify({"error": f"Failed to analyze PDF '{original_filename}': {pdf_info_result.error}"}), 500
 
         except Exception as e:
-            return jsonify({"error": f"Unexpected error while analyzing PDF: {str(e)}"}), 500
+            return jsonify({"error": f"Unexpected error while analyzing PDF: {e!s}"}), 500
 
     def _validate_upload_request() -> tuple[Optional[FileStorage], Optional[str]]:
         """Common validation for upload endpoints.
@@ -547,7 +584,11 @@ def register_routes(app: Flask) -> None:
         """
         service = get_pdf_service()
         if not is_processor_available() or service is None:
-            return None, "PDF processing service is temporarily unavailable. Please check your configuration and try again in a few moments."
+            return (
+                None,
+                "PDF processing service is temporarily unavailable. Please check your "
+                "configuration and try again in a few moments.",
+            )
 
         if "pdf_file" not in request.files:
             return None, "No file was uploaded. Please select a PDF file and try again."
@@ -569,10 +610,10 @@ def register_routes(app: Flask) -> None:
 
         # Generate unique operation ID
         operation_id = str(uuid.uuid4())
-        
+
         # Initialize progress tracking
         update_progress(operation_id, "starting", 0, "Upload received, starting processing...")
-        
+
         # Save file first before passing to thread (FileStorage closes after request)
         config = get_app_config()
         if not file.filename:
@@ -580,19 +621,28 @@ def register_routes(app: Flask) -> None:
         original_filename = secure_filename(file.filename)
         saved_path = Path(config.files.upload_folder) / f"{operation_id}_{original_filename}"
         file.save(str(saved_path))
-        
+
         # Convert form data to dict (Flask objects don't work in threads)
         form_data = dict(request.form)
-        
+
         # Start background processing with app context
         from flask import current_app
+
         thread = threading.Thread(
-            target=background_process_document, 
-            args=(operation_id, form_data, str(saved_path), original_filename, False, get_app_context(), current_app._get_current_object()),
-            daemon=True
+            target=background_process_document,
+            args=(
+                operation_id,
+                form_data,
+                str(saved_path),
+                original_filename,
+                False,
+                get_app_context(),
+                current_app._get_current_object(),
+            ),
+            daemon=True,
         )
         thread.start()
-        
+
         # Return processing page immediately
         return render_template("processing.html", operation_id=operation_id, enable_timing=False)
 
@@ -609,10 +659,10 @@ def register_routes(app: Flask) -> None:
 
         # Generate unique operation ID
         operation_id = str(uuid.uuid4())
-        
+
         # Initialize progress tracking
         update_progress(operation_id, "starting", 0, "Upload received, starting processing with timing data...")
-        
+
         # Save file first before passing to thread (FileStorage closes after request)
         config = get_app_config()
         if not file.filename:
@@ -620,19 +670,28 @@ def register_routes(app: Flask) -> None:
         original_filename = secure_filename(file.filename)
         saved_path = Path(config.files.upload_folder) / f"{operation_id}_{original_filename}"
         file.save(str(saved_path))
-        
+
         # Convert form data to dict (Flask objects don't work in threads)
         form_data = dict(request.form)
-        
+
         # Start background processing WITH timing and app context
         from flask import current_app
+
         thread = threading.Thread(
-            target=background_process_document, 
-            args=(operation_id, form_data, str(saved_path), original_filename, True, get_app_context(), current_app._get_current_object()),
-            daemon=True
+            target=background_process_document,
+            args=(
+                operation_id,
+                form_data,
+                str(saved_path),
+                original_filename,
+                True,
+                get_app_context(),
+                current_app._get_current_object(),
+            ),
+            daemon=True,
         )
         thread.start()
-        
+
         # Return processing page immediately
         return render_template("processing.html", operation_id=operation_id, enable_timing=True)
 
@@ -828,27 +887,29 @@ def process_upload_request(
         return None, _get_safe_filename_from_locals(locals()), "", f"An unexpected error occurred: {e!s}"
 
 
-def _process_saved_file(saved_file_path: str, original_filename: str, request_form: dict, config: SystemConfig) -> FileProcessingInfo:
+def _process_saved_file(
+    saved_file_path: str, original_filename: str, request_form: dict, config: SystemConfig
+) -> FileProcessingInfo:
     """Process and validate a saved file, return file information or error."""
     base_filename_no_ext = Path(original_filename).stem
     pdf_path = Path(saved_file_path)
-    
+
     # Parse and validate page range and plain English setting
     page_range = parse_page_range_from_form(request_form)
     enable_plain_english = parse_plain_english_from_form(request_form)
-    
+
     if not page_range.is_full_document():
         # Need to validate page range - but can't use _configure_processing_services() as it needs Flask context
         # For now, skip validation in background thread (it will be caught during processing)
         pass
-    
+
     return FileProcessingInfo(
         original_filename=original_filename,
         base_filename=base_filename_no_ext,
         pdf_path=str(pdf_path),
         page_range=page_range,
         enable_plain_english=enable_plain_english,
-        error=None
+        error=None,
     )
 
 

@@ -1,7 +1,7 @@
 # utils.py - Pure utility functions extracted from app.py
+from pathlib import Path
 import re
 import shutil
-from pathlib import Path
 from typing import Any, Optional, Union
 
 from application.config.system_config import SystemConfig
@@ -113,13 +113,14 @@ def _get_retry_suggestion(error: ApplicationError, config: SystemConfig) -> str:
 
 # Enhanced Error Message Functions for Better User Experience
 
+
 def _get_specific_error_context(error: ApplicationError) -> Optional[str]:
     """Extract specific context from error details for more helpful messages."""
     if not error.details:
         return None
-        
+
     details = error.details.lower()
-    
+
     # Text extraction specific issues
     if error.code == ErrorCode.TEXT_EXTRACTION_FAILED:
         if "password" in details or "encrypted" in details:
@@ -130,8 +131,8 @@ def _get_specific_error_context(error: ApplicationError) -> Optional[str]:
             return "corrupted"
         elif "empty" in details or "no text" in details:
             return "no_text"
-    
-    # TTS specific issues  
+
+    # TTS specific issues
     elif error.code in [ErrorCode.TTS_ENGINE_ERROR, ErrorCode.AUDIO_GENERATION_FAILED]:
         if "rate limit" in details or "quota" in details:
             return "rate_limited"
@@ -143,20 +144,20 @@ def _get_specific_error_context(error: ApplicationError) -> Optional[str]:
             return "timeout"
         elif "memory" in details or "resource" in details:
             return "resource_exhaustion"
-    
+
     # File system issues
     elif "disk" in details and "space" in details:
         return "disk_space"
     elif "permission" in details or "access denied" in details:
         return "permission_denied"
-    
+
     return None
 
 
 def _get_enhanced_error_message(error: ApplicationError) -> str:
     """Get enhanced, context-aware error message."""
     context = _get_specific_error_context(error)
-    
+
     if error.code == ErrorCode.TEXT_EXTRACTION_FAILED:
         if context == "password_protected":
             return "This PDF is password-protected and cannot be processed. Please remove the password protection and try again."
@@ -167,8 +168,10 @@ def _get_enhanced_error_message(error: ApplicationError) -> str:
         elif context == "no_text":
             return "No readable text was found in this PDF. The file may be empty, image-only, or use an unsupported text format."
         else:
-            return "Could not extract text from the PDF. The file might be corrupted, image-only, or password-protected."
-    
+            return (
+                "Could not extract text from the PDF. The file might be corrupted, image-only, or password-protected."
+            )
+
     elif error.code in [ErrorCode.TTS_ENGINE_ERROR, ErrorCode.AUDIO_GENERATION_FAILED]:
         if context == "rate_limited":
             return "Audio generation rate limit reached. Please wait a few minutes before trying again, or try processing a smaller document."
@@ -182,15 +185,17 @@ def _get_enhanced_error_message(error: ApplicationError) -> str:
             return "Insufficient system resources for audio generation. Try closing other applications or processing a smaller document."
         else:
             return "Failed to generate audio from the text. This might be a temporary issue with the text-to-speech service."
-    
+
     elif error.code == ErrorCode.LLM_PROVIDER_ERROR:
         if context == "rate_limited":
             return "Text processing rate limit reached. Please wait a moment before trying again."
         elif context == "network_error":
-            return "Cannot connect to the text processing service. Check your internet connection and API configuration."
+            return (
+                "Cannot connect to the text processing service. Check your internet connection and API configuration."
+            )
         else:
             return "Text cleaning service encountered an error. This might be temporary."
-    
+
     # Use original function for other cases
     return _get_user_friendly_error_message(error)
 
@@ -198,7 +203,7 @@ def _get_enhanced_error_message(error: ApplicationError) -> str:
 def _get_enhanced_retry_suggestion(error: ApplicationError, config: SystemConfig) -> str:
     """Get enhanced, context-aware retry suggestion."""
     context = _get_specific_error_context(error)
-    
+
     if error.code == ErrorCode.TEXT_EXTRACTION_FAILED:
         if context == "password_protected":
             return "Remove the password from your PDF using a PDF editor, or try a different PDF file."
@@ -208,7 +213,7 @@ def _get_enhanced_retry_suggestion(error: ApplicationError, config: SystemConfig
             return "Try opening the PDF in a PDF reader first to verify it works, or try re-downloading/re-saving the file."
         else:
             return "Try a different PDF file, or ensure the PDF is not password-protected or image-only."
-    
+
     elif error.code in [ErrorCode.TTS_ENGINE_ERROR, ErrorCode.AUDIO_GENERATION_FAILED]:
         if context == "rate_limited":
             return "Wait 2-5 minutes before trying again. For large documents, consider processing smaller page ranges."
@@ -222,21 +227,21 @@ def _get_enhanced_retry_suggestion(error: ApplicationError, config: SystemConfig
             return "Close other applications to free up memory, or try processing a smaller document (fewer pages)."
         elif error.retryable:
             return "Please try again in a few moments. If the problem persists, the text-to-speech service might be temporarily unavailable."
-    
+
     elif error.code == ErrorCode.FILE_SIZE_ERROR:
         size_info = _extract_size_info(error.details) if error.details else None
         if size_info:
             return f"Your PDF is {size_info['actual']}MB but the limit is {size_info['limit']}MB. Try compressing the PDF or splitting it into smaller files."
         else:
             return f"Please use a smaller PDF file (maximum {config.files.max_file_size_mb}MB)."
-    
+
     # Check for system resource issues
     if context == "disk_space":
         free_space = _get_available_disk_space()
         return f"Free up at least 500MB of disk space (currently {free_space}MB available) and try again."
     elif context == "permission_denied":
         return "Check file permissions and ensure the application has write access to its folders."
-    
+
     # Use original function for other cases
     return _get_retry_suggestion(error, config)
 
@@ -244,6 +249,7 @@ def _get_enhanced_retry_suggestion(error: ApplicationError, config: SystemConfig
 def _extract_size_info(details: str) -> Optional[dict[str, str]]:
     """Extract file size information from error details."""
     import re
+
     # Look for patterns like "45.2MB exceeds limit of 100MB"
     match = re.search(r"(\d+\.?\d*)\s*MB.*?(\d+\.?\d*)\s*MB", details)
     if match:
@@ -265,13 +271,13 @@ def get_contextual_error_message(error: ApplicationError, config: SystemConfig, 
     """Get a complete, contextual error message with filename and suggestions."""
     enhanced_message = _get_enhanced_error_message(error)
     enhanced_suggestion = _get_enhanced_retry_suggestion(error, config)
-    
+
     # Add filename context if available
     if filename:
         file_context = f"Error processing '{filename}': "
     else:
         file_context = "Processing error: "
-    
+
     # Combine message with suggestion
     if enhanced_suggestion:
         return f"{file_context}{enhanced_message}<br><br>💡 <strong>What to try:</strong> {enhanced_suggestion}"
@@ -282,19 +288,19 @@ def get_contextual_error_message(error: ApplicationError, config: SystemConfig, 
 def get_processing_stage_error(stage: str, error: Exception, filename: Optional[str] = None) -> str:
     """Get error message for specific processing stages with context."""
     file_info = f" for '{filename}'" if filename else ""
-    
+
     stage_messages = {
         "text_extraction": f"Failed to extract text from PDF{file_info}",
-        "text_processing": f"Failed to process and clean text{file_info}", 
+        "text_processing": f"Failed to process and clean text{file_info}",
         "audio_generation": f"Failed to generate audio{file_info}",
         "file_combination": f"Failed to create final audio file{file_info}",
         "file_validation": f"File validation failed{file_info}",
         "configuration": f"Configuration error{file_info}",
     }
-    
+
     base_message = stage_messages.get(stage, f"Processing failed at {stage}{file_info}")
     error_detail = str(error)
-    
+
     # Add specific suggestions based on stage and error type
     if stage == "text_extraction" and ("password" in error_detail.lower() or "encrypted" in error_detail.lower()):
         return f"{base_message}: The PDF is password-protected. Please remove the password and try again."

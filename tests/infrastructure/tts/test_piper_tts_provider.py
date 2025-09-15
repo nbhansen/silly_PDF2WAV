@@ -1,0 +1,589 @@
+"""Comprehensive infrastructure tests for PiperTTSProvider.
+
+Tests real Piper TTS functionality without mocking core provider behavior.
+These tests validate actual TTS generation, model management, and error handling.
+"""
+
+from collections.abc import Generator
+from pathlib import Path
+import tempfile
+from unittest.mock import Mock, patch
+
+import pytest
+
+from domain.config.tts_config import PiperConfig
+from domain.errors import ErrorCode, Result
+from infrastructure.tts.piper_tts_provider import PiperTTSProvider
+
+
+@pytest.fixture
+def temp_models_dir() -> Generator[str, None, None]:
+    """Create temporary directory for test models."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        yield temp_dir
+
+
+@pytest.fixture
+def basic_piper_config(temp_models_dir: str) -> PiperConfig:
+    """Basic PiperConfig for testing."""
+    return PiperConfig(
+        model_name="en_US-lessac-medium",
+        model_path=None,  # Will be auto-downloaded
+        config_path=None,
+        download_dir=temp_models_dir,
+        length_scale=1.0,
+        speaker_id=None,
+    )
+
+
+@pytest.fixture
+def custom_piper_config(temp_models_dir: str) -> PiperConfig:
+    """Custom PiperConfig with specific model paths."""
+    model_path = str(Path(temp_models_dir) / "test_model.onnx")
+    config_path = str(Path(temp_models_dir) / "test_model.onnx.json")
+
+    # Create dummy model files for testing
+    Path(model_path).touch()
+    Path(config_path).touch()
+
+    return PiperConfig(
+        model_name="en_US-lessac-medium",
+        model_path=model_path,
+        config_path=config_path,
+        download_dir=temp_models_dir,
+        length_scale=0.8,
+        speaker_id=1,
+    )
+
+
+class TestPiperTTSProviderInitialization:
+    """Test PiperTTSProvider initialization and configuration."""
+
+    def test_init_with_basic_config(self, basic_piper_config: PiperConfig) -> None:
+        """Should initialize with basic configuration."""
+        provider = PiperTTSProvider(basic_piper_config)
+
+        assert provider.config == basic_piper_config
+        assert provider.output_format == "wav"
+        assert provider.models_dir == basic_piper_config.download_dir
+        assert Path(provider.models_dir).exists()
+
+    def test_init_with_custom_paths(self, custom_piper_config: PiperConfig) -> None:
+        """Should initialize with custom model paths."""
+        provider = PiperTTSProvider(custom_piper_config)
+
+        assert provider.model_path == custom_piper_config.model_path
+        assert provider.config_path == custom_piper_config.config_path
+        assert provider.model_path and Path(provider.model_path).is_absolute()
+        assert provider.config_path and Path(provider.config_path).is_absolute()
+
+    def test_init_with_missing_model_files(self, temp_models_dir: str) -> None:
+        """Should raise FileNotFoundError for missing model files."""
+        config = PiperConfig(
+            model_name="en_US-lessac-medium",
+            model_path="/nonexistent/model.onnx",
+            config_path="/nonexistent/config.json",
+            download_dir=temp_models_dir,
+        )
+
+        with pytest.raises(FileNotFoundError, match="Model file not found"):
+            PiperTTSProvider(config)
+
+    def test_init_with_custom_project_root(self, basic_piper_config: PiperConfig) -> None:
+        """Should accept custom project root for secure binary lookup."""
+        custom_root = "/custom/project/root"
+        provider = PiperTTSProvider(basic_piper_config, project_root=custom_root)
+
+        assert provider.project_root == custom_root
+
+    @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True)
+    def test_init_detects_python_library(self, basic_piper_config: PiperConfig) -> None:
+        """Should detect Python library availability."""
+        provider = PiperTTSProvider(basic_piper_config)
+
+        assert hasattr(provider, "piper_method")
+        assert provider.piper_method == "python_library"
+
+    @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
+    @patch("subprocess.run")
+    def test_init_detects_command_line(self, mock_run: Mock, basic_piper_config: PiperConfig) -> None:
+        """Should detect command line Piper availability."""
+        mock_run.return_value = Mock(returncode=0)
+
+        provider = PiperTTSProvider(basic_piper_config)
+
+        assert provider.piper_method == "command_line"
+        assert hasattr(provider, "piper_command")
+
+
+class TestPiperTTSProviderSSMLProcessing:
+    """Test SSML text processing for Piper compatibility."""
+
+    def test_process_text_for_piper_removes_all_ssml(self, basic_piper_config: PiperConfig) -> None:
+        """Should remove all SSML tags since Piper doesn't support SSML."""
+        provider = PiperTTSProvider(basic_piper_config)
+
+        ssml_text = """
+        <speak>
+            <break time="1s"/>
+            <emphasis level="strong">Important text</emphasis>
+            <prosody rate="slow" pitch="low">Slow low voice</prosody>
+            Regular text.
+        </speak>
+        """
+
+        result = provider._process_text_for_piper(ssml_text)
+
+        assert "<" not in result
+        assert ">" not in result
+        assert "Important text" in result
+        assert "Slow low voice" in result
+        assert "Regular text." in result
+
+    def test_process_text_for_piper_cleans_whitespace(self, basic_piper_config: PiperConfig) -> None:
+        """Should clean up whitespace after SSML removal."""
+        provider = PiperTTSProvider(basic_piper_config)
+
+        ssml_text = "Text with   <break/>   multiple    spaces."
+        result = provider._process_text_for_piper(ssml_text)
+
+        assert result == "Text with multiple spaces."
+
+    def test_process_text_for_piper_fixes_punctuation_spacing(self, basic_piper_config: PiperConfig) -> None:
+        """Should fix spacing before punctuation after tag removal."""
+        provider = PiperTTSProvider(basic_piper_config)
+
+        ssml_text = "Hello <break/> , world <break/> !"
+        result = provider._process_text_for_piper(ssml_text)
+
+        assert result == "Hello, world!"
+
+    def test_process_text_for_piper_preserves_plain_text(self, basic_piper_config: PiperConfig) -> None:
+        """Should preserve plain text without SSML tags."""
+        provider = PiperTTSProvider(basic_piper_config)
+
+        plain_text = "This is plain text without any markup."
+        result = provider._process_text_for_piper(plain_text)
+
+        assert result == plain_text
+
+
+class TestPiperTTSProviderInterfaces:
+    """Test ITTSEngine interface implementation."""
+
+    def test_get_output_format(self, basic_piper_config: PiperConfig) -> None:
+        """Should return WAV format."""
+        provider = PiperTTSProvider(basic_piper_config)
+
+        assert provider.get_output_format() == "wav"
+
+    def test_prefers_sync_processing(self, basic_piper_config: PiperConfig) -> None:
+        """Should prefer synchronous processing for local engine."""
+        provider = PiperTTSProvider(basic_piper_config)
+
+        assert provider.prefers_sync_processing() is True
+
+    def test_supports_ssml(self, basic_piper_config: PiperConfig) -> None:
+        """Should return False since Piper doesn't support SSML."""
+        provider = PiperTTSProvider(basic_piper_config)
+
+        assert provider.supports_ssml() is False
+
+
+class TestPiperTTSProviderTextValidation:
+    """Test text input validation for TTS generation."""
+
+    @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
+    @patch("subprocess.run")
+    def test_generate_audio_data_rejects_empty_text(
+        self, mock_run: Mock, basic_piper_config: PiperConfig
+    ) -> None:
+        """Should reject empty text input."""
+        mock_run.return_value = Mock(returncode=0)
+        provider = PiperTTSProvider(basic_piper_config)
+
+        result = provider.generate_audio_data("")
+
+        assert result.is_failure
+        assert result.error is not None
+        assert "Empty text provided" in str(result.error.details)
+
+    @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
+    @patch("subprocess.run")
+    def test_generate_audio_data_rejects_whitespace_only(
+        self, mock_run: Mock, basic_piper_config: PiperConfig
+    ) -> None:
+        """Should reject whitespace-only text."""
+        mock_run.return_value = Mock(returncode=0)
+        provider = PiperTTSProvider(basic_piper_config)
+
+        result = provider.generate_audio_data("   \n\t  ")
+
+        assert result.is_failure
+        assert result.error is not None
+        assert "Empty text provided" in str(result.error.details)
+
+    @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
+    @patch("subprocess.run")
+    def test_generate_audio_data_rejects_error_messages(
+        self, mock_run: Mock, basic_piper_config: PiperConfig
+    ) -> None:
+        """Should reject error message text."""
+        mock_run.return_value = Mock(returncode=0)
+        provider = PiperTTSProvider(basic_piper_config)
+
+        error_texts = [
+            "LLM cleaning skipped due to error",
+            "Error: Processing failed",
+            "Could not convert PDF to audio",
+        ]
+
+        for error_text in error_texts:
+            result = provider.generate_audio_data(error_text)
+
+            assert result.is_failure
+            assert result.error is not None
+            assert "Cannot generate audio from error message" in str(result.error.details)
+
+    @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
+    @patch("subprocess.run")
+    def test_generate_audio_data_rejects_ssml_only_content(
+        self, mock_run: Mock, basic_piper_config: PiperConfig
+    ) -> None:
+        """Should reject content that becomes empty after SSML removal."""
+        mock_run.return_value = Mock(returncode=0)
+        provider = PiperTTSProvider(basic_piper_config)
+
+        ssml_only = "<break time='2s'/><silence duration='1s'/>"
+        result = provider.generate_audio_data(ssml_only)
+
+        assert result.is_failure
+        assert result.error is not None
+        assert "Text processing resulted in empty content" in str(result.error.details)
+
+
+class TestPiperTTSProviderAvailabilityChecking:
+    """Test Piper availability detection."""
+
+    @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
+    @patch("subprocess.run")
+    def test_generate_audio_data_fails_when_unavailable(
+        self, mock_run: Mock, basic_piper_config: PiperConfig
+    ) -> None:
+        """Should fail gracefully when Piper is not available."""
+        # Mock command line check to fail
+        mock_run.side_effect = FileNotFoundError("piper command not found")
+
+        provider = PiperTTSProvider(basic_piper_config)
+        result = provider.generate_audio_data("Test text")
+
+        assert result.is_failure
+        assert result.error is not None
+        assert "Piper TTS not available" in str(result.error.details)
+        assert "pip install piper-tts" in str(result.error.details)
+
+
+class TestPiperTTSProviderCommandLineGeneration:
+    """Test command line TTS generation functionality."""
+
+    @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
+    @patch("subprocess.run")
+    @patch("tempfile.NamedTemporaryFile")
+    @patch("pathlib.Path.exists")
+    @patch("pathlib.Path.open")
+    @patch("pathlib.Path.stat")
+    def test_generate_with_command_line_success(
+        self,
+        mock_stat: Mock,
+        mock_open: Mock,
+        mock_exists: Mock,
+        mock_tempfile: Mock,
+        mock_run: Mock,
+        custom_piper_config: PiperConfig,
+    ) -> None:
+        """Should successfully generate audio using command line."""
+        # Setup mocks
+        mock_temp_file = Mock()
+        mock_temp_file.name = "/tmp/test_audio.wav"
+        mock_tempfile.return_value.__enter__.return_value = mock_temp_file
+
+        mock_run.return_value = Mock(returncode=0, stderr="", stdout="")
+        mock_exists.return_value = True
+        mock_stat.return_value = Mock(st_size=44100)  # Non-zero file size
+
+        # Mock file reading
+        fake_audio_data = b"RIFF\x24\x08\x00\x00WAVEfmt "  # WAV header
+        mock_file_handle = Mock()
+        mock_file_handle.read.return_value = fake_audio_data
+        mock_open.return_value.__enter__.return_value = mock_file_handle
+
+        # Mock initial piper availability check
+        initial_run_patch = patch("subprocess.run", return_value=Mock(returncode=0))
+        with initial_run_patch:
+            provider = PiperTTSProvider(custom_piper_config)
+
+        # Test generation
+        result = provider.generate_audio_data("Hello, this is a test.")
+
+        assert result.is_success
+        assert result.value == fake_audio_data
+
+        # Verify command construction
+        mock_run.assert_called()
+        call_args = mock_run.call_args
+        cmd = call_args[0][0]
+
+        assert "piper" in cmd[0]
+        assert "--model" in cmd
+        assert custom_piper_config.model_path in cmd
+        assert "--output_file" in cmd
+        assert "--length_scale" in cmd
+        assert "0.8" in cmd  # custom length scale
+        assert "--speaker" in cmd
+        assert "1" in cmd  # custom speaker ID
+
+    @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
+    @patch("subprocess.run")
+    def test_generate_with_command_line_handles_timeout(
+        self, mock_run: Mock, custom_piper_config: PiperConfig
+    ) -> None:
+        """Should handle command timeout gracefully."""
+        # Mock successful piper check
+        mock_run.return_value = Mock(returncode=0)
+        provider = PiperTTSProvider(custom_piper_config)
+
+        # Mock timeout on actual generation
+        from subprocess import TimeoutExpired
+        mock_run.side_effect = TimeoutExpired("piper", 30)
+
+        result = provider.generate_audio_data("Test text")
+
+        assert result.is_failure
+        assert result.error is not None
+        assert result.error.code == ErrorCode.TTS_ENGINE_ERROR
+        assert "timed out after 30 seconds" in str(result.error.details)
+
+    @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
+    @patch("subprocess.run")
+    def test_generate_with_command_line_handles_command_failure(
+        self, mock_run: Mock, custom_piper_config: PiperConfig
+    ) -> None:
+        """Should handle command execution failures."""
+        # Mock successful piper check
+        mock_run.return_value = Mock(returncode=0)
+        provider = PiperTTSProvider(custom_piper_config)
+
+        # Mock command failure
+        mock_run.return_value = Mock(
+            returncode=1, stderr="Model not found", stdout="", args=["piper"]
+        )
+
+        result = provider.generate_audio_data("Test text")
+
+        assert result.is_failure
+        assert result.error is not None
+        assert result.error.code == ErrorCode.TTS_ENGINE_ERROR
+        assert "Piper command failed with code 1" in str(result.error.details)
+
+
+class TestPiperTTSProviderAsyncGeneration:
+    """Test async TTS generation functionality."""
+
+    @pytest.mark.asyncio
+    @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
+    @patch("subprocess.run")
+    async def test_generate_audio_data_async_calls_sync_method(
+        self, mock_run: Mock, basic_piper_config: PiperConfig
+    ) -> None:
+        """Should call sync method in thread pool."""
+        # Mock successful piper availability
+        mock_run.return_value = Mock(returncode=0)
+        provider = PiperTTSProvider(basic_piper_config)
+
+        # Mock sync method to avoid actual TTS generation
+        with patch.object(provider, "generate_audio_data") as mock_sync:
+            mock_sync.return_value = Result.success(b"fake_audio")
+
+            result = await provider.generate_audio_data_async("Test text")
+
+            assert result.is_success
+            assert result.value == b"fake_audio"
+            mock_sync.assert_called_once_with("Test text")
+
+
+class TestPiperTTSProviderSecureDownload:
+    """Test secure model downloading functionality."""
+
+    def test_secure_download_validates_url_format(self, basic_piper_config: PiperConfig) -> None:
+        """Should validate URL format before downloading."""
+        provider = PiperTTSProvider(basic_piper_config)
+
+        invalid_urls = [
+            "not-a-url",
+            "ftp://example.com/file.onnx",
+            "http://insecure.com/file.onnx",  # HTTP not allowed
+            "",
+        ]
+
+        for invalid_url in invalid_urls:
+            with pytest.raises(ValueError, match="Invalid URL format|Only HTTPS URLs are allowed"):
+                provider._secure_download(invalid_url, "/tmp/test_file")
+
+    @patch("urllib.request.urlopen")
+    def test_secure_download_success(
+        self, mock_urlopen: Mock, basic_piper_config: PiperConfig, temp_models_dir: str
+    ) -> None:
+        """Should successfully download files with SSL verification."""
+        provider = PiperTTSProvider(basic_piper_config)
+
+        # Mock successful download
+        mock_response = Mock()
+        mock_response.status = 200
+        mock_response.read.side_effect = [b"file_content", b""]  # First call returns content, second is EOF
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        destination = str(Path(temp_models_dir) / "test_model.onnx")
+        provider._secure_download("https://example.com/model.onnx", destination)
+
+        # Verify file was written
+        assert Path(destination).exists()
+        assert Path(destination).read_bytes() == b"file_content"
+
+        # Verify SSL context was used
+        mock_urlopen.assert_called_once()
+        call_args = mock_urlopen.call_args
+        assert "context" in call_args.kwargs
+        assert call_args.kwargs["timeout"] == 30
+
+    @patch("urllib.request.urlopen")
+    def test_secure_download_handles_http_errors(
+        self, mock_urlopen: Mock, basic_piper_config: PiperConfig
+    ) -> None:
+        """Should handle HTTP error responses."""
+        provider = PiperTTSProvider(basic_piper_config)
+
+        # Mock HTTP 404 error
+        mock_response = Mock()
+        mock_response.status = 404
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        with pytest.raises(Exception, match="Download failed"):
+            provider._secure_download("https://example.com/missing.onnx", "/tmp/test")
+
+
+class TestPiperTTSProviderModelManagement:
+    """Test model downloading and management."""
+
+    @patch.object(PiperTTSProvider, "_secure_download")
+    def test_ensure_model_downloads_when_missing(
+        self, mock_download: Mock, temp_models_dir: str
+    ) -> None:
+        """Should download model files when they don't exist."""
+        config = PiperConfig(
+            model_name="en_US-ryan-medium",
+            download_dir=temp_models_dir,
+        )
+
+        provider = PiperTTSProvider(config)
+        model_path, config_path = provider._ensure_model()
+
+        # Verify download was called for both files
+        assert mock_download.call_count == 2
+
+        # Verify paths are correct
+        assert model_path.endswith("en_US-ryan-medium.onnx")
+        assert config_path.endswith("en_US-ryan-medium.onnx.json")
+
+    def test_ensure_model_returns_existing_files(self, temp_models_dir: str) -> None:
+        """Should return existing model files without downloading."""
+        config = PiperConfig(
+            model_name="en_US-lessac-medium",
+            download_dir=temp_models_dir,
+        )
+
+        # Create existing model files
+        model_file = Path(temp_models_dir) / "en_US-lessac-medium.onnx"
+        config_file = Path(temp_models_dir) / "en_US-lessac-medium.onnx.json"
+        model_file.touch()
+        config_file.touch()
+
+        provider = PiperTTSProvider(config)
+
+        with patch.object(provider, "_secure_download") as mock_download:
+            model_path, config_path = provider._ensure_model()
+
+            # Should not download when files exist
+            mock_download.assert_not_called()
+
+            assert model_path == str(model_file)
+            assert config_path == str(config_file)
+
+    @patch.object(PiperTTSProvider, "_secure_download")
+    def test_ensure_model_handles_download_failure(
+        self, mock_download: Mock, temp_models_dir: str
+    ) -> None:
+        """Should handle model download failures gracefully."""
+        config = PiperConfig(
+            model_name="en_US-lessac-medium",
+            download_dir=temp_models_dir,
+        )
+
+        mock_download.side_effect = Exception("Network error")
+
+        provider = PiperTTSProvider(config)
+
+        with pytest.raises(Exception, match="Model download failed"):
+            provider._ensure_model()
+
+
+class TestPiperTTSProviderRealWorldScenarios:
+    """Test real-world usage scenarios and edge cases."""
+
+    @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
+    @patch("subprocess.run")
+    def test_handles_very_long_text(self, mock_run: Mock, basic_piper_config: PiperConfig) -> None:
+        """Should handle very long text input with appropriate timeout."""
+        mock_run.return_value = Mock(returncode=0)
+        provider = PiperTTSProvider(basic_piper_config)
+
+        # Create long text (5000 characters)
+        long_text = "This is a very long text. " * 200
+
+        with patch.object(provider, "_generate_with_command_line") as mock_generate:
+            mock_generate.return_value = b"audio_data"
+
+            result = provider.generate_audio_data(long_text)
+
+            # Should process without timeout errors
+            mock_generate.assert_called_once_with(long_text)
+
+    @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
+    @patch("subprocess.run")
+    def test_handles_unicode_text(self, mock_run: Mock, basic_piper_config: PiperConfig) -> None:
+        """Should handle Unicode characters in text."""
+        mock_run.return_value = Mock(returncode=0)
+        provider = PiperTTSProvider(basic_piper_config)
+
+        unicode_text = "Héllo wörld! 你好世界 🌍"
+
+        with patch.object(provider, "_generate_with_command_line") as mock_generate:
+            mock_generate.return_value = b"audio_data"
+
+            result = provider.generate_audio_data(unicode_text)
+
+            # Should process Unicode text
+            mock_generate.assert_called_once_with(unicode_text)
+
+    def test_thread_safety_with_multiple_instances(self, temp_models_dir: str) -> None:
+        """Should handle multiple provider instances safely."""
+        configs = [
+            PiperConfig(model_name="en_US-lessac-medium", download_dir=temp_models_dir),
+            PiperConfig(model_name="en_US-ryan-medium", download_dir=temp_models_dir),
+        ]
+
+        # Should be able to create multiple instances without conflicts
+        providers = [PiperTTSProvider(config) for config in configs]
+
+        assert len(providers) == 2
+        assert providers[0].config.model_name != providers[1].config.model_name
+        assert all(p.models_dir == temp_models_dir for p in providers)

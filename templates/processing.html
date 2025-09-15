@@ -13,14 +13,14 @@
                 <i class="fas fa-cogs"></i>
                 <span id="status-message">Starting processing...</span>
             </div>
-            
+
             <div class="progress-bar-container">
                 <div class="progress-bar" id="progress-bar">
                     <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
                 </div>
                 <span class="progress-text" id="progress-text">0%</span>
             </div>
-            
+
             <div class="processing-actions">
                 <button type="button" id="cancel-btn" class="btn btn-secondary">
                     <i class="fas fa-times"></i> Cancel Processing
@@ -44,24 +44,24 @@
 <script>
     const operationId = "{{ operation_id }}";
     const enableTiming = {{ 'true' if enable_timing else 'false' }};
-    
+
     // DOM elements
     const statusMessage = document.getElementById('status-message');
     const progressFill = document.getElementById('progress-fill');
     const progressText = document.getElementById('progress-text');
     const cancelBtn = document.getElementById('cancel-btn');
-    
+
     let cancelled = false;
     let pollInterval;
-    
+
     // Update progress display
     function updateProgress(data) {
         const percentage = Math.max(0, Math.min(100, data.percentage || 0));
-        
+
         statusMessage.textContent = data.message || 'Processing...';
         progressFill.style.width = percentage + '%';
         progressText.textContent = percentage + '%';
-        
+
         // Update progress bar color based on stage
         progressFill.className = 'progress-fill';
         if (data.error) {
@@ -70,16 +70,16 @@
             progressFill.classList.add('success');
         }
     }
-    
+
     // Check progress status
     function checkProgress() {
         if (cancelled) return;
-        
+
         fetch(`/api/progress/${operationId}`)
             .then(response => response.json())
             .then(data => {
                 updateProgress(data);
-                
+
                 if (data.error) {
                     // Handle error
                     statusMessage.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ' + (data.error_message || 'Processing failed');
@@ -87,26 +87,26 @@
                     cancelBtn.textContent = 'Go Back';
                     cancelBtn.onclick = () => window.location.href = '/';
                     clearInterval(pollInterval);
-                    
+
                 } else if (data.cancelled) {
                     // Handle cancellation
                     statusMessage.innerHTML = '<i class="fas fa-ban"></i> Processing cancelled by user';
                     cancelBtn.textContent = 'Go Back';
                     cancelBtn.onclick = () => window.location.href = '/';
                     clearInterval(pollInterval);
-                    
+
                 } else if (data.complete) {
                     // Handle completion
                     statusMessage.innerHTML = '<i class="fas fa-check-circle"></i> Processing complete! Redirecting...';
                     progressFill.classList.add('success');
                     cancelBtn.style.display = 'none';
                     clearInterval(pollInterval);
-                    
+
                     // Redirect to results after short delay
                     setTimeout(() => {
                         window.location.href = `/result/${operationId}`;
                     }, 2000);
-                    
+
                 } else {
                     // Continue polling
                     setTimeout(checkProgress, 1000);
@@ -120,18 +120,18 @@
                 setTimeout(checkProgress, 3000);
             });
     }
-    
+
     // Cancel processing
     function cancelProcessing() {
         if (cancelled) {
             window.location.href = '/';
             return;
         }
-        
+
         cancelled = true;
         statusMessage.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cancelling...';
         cancelBtn.disabled = true;
-        
+
         fetch(`/api/cancel/${operationId}`, { method: 'POST' })
             .then(response => response.json())
             .then(data => {
@@ -148,16 +148,16 @@
                 cancelled = false;
             });
     }
-    
+
     // Initialize
     cancelBtn.addEventListener('click', cancelProcessing);
-    
+
     // Start polling immediately
     checkProgress();
-    
+
     // Also set up regular polling as backup
     pollInterval = setInterval(checkProgress, 2000);
-    
+
     // Handle page unload
     window.addEventListener('beforeunload', function(e) {
         if (!cancelled && progressFill.style.width !== '100%') {

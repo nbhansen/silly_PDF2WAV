@@ -154,3 +154,13 @@ def unsupported_file_type_error(file_type: str) -> ApplicationError:
         details="Only PDF files are supported",
         retryable=False,
     )
+
+
+def unknown_error(details: str) -> ApplicationError:
+    """Create a generic error for unknown failures."""
+    return ApplicationError(
+        code=ErrorCode.UNKNOWN_ERROR,
+        message="Unknown error",
+        details=details,
+        retryable=True,
+    )
