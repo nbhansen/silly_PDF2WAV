@@ -12,8 +12,13 @@ import os
 from pathlib import Path
 import threading
 import time
-from typing import Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 import uuid
+
+if TYPE_CHECKING:
+    from domain.audio.audio_engine import IAudioEngine
+    from domain.document.document_engine import IDocumentEngine
+    from domain.text.text_pipeline import ITextPipeline
 
 from flask import Flask, Response, current_app, jsonify, render_template, request, send_from_directory, url_for
 from werkzeug.datastructures import FileStorage
@@ -51,9 +56,9 @@ class ProcessingServices:
     """Collection of processing services."""
 
     service_container: ServiceContainer
-    document_engine: object  # IDocumentEngine - avoiding circular import
-    audio_engine: object  # IAudioEngine - avoiding circular import
-    text_pipeline: object  # ITextPipeline - avoiding circular import
+    document_engine: "IDocumentEngine"
+    audio_engine: "IAudioEngine"
+    text_pipeline: "ITextPipeline"
 
 
 @dataclass(frozen=True)
