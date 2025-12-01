@@ -176,7 +176,6 @@ module = [
     "tests.conftest",
     "tests.test_helpers",
     "app_factory",
-    "routes"
 ]
 ignore_errors = true
 
