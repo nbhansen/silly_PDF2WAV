@@ -297,3 +297,90 @@ def cleanup_test_files(temp_dir):
     """Automatically clean up test files after each test."""
     return
     # Cleanup happens automatically with temp_dir fixture
+
+
+# === Skip-If-Unavailable Fixtures for Real External Services ===
+
+
+def _check_command_available(command: str) -> bool:
+    """Check if a command is available on the system."""
+    import shutil
+    return shutil.which(command) is not None
+
+
+def _check_piper_available() -> bool:
+    """Check if Piper TTS is available (command line or Python library)."""
+    # Check command line
+    if _check_command_available("piper"):
+        return True
+    # Check Python library
+    try:
+        from piper.voice import PiperVoice  # noqa: F401
+        return True
+    except ImportError:
+        pass
+    # Check project local piper binary
+    local_piper = Path.cwd() / "piper"
+    return local_piper.exists() and local_piper.is_file()
+
+
+@pytest.fixture
+def requires_tesseract():
+    """Skip test if Tesseract OCR is not available."""
+    if not _check_command_available("tesseract"):
+        pytest.skip("Tesseract OCR not available")
+
+
+@pytest.fixture
+def requires_piper():
+    """Skip test if Piper TTS is not available."""
+    if not _check_piper_available():
+        pytest.skip("Piper TTS not available")
+
+
+@pytest.fixture
+def requires_ffmpeg():
+    """Skip test if FFmpeg is not available."""
+    if not _check_command_available("ffmpeg"):
+        pytest.skip("FFmpeg not available")
+
+
+@pytest.fixture
+def requires_poppler():
+    """Skip test if Poppler (pdftoppm/pdfinfo) is not available."""
+    if not _check_command_available("pdftoppm"):
+        pytest.skip("Poppler utilities not available")
+
+
+@pytest.fixture
+def real_piper_tts(requires_piper, temp_dir):
+    """Create a real Piper TTS provider for integration testing."""
+    from domain.config import PiperConfig
+    from infrastructure.tts.piper_tts_provider import PiperTTSProvider
+
+    config = PiperConfig(
+        model_name="en_US-lessac-medium",
+        download_dir=str(temp_dir / "piper_models"),
+    )
+    provider = PiperTTSProvider(config, project_root=str(Path.cwd()))
+    return provider
+
+
+@pytest.fixture
+def real_tesseract_ocr(requires_tesseract, requires_poppler):
+    """Create a real Tesseract OCR provider for integration testing."""
+    from infrastructure.ocr.tesseract_ocr_provider import TesseractOCRProvider
+
+    return TesseractOCRProvider()
+
+
+@pytest.fixture
+def real_file_manager(temp_dir):
+    """Create a real FileManager for integration testing."""
+    from infrastructure.file.file_manager import FileManager
+
+    upload_dir = temp_dir / "uploads"
+    output_dir = temp_dir / "output"
+    upload_dir.mkdir(exist_ok=True)
+    output_dir.mkdir(exist_ok=True)
+    return FileManager(str(upload_dir), str(output_dir))

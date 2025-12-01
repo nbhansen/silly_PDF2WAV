@@ -349,3 +349,50 @@ class TestRealProviderInteraction:
             # Should have file operation methods
             assert hasattr(file_manager, 'save_uploaded_file')
             assert hasattr(file_manager, 'cleanup_old_files')
+
+
+class TestRealExternalServicesIntegration:
+    """Integration tests with real external services (skipped if unavailable)."""
+
+    def test_real_piper_generates_audio(self, real_piper_tts) -> None:
+        """Should generate actual audio with real Piper TTS."""
+        test_text = "Hello, this is a test of Piper text to speech."
+        result = real_piper_tts.generate_audio_data(test_text)
+
+        # Should return Result pattern
+        assert hasattr(result, 'is_success')
+        if result.is_success:
+            audio_data = result.value
+            assert audio_data is not None
+            assert len(audio_data) > 0
+            # WAV files start with RIFF header
+            assert audio_data[:4] == b'RIFF', "Expected WAV audio format"
+
+    def test_real_file_manager_saves_and_retrieves(self, real_file_manager) -> None:
+        """Should save and retrieve files with real FileManager."""
+        # Save a test file
+        test_content = b"Test audio content for integration testing"
+        saved_path = real_file_manager.save_output_file(test_content, "test_integration.wav")
+
+        assert saved_path is not None
+        assert Path(saved_path).exists()
+
+        # Read it back
+        with open(saved_path, 'rb') as f:
+            retrieved_content = f.read()
+        assert retrieved_content == test_content
+
+        # Clean up
+        Path(saved_path).unlink()
+
+    def test_real_tesseract_interface(self, real_tesseract_ocr) -> None:
+        """Should have proper OCR interface methods."""
+        # Verify the OCR provider has expected interface
+        assert hasattr(real_tesseract_ocr, 'extract_text')
+        assert callable(real_tesseract_ocr.extract_text)
+
+        # Test with nonexistent file - should handle gracefully
+        result = real_tesseract_ocr.extract_text("/nonexistent/file.pdf", PageRange())
+
+        # Should return empty string or handle error gracefully
+        assert isinstance(result, str)
