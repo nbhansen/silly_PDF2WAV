@@ -45,6 +45,9 @@ class PiperTTSProvider(ITTSEngine):  # FIXED: Only implement ITTSEngine
             config: Piper configuration
             repository_url: URL for downloading Piper models
             project_root: Secure project root path (for binary lookup)
+
+        Note: Constructor never raises exceptions. Initialization errors
+        are stored and returned on first call to generate_audio_data().
         """
         self.config = config
         self.output_format = "wav"
@@ -54,6 +57,7 @@ class PiperTTSProvider(ITTSEngine):  # FIXED: Only implement ITTSEngine
         self.models_dir = config.download_dir
         self.voice_instance = None
         self.repository_url = repository_url
+        self._initialization_error: Optional[str] = None  # Deferred error handling
 
         # Check what's available
         self._check_piper_availability()
@@ -68,7 +72,12 @@ class PiperTTSProvider(ITTSEngine):  # FIXED: Only implement ITTSEngine
 
         # Auto-download model if no path specified
         if not self.model_path:
-            self.model_path, self.config_path = self._ensure_model()
+            try:
+                self.model_path, self.config_path = self._ensure_model()
+            except Exception as e:
+                self._initialization_error = f"Model download failed: {e}"
+                logger.error("Model download failed during init: %s", e)
+                return
 
         # Make paths absolute
         if self.model_path and not Path(self.model_path).is_absolute():
@@ -76,11 +85,15 @@ class PiperTTSProvider(ITTSEngine):  # FIXED: Only implement ITTSEngine
         if self.config_path and not Path(self.config_path).is_absolute():
             self.config_path = str(Path(self.config_path).resolve())
 
-        # Verify files exist
+        # Verify files exist (defer errors instead of raising)
         if self.model_path and not Path(self.model_path).exists():
-            raise FileNotFoundError(f"Model file not found: {self.model_path}")
+            self._initialization_error = f"Model file not found: {self.model_path}"
+            logger.error("Model file not found: %s", self.model_path)
+            return
         if self.config_path and not Path(self.config_path).exists():
-            raise FileNotFoundError(f"Config file not found: {self.config_path}")
+            self._initialization_error = f"Config file not found: {self.config_path}"
+            logger.error("Config file not found: %s", self.config_path)
+            return
 
         # Initialize Python library if available
         if self.piper_method == "python_library":
@@ -91,6 +104,11 @@ class PiperTTSProvider(ITTSEngine):  # FIXED: Only implement ITTSEngine
     def generate_audio_data(self, text_to_speak: str) -> Result[bytes]:
         """Generate audio data using Piper TTS."""
         logger.info(f"Starting Piper TTS generation for {len(text_to_speak)} characters")
+
+        # Check for deferred initialization errors
+        if self._initialization_error:
+            logger.error("Piper TTS initialization failed: %s", self._initialization_error)
+            return Result.failure(tts_engine_error(self._initialization_error))
 
         if not text_to_speak or text_to_speak.strip() == "":
             logger.warning("Empty text provided to Piper TTS")
