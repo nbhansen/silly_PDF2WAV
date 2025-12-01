@@ -29,6 +29,13 @@ from application.context.application_context import ApplicationContext
 from domain.container.service_container import ServiceContainer
 from domain.models import PageRange, ProcessingResult, TimingMetadata
 from infrastructure.file.file_manager import FileManager
+from progress_store import (
+    ProgressStatus,
+    cancel_operation,
+    get_progress,
+    is_operation_cancelled,
+    update_progress,
+)
 from utils import (
     allowed_file,
     clean_text_for_display,
@@ -59,76 +66,6 @@ class ProcessingServices:
     document_engine: "IDocumentEngine"
     audio_engine: "IAudioEngine"
     text_pipeline: "ITextPipeline"
-
-
-@dataclass(frozen=True)
-class ProgressStatus:
-    """Progress tracking for long-running operations."""
-
-    operation_id: str
-    stage: str
-    percentage: int
-    message: str
-    is_complete: bool = False
-    is_error: bool = False
-    error_message: Optional[str] = None
-    result_data: Optional[dict[str, Any]] = None
-    cancelled: bool = False
-
-
-# Simple in-memory storage for progress tracking (fine for single-user home app)
-progress_storage: dict[str, ProgressStatus] = {}
-cancellation_flags: dict[str, bool] = {}
-
-
-def update_progress(
-    operation_id: str,
-    stage: str,
-    percentage: int,
-    message: str,
-    is_complete: bool = False,
-    is_error: bool = False,
-    error_message: Optional[str] = None,
-    result_data: Optional[dict[str, Any]] = None,
-) -> None:
-    """Update progress for an operation."""
-    progress_storage[operation_id] = ProgressStatus(
-        operation_id=operation_id,
-        stage=stage,
-        percentage=percentage,
-        message=message,
-        is_complete=is_complete,
-        is_error=is_error,
-        error_message=error_message,
-        result_data=result_data,
-        cancelled=cancellation_flags.get(operation_id, False),
-    )
-
-
-def get_progress(operation_id: str) -> Optional[ProgressStatus]:
-    """Get current progress for an operation."""
-    return progress_storage.get(operation_id)
-
-
-def cancel_operation(operation_id: str) -> None:
-    """Mark an operation as cancelled."""
-    cancellation_flags[operation_id] = True
-    if operation_id in progress_storage:
-        current_progress = progress_storage[operation_id]
-        progress_storage[operation_id] = ProgressStatus(
-            operation_id=current_progress.operation_id,
-            stage="cancelled",
-            percentage=current_progress.percentage,
-            message="Processing cancelled by user",
-            is_complete=True,
-            is_error=False,
-            cancelled=True,
-        )
-
-
-def is_operation_cancelled(operation_id: str) -> bool:
-    """Check if an operation has been cancelled."""
-    return cancellation_flags.get(operation_id, False)
 
 
 def background_process_document(
