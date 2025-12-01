@@ -9,10 +9,13 @@ import asyncio
 from collections.abc import Awaitable, Coroutine
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Union
 
 from ..errors import Result, audio_generation_error
+
+logger = logging.getLogger(__name__)
 from ..interfaces import IFileManager, ITTSEngine
 from ..models import TimedAudioResult
 from ..text.chunking_strategy import ChunkingMode, IChunkingStrategy, create_chunking_strategy
@@ -74,9 +77,11 @@ class AudioEngine(IAudioEngine):
         self.chunking_strategy = chunking_strategy or create_chunking_strategy(ChunkingMode.SENTENCE_BASED)
         self.base_delay = self._get_base_delay_for_engine()
 
-        print("🔍 AudioEngine: Initialized with chunk sizes:")
-        print(f"  - audio_target_chunk_size: {self.audio_target_chunk_size}")
-        print(f"  - audio_max_chunk_size: {self.audio_max_chunk_size}")
+        logger.debug(
+            "AudioEngine initialized with chunk sizes: target=%d, max=%d",
+            self.audio_target_chunk_size,
+            self.audio_max_chunk_size,
+        )
 
     def generate_with_timing(self, text_chunks: list[str], output_filename: str) -> Result[TimedAudioResult]:
         """Main entry point for audio generation with timing.
@@ -90,8 +95,8 @@ class AudioEngine(IAudioEngine):
 
         Returns Result with audio result or error - no exceptions thrown.
         """
-        print(f"AudioEngine: Generating simple audio for {len(text_chunks)} chunks")
-        print(f"🔍 AudioEngine: Chunk sizes: {[len(chunk) for chunk in text_chunks]}")
+        logger.info("Generating simple audio for %d chunks", len(text_chunks))
+        logger.debug("Chunk sizes: %s", [len(chunk) for chunk in text_chunks])
 
         if not text_chunks:
             return Result.success(TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None))
@@ -99,7 +104,7 @@ class AudioEngine(IAudioEngine):
         try:
             # Use chunking strategy for optimal text splitting
             max_chunk_size = self.audio_target_chunk_size
-            print(f"🔍 AudioEngine: Using max_chunk_size = {max_chunk_size} (from self.audio_target_chunk_size)")
+            logger.debug("Using max_chunk_size=%d (from audio_target_chunk_size)", max_chunk_size)
 
             chunks_result = self.chunking_strategy.chunk_text(text_chunks, max_chunk_size)
             if chunks_result.is_failure:
@@ -109,19 +114,19 @@ class AudioEngine(IAudioEngine):
             if processed_chunks is None:
                 return Result.success(TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None))
 
-            print(f"AudioEngine: Processing {len(processed_chunks)} chunks (max size: {max_chunk_size} chars)")
-            print(f"🔍 AudioEngine: After rechunking, chunk sizes: {[len(chunk) for chunk in processed_chunks]}")
+            logger.info("Processing %d chunks (max size: %d chars)", len(processed_chunks), max_chunk_size)
+            logger.debug("After rechunking, chunk sizes: %s", [len(chunk) for chunk in processed_chunks])
 
             # Generate audio using sync or async based on config
             if self.enable_async:
-                print("AudioEngine: Using async processing for simple audio generation")
+                logger.debug("Using async processing for simple audio generation")
                 audio_chunks = self._generate_chunks_with_new_async_interface(processed_chunks)
             else:
-                print("AudioEngine: Using synchronous processing for simple audio generation")
+                logger.debug("Using synchronous processing for simple audio generation")
                 audio_chunks = self._generate_chunks_sync(processed_chunks)
 
             if not audio_chunks:
-                print("AudioEngine: No successful audio chunks generated")
+                logger.warning("No successful audio chunks generated")
                 return Result.success(TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None))
 
             # Combine audio chunks
@@ -148,7 +153,7 @@ class AudioEngine(IAudioEngine):
                 Path(temp_wav_path).unlink()
 
             if conversion_result.is_success:
-                print(f"AudioEngine: Simple audio generated and converted to MP3: {mp3_filename}")
+                logger.info("Simple audio generated and converted to MP3: %s", mp3_filename)
                 return Result.success(
                     TimedAudioResult(
                         audio_files=[mp3_filename],
@@ -157,11 +162,11 @@ class AudioEngine(IAudioEngine):
                     )
                 )
             else:
-                print(f"AudioEngine: MP3 conversion failed: {conversion_result.error}")
+                logger.error("MP3 conversion failed: %s", conversion_result.error)
                 return Result.success(TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None))
 
         except Exception as e:
-            print(f"AudioEngine: Simple audio generation failed: {e}")
+            logger.exception("Simple audio generation failed: %s", e)
             return Result.failure(audio_generation_error(f"Simple audio generation failed: {e}"))
 
     def _generate_chunks_with_new_async_interface(self, processed_chunks: list[str]) -> list[bytes]:
@@ -181,7 +186,7 @@ class AudioEngine(IAudioEngine):
             finally:
                 loop.close()
         except Exception as e:
-            print(f"AudioEngine: Async processing failed: {e}")
+            logger.exception("Async processing failed: %s", e)
             return []
 
     def _generate_chunks_sync(self, processed_chunks: list[str]) -> list[bytes]:
@@ -192,14 +197,14 @@ class AudioEngine(IAudioEngine):
         audio_chunks = []
 
         for i, chunk in enumerate(processed_chunks, 1):
-            print(f"🎵 AudioEngine: Processing chunk {i}/{len(processed_chunks)} ({len(chunk)} chars)")
+            logger.debug("Processing chunk %d/%d (%d chars)", i, len(processed_chunks), len(chunk))
 
             result = self.tts_engine.generate_audio_data(chunk)
             if result.is_success and result.value is not None:
                 audio_chunks.append(result.value)
-                print(f"✅ Chunk {i} completed ({len(result.value)} bytes)")
+                logger.debug("Chunk %d completed (%d bytes)", i, len(result.value))
             else:
-                print(f"❌ Chunk {i} failed: {result.error}")
+                logger.warning("Chunk %d failed: %s", i, result.error)
 
         return audio_chunks
 
@@ -225,7 +230,7 @@ class AudioEngine(IAudioEngine):
         import time
 
         start_time = time.time()
-        print(f"🚀 AudioEngine: Starting parallel processing at {start_time:.2f}")
+        logger.debug("Starting parallel processing at %.2f", start_time)
         return {"start_time": start_time}
 
     def _create_chunk_tasks(self, processed_chunks: list[str]) -> list[Coroutine[Any, Any, Optional[bytes]]]:
@@ -237,7 +242,7 @@ class AudioEngine(IAudioEngine):
             task = self._process_single_chunk_async(chunk, i + 1, len(processed_chunks))
             tasks.append(task)
 
-        print(f"🚀 AudioEngine: Created {len(tasks)} tasks from {len(processed_chunks)} chunks")
+        logger.debug("Created %d tasks from %d chunks", len(tasks), len(processed_chunks))
         return tasks
 
     async def _execute_tasks_with_rate_limiting(
@@ -265,7 +270,7 @@ class AudioEngine(IAudioEngine):
 
         end_time = time.time()
         total_time = end_time - timing_context["start_time"]
-        print(f"⏱️  AudioEngine: Parallel processing completed in {total_time:.2f} seconds")
+        logger.info("Parallel processing completed in %.2f seconds", total_time)
 
         # Filter successful results (immutable) - cast is safe because we filter out non-bytes
         audio_chunks: list[bytes] = [
@@ -277,11 +282,13 @@ class AudioEngine(IAudioEngine):
         # Handle failed chunks logging
         for i, result in enumerate(results):
             if isinstance(result, Exception):
-                print(f"AudioEngine: Chunk {i + 1} failed with exception: {result}")
+                logger.warning("Chunk %d failed with exception: %s", i + 1, result)
 
-        print(
-            f"✅ AudioEngine: Successfully processed {len(audio_chunks)}/"
-            f"{len(processed_chunks)} chunks in {total_time:.2f}s"
+        logger.info(
+            "Successfully processed %d/%d chunks in %.2fs",
+            len(audio_chunks),
+            len(processed_chunks),
+            total_time,
         )
 
         # Calculate and log performance metrics
@@ -289,7 +296,7 @@ class AudioEngine(IAudioEngine):
             avg_time_per_chunk = total_time / len(processed_chunks)
             theoretical_sequential_time = avg_time_per_chunk * len(processed_chunks)
             speedup = theoretical_sequential_time / total_time if total_time > 0 else 1
-            print(f"🔥 Async speedup: {speedup:.1f}x faster than sequential processing")
+            logger.debug("Async speedup: %.1fx faster than sequential processing", speedup)
 
         return audio_chunks
 
@@ -308,7 +315,7 @@ class AudioEngine(IAudioEngine):
         import time
 
         chunk_start = time.time()
-        print(f"🎵 AudioEngine: Starting chunk {chunk_num}/{total_chunks} ({len(chunk)} chars) at {chunk_start:.2f}")
+        logger.debug("Starting chunk %d/%d (%d chars)", chunk_num, total_chunks, len(chunk))
 
         try:
             # Use the new async interface
@@ -317,16 +324,16 @@ class AudioEngine(IAudioEngine):
             chunk_time = chunk_end - chunk_start
 
             if result.is_success and result.value:
-                print(f"✅ Chunk {chunk_num} completed in {chunk_time:.2f}s ({len(result.value)} bytes)")
+                logger.debug("Chunk %d completed in %.2fs (%d bytes)", chunk_num, chunk_time, len(result.value))
                 return result.value
             else:
                 error_msg = result.error if result.is_failure else "No audio data"
-                print(f"❌ Chunk {chunk_num} failed in {chunk_time:.2f}s: {error_msg}")
+                logger.warning("Chunk %d failed in %.2fs: %s", chunk_num, chunk_time, error_msg)
                 return None
         except Exception as e:
             chunk_end = time.time()
             chunk_time = chunk_end - chunk_start
-            print(f"💥 Chunk {chunk_num} exception in {chunk_time:.2f}s: {e}")
+            logger.exception("Chunk %d exception in %.2fs: %s", chunk_num, chunk_time, e)
             return None
 
     def process_audio_file(self, file_path: str) -> Result[float]:
@@ -396,7 +403,7 @@ class AudioEngine(IAudioEngine):
             return output_buffer.getvalue()
 
         except Exception as e:
-            print(f"AudioEngine: Error combining audio chunks: {e}")
+            logger.exception("Error combining audio chunks: %s", e)
             # Fallback: return the first chunk if combination fails
             return audio_chunks[0] if audio_chunks else b""
 
@@ -484,7 +491,7 @@ class AudioEngine(IAudioEngine):
         Async function for backward compatibility - returns tuple directly.
         """
         if not self.tts_engine:
-            print("AudioEngine: No TTS engine available")
+            logger.error("No TTS engine available")
             return [], None
 
         Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -493,10 +500,10 @@ class AudioEngine(IAudioEngine):
         valid_chunks = self._filter_valid_chunks(text_chunks)
 
         if not valid_chunks:
-            print("AudioEngine: No valid chunks to process")
+            logger.warning("No valid chunks to process")
             return [], None
 
-        print(f"AudioEngine: Processing {len(valid_chunks)} valid chunks concurrently")
+        logger.info("Processing %d valid chunks concurrently", len(valid_chunks))
 
         # Generate audio files concurrently
         audio_files = await self._generate_audio_files_concurrent(valid_chunks, output_name, output_dir)
@@ -509,7 +516,7 @@ class AudioEngine(IAudioEngine):
             if result.is_success and result.value:
                 combined_mp3 = Path(result.value).name
             else:
-                print(f"AudioEngine: Failed to create combined MP3: {result.error}")
+                logger.error("Failed to create combined MP3: %s", result.error)
 
         return [Path(f).name for f in audio_files], combined_mp3
 
@@ -549,7 +556,7 @@ class AudioEngine(IAudioEngine):
         audio_files: list[str] = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
-                print(f"AudioEngine: Task {i + 1} failed: {result}")
+                logger.warning("Task %d failed: %s", i + 1, result)
             elif isinstance(result, str) and result and Path(result).exists():
                 audio_files.append(result)
 
@@ -572,26 +579,26 @@ class AudioEngine(IAudioEngine):
                     audio_result = await loop.run_in_executor(None, lambda: future.result())
 
                 if audio_result.is_failure:
-                    print(f"AudioEngine: TTS failed for chunk {chunk_number}: {audio_result.error}")
+                    logger.warning("TTS failed for chunk %d: %s", chunk_number, audio_result.error)
                     return None
 
                 # Validate audio data before saving
                 if not audio_result.value:
-                    print(f"AudioEngine: No audio data for chunk {chunk_number}")
+                    logger.warning("No audio data for chunk %d", chunk_number)
                     return None
 
                 # Save the audio file
                 save_path = self.file_manager.save_output_file(audio_result.value, filename)
 
                 if save_path:
-                    print(f"AudioEngine: Generated chunk {chunk_number}: {filename}")
+                    logger.debug("Generated chunk %d: %s", chunk_number, filename)
                     return save_path
                 else:
-                    print(f"AudioEngine: Failed to save chunk {chunk_number}")
+                    logger.warning("Failed to save chunk %d", chunk_number)
                     return None
 
             except Exception as e:
-                print(f"AudioEngine: Failed to generate chunk {chunk_number}: {e}")
+                logger.exception("Failed to generate chunk %d: %s", chunk_number, e)
                 return None
 
     def _call_tts_engine(self, text: str) -> Result[bytes]:

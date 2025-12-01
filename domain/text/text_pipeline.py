@@ -5,10 +5,13 @@ No exceptions thrown - all errors returned as Result[T].
 """
 
 from abc import ABC, abstractmethod
+import logging
 import re
 from typing import TYPE_CHECKING, Optional
 
 from ..errors import ApplicationError, ErrorCode, Result
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from ..interfaces import ILLMProvider
@@ -57,7 +60,7 @@ class TextPipeline(ITextPipeline):
 
         Returns Result with cleaned text or error.
         """
-        print(f"🔬 TextPipeline.clean_text(): Input {len(raw_text)} chars")
+        logger.debug("TextPipeline.clean_text(): Input %d chars", len(raw_text))
 
         if not raw_text:
             return Result.failure(
@@ -69,9 +72,9 @@ class TextPipeline(ITextPipeline):
         try:
             if not self.enable_cleaning or not self.llm_provider:
                 llm_available = self.llm_provider is not None
-                print(f"   → Using basic cleanup (cleaning={self.enable_cleaning}, llm_provider={llm_available})")
+                logger.debug("Using basic cleanup (cleaning=%s, llm_provider=%s)", self.enable_cleaning, llm_available)
                 result = self._basic_text_cleanup(raw_text)
-                print(f"   → Basic cleanup result: {len(result)} chars")
+                logger.debug("Basic cleanup result: %d chars", len(result))
 
                 # Stage 2: Apply plain English conversion if enabled
                 if self.enable_plain_english and self.llm_provider:
@@ -82,29 +85,29 @@ class TextPipeline(ITextPipeline):
                     plain_result_value = plain_result.value
                     if plain_result_value is not None:
                         result = plain_result_value
-                        print(f"   → Plain English applied: {len(result)} chars")
+                        logger.debug("Plain English applied: %d chars", len(result))
                     else:
-                        print("   → Plain English returned None, keeping original result")
+                        logger.debug("Plain English returned None, keeping original result")
 
                 return Result.success(result)
 
             # Use LLM for advanced cleaning
-            print(f"   → Using LLM cleaning (provider: {type(self.llm_provider).__name__})")
+            logger.debug("Using LLM cleaning (provider: %s)", type(self.llm_provider).__name__)
             cleaning_prompt = self._generate_cleaning_prompt(raw_text)
-            print(f"   → Generated cleaning prompt ({len(cleaning_prompt)} chars)")
+            logger.debug("Generated cleaning prompt (%d chars)", len(cleaning_prompt))
 
-            print("   → Calling LLM API...")
+            logger.debug("Calling LLM API...")
             llm_result = self.llm_provider.generate_content(cleaning_prompt)
 
             if llm_result.is_success:
                 cleaned = llm_result.value
                 cleaned_len = len(cleaned) if cleaned else 0
-                print(f"   → LLM success: {cleaned_len} chars returned")
+                logger.debug("LLM success: %d chars returned", cleaned_len)
                 # Basic validation of LLM output
                 if cleaned and len(cleaned) > len(raw_text) * 0.05:  # At least 5% of original length
-                    print("   → LLM output valid, applying basic cleanup")
+                    logger.debug("LLM output valid, applying basic cleanup")
                     final_result = self._basic_text_cleanup(cleaned)
-                    print(f"   → Basic cleanup complete: {len(final_result)} chars")
+                    logger.debug("Basic cleanup complete: %d chars", len(final_result))
 
                     # Stage 2: Apply plain English conversion if enabled
                     if self.enable_plain_english:
@@ -112,37 +115,37 @@ class TextPipeline(ITextPipeline):
                         if plain_result.is_success and plain_result.value is not None:
                             final_result = plain_result.value
 
-                    print(f"   → Final result: {len(final_result)} chars")
+                    logger.debug("Final result: %d chars", len(final_result))
                     return Result.success(final_result)
                 else:
                     cleaned_len = len(cleaned) if cleaned else 0
-                    print(f"   → LLM output too short ({cleaned_len} chars), trying smaller chunks")
+                    logger.debug("LLM output too short (%d chars), trying smaller chunks", cleaned_len)
             else:
-                print(f"   → LLM failed: {llm_result.error}")
+                logger.warning("LLM failed: %s", llm_result.error)
 
             # If large chunk failed, try processing in smaller pieces
             if len(raw_text) > 15000:
-                print("   → Attempting retry with smaller chunks (15K chars each)")
+                logger.debug("Attempting retry with smaller chunks (15K chars each)")
                 chunk_result = self._process_in_chunks(raw_text)
                 if chunk_result.is_success:
                     return chunk_result
 
             # Final fallback to basic cleaning if all else fails
-            print("   → All attempts failed, using basic cleanup")
+            logger.debug("All attempts failed, using basic cleanup")
             fallback_result = self._basic_text_cleanup(raw_text)
-            print(f"   → Fallback result: {len(fallback_result)} chars")
+            logger.debug("Fallback result: %d chars", len(fallback_result))
 
             # Stage 2: Apply plain English conversion if enabled
             if self.enable_plain_english:
                 plain_result = self._apply_plain_english_conversion(fallback_result)
                 if plain_result.is_success and plain_result.value is not None:
                     fallback_result = plain_result.value
-                    print(f"   → Plain English applied to fallback: {len(fallback_result)} chars")
+                    logger.debug("Plain English applied to fallback: %d chars", len(fallback_result))
 
             return Result.success(fallback_result)
 
         except Exception as e:
-            print(f"   → TextPipeline: Exception during cleaning: {e}")
+            logger.exception("TextPipeline: Exception during cleaning: %s", e)
             # Even on exception, try to return basic cleaned text
             try:
                 fallback = self._basic_text_cleanup(raw_text)
@@ -169,7 +172,7 @@ class TextPipeline(ITextPipeline):
 
             # Check if async method is available
             if not hasattr(self.llm_provider, "generate_content_async"):
-                print("TextPipeline: Async cleaning not available, using sync method")
+                logger.debug("Async cleaning not available, using sync method")
                 return self.clean_text(raw_text)
 
             # Use async LLM for advanced cleaning with rate limiting
@@ -188,7 +191,7 @@ class TextPipeline(ITextPipeline):
             return Result.success(fallback)
 
         except Exception as e:
-            print(f"TextPipeline: Async LLM cleaning failed: {e}")
+            logger.exception("Async LLM cleaning failed: %s", e)
             try:
                 fallback = self._basic_text_cleanup(raw_text)
                 return Result.success(fallback)
@@ -218,7 +221,7 @@ class TextPipeline(ITextPipeline):
 
         except Exception as e:
             # On error, return original text
-            print(f"TextPipeline: Enhancement failed: {e}")
+            logger.exception("Enhancement failed: %s", e)
             return Result.success(text)
 
     def split_into_sentences(self, text: str) -> Result[list[str]]:
@@ -258,7 +261,7 @@ class TextPipeline(ITextPipeline):
 
             for i in range(0, len(raw_text), chunk_size):
                 chunk = raw_text[i : i + chunk_size]
-                print(f"     → Processing sub-chunk {i // chunk_size + 1} ({len(chunk)} chars)")
+                logger.debug("Processing sub-chunk %d (%d chars)", i // chunk_size + 1, len(chunk))
 
                 sub_prompt = self._generate_cleaning_prompt(chunk)
                 if self.llm_provider is not None:
@@ -266,19 +269,19 @@ class TextPipeline(ITextPipeline):
 
                     if sub_result.is_success and sub_result.value is not None:
                         cleaned_parts.append(sub_result.value)
-                        print(f"     → Sub-chunk success: {len(sub_result.value)} chars")
+                        logger.debug("Sub-chunk success: %d chars", len(sub_result.value))
                     else:
                         # Use basic cleanup for failed sub-chunks
                         cleaned_parts.append(self._basic_text_cleanup(chunk))
-                        print("     → Sub-chunk failed, using basic cleanup")
+                        logger.debug("Sub-chunk failed, using basic cleanup")
                 else:
                     # No LLM provider available
                     cleaned_parts.append(self._basic_text_cleanup(chunk))
-                    print("     → No LLM provider, using basic cleanup")
+                    logger.debug("No LLM provider, using basic cleanup")
 
             if cleaned_parts:
                 combined_result = " ".join(cleaned_parts)
-                print(f"   → Combined sub-chunks: {len(combined_result)} chars")
+                logger.debug("Combined sub-chunks: %d chars", len(combined_result))
                 final_result = self._basic_text_cleanup(combined_result)
 
                 # Stage 2: Apply plain English conversion if enabled
@@ -407,36 +410,36 @@ Text to convert:
         Returns Result with converted text or original on failure.
         """
         if not self.llm_provider:
-            print("   → Plain English: No LLM provider available, skipping conversion")
+            logger.debug("Plain English: No LLM provider available, skipping conversion")
             return Result.success(text)
 
-        print(f"   → Plain English: Converting {len(text)} chars")
+        logger.debug("Plain English: Converting %d chars", len(text))
 
         try:
             # For very large texts, process in chunks
             if len(text) > 15000:
-                print("   → Plain English: Processing in chunks")
+                logger.debug("Plain English: Processing in chunks")
                 chunk_size = 15000
                 converted_parts = []
 
                 for i in range(0, len(text), chunk_size):
                     chunk = text[i : i + chunk_size]
-                    print(f"     → Plain English chunk {i // chunk_size + 1} ({len(chunk)} chars)")
+                    logger.debug("Plain English chunk %d (%d chars)", i // chunk_size + 1, len(chunk))
 
                     chunk_prompt = self._generate_plain_english_prompt(chunk)
                     chunk_result = self.llm_provider.generate_content(chunk_prompt)
 
                     if chunk_result.is_success and chunk_result.value:
                         converted_parts.append(chunk_result.value)
-                        print(f"     → Plain English chunk success: {len(chunk_result.value)} chars")
+                        logger.debug("Plain English chunk success: %d chars", len(chunk_result.value))
                     else:
                         # Use original chunk if conversion fails
                         converted_parts.append(chunk)
-                        print("     → Plain English chunk failed, using original")
+                        logger.debug("Plain English chunk failed, using original")
 
                 if converted_parts:
                     combined_result = " ".join(converted_parts)
-                    print(f"   → Plain English: Combined chunks: {len(combined_result)} chars")
+                    logger.debug("Plain English: Combined chunks: %d chars", len(combined_result))
                     return Result.success(combined_result)
             else:
                 # Process whole text
@@ -446,20 +449,20 @@ Text to convert:
                 if result.is_success and result.value:
                     # Basic validation - converted text should be reasonable length
                     if len(result.value) > len(text) * 0.3:  # At least 30% of original
-                        print(f"   → Plain English: Success: {len(result.value)} chars")
+                        logger.debug("Plain English: Success: %d chars", len(result.value))
                         return Result.success(result.value)
                     else:
-                        print(f"   → Plain English: Result too short ({len(result.value)} chars), using original")
+                        logger.debug("Plain English: Result too short (%d chars), using original", len(result.value))
                 else:
                     error_msg = result.error if hasattr(result, "error") else "Unknown error"
-                    print(f"   → Plain English: LLM failed: {error_msg}")
+                    logger.warning("Plain English: LLM failed: %s", error_msg)
 
             # Fallback to original text if conversion fails
-            print("   → Plain English: Using original text as fallback")
+            logger.debug("Plain English: Using original text as fallback")
             return Result.success(text)
 
         except Exception as e:
-            print(f"   → Plain English: Exception during conversion: {e}")
+            logger.exception("Plain English: Exception during conversion: %s", e)
             return Result.success(text)
 
     def _enhance_with_natural_formatting(self, text: str) -> str:

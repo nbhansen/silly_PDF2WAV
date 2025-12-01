@@ -41,16 +41,17 @@ class ApplicationContext:
     @property
     def is_processor_available(self) -> bool:
         """Check if PDF processing service is available."""
+        logger = logging.getLogger(__name__)
         try:
             # Check if we can get an audio engine (main processing component)
             from domain.audio.audio_engine import IAudioEngine
 
             audio_service = self.service_container.get(IAudioEngine)
             result = audio_service is not None
-            print(f"DEBUG: Audio service check - service={audio_service}, result={result}")
+            logger.debug("Audio service check - service=%s, result=%s", audio_service, result)
             return result
         except Exception as e:
-            print(f"DEBUG: Audio service check failed: {e}")
+            logger.debug("Audio service check failed: %s", e)
             return False
 
     @property

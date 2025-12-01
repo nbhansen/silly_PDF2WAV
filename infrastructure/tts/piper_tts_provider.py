@@ -329,9 +329,9 @@ class PiperTTSProvider(ITTSEngine):  # FIXED: Only implement ITTSEngine
                 (":" + env.get("LD_LIBRARY_PATH", "")) if env.get("LD_LIBRARY_PATH") else ""
             )
 
-            print(f"🔍 PIPER COMMAND: {' '.join(cmd)}")
-            print(f"🔍 PIPER ENV LD_LIBRARY_PATH: {env.get('LD_LIBRARY_PATH')}")
-            print(f"🔍 PIPER INPUT LENGTH: {len(text)} chars")
+            logger.debug("PIPER COMMAND: %s", ' '.join(cmd))
+            logger.debug("PIPER ENV LD_LIBRARY_PATH: %s", env.get('LD_LIBRARY_PATH'))
+            logger.debug("PIPER INPUT LENGTH: %d chars", len(text))
             process = subprocess.run(cmd, input=text, capture_output=True, text=True, timeout=timeout, env=env)
 
             if process.returncode != 0:
@@ -342,7 +342,7 @@ class PiperTTSProvider(ITTSEngine):  # FIXED: Only implement ITTSEngine
                     f"Env LD_LIBRARY_PATH: {env.get('LD_LIBRARY_PATH', 'not set')}\n"
                     f"Input text length: {len(text)}\nFirst 200 chars: {text[:200]!r}"
                 )
-                print(f"🔍 PIPER DEBUG: {error_msg}")
+                logger.error("PIPER DEBUG: %s", error_msg)
                 raise Exception(error_msg)
 
             if Path(temp_path).exists():

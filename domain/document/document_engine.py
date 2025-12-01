@@ -7,6 +7,7 @@ No exceptions thrown - all errors returned as Result[T].
 from abc import ABC, abstractmethod
 from contextlib import suppress
 import io
+import logging
 from typing import TYPE_CHECKING, Any, Optional
 
 import pdfplumber
@@ -23,6 +24,8 @@ from ..models import PageRange, PDFInfo, ProcessingRequest, TimedAudioResult
 if TYPE_CHECKING:
     from ..audio.audio_engine import IAudioEngine
     from ..text.text_pipeline import ITextPipeline
+
+logger = logging.getLogger(__name__)
 
 
 class IDocumentEngine(ABC):
@@ -62,7 +65,7 @@ class DocumentEngine(IDocumentEngine):
         self.ocr_provider = ocr_provider
         self.file_manager = file_manager
         self.min_text_threshold = min_text_threshold
-        print("DocumentEngine initialized with Result[T] pattern.")
+        logger.debug("DocumentEngine initialized with Result[T] pattern")
 
     def get_pdf_info(self, pdf_path: str) -> Result[PDFInfo]:
         """Get PDF information - delegates to OCR provider."""
@@ -108,7 +111,7 @@ class DocumentEngine(IDocumentEngine):
             return Result.success(extracted_text)
 
         except Exception as e:
-            print(f"DocumentEngine: Error extracting text from {pdf_path}: {e}")
+            logger.exception("Error extracting text from %s: %s", pdf_path, e)
             return Result.from_exception(e, ErrorCode.TEXT_EXTRACTION_FAILED, retryable=True)
 
     def process_document(
@@ -150,7 +153,7 @@ class DocumentEngine(IDocumentEngine):
 
     def _extract_initial_text(self, request: ProcessingRequest) -> Result[list[str]]:
         """Extract and validate text from PDF with page range conversion."""
-        print(f"DocumentEngine: Starting processing for {request.pdf_path}")
+        logger.info("Starting processing for %s", request.pdf_path)
 
         # Convert page range to page list
         pages_result = self._convert_page_range_to_list(request.pdf_path, request.page_range)
@@ -165,48 +168,48 @@ class DocumentEngine(IDocumentEngine):
 
         text_chunks = text_result.value
         if not text_chunks:
-            print("DocumentEngine: No text extracted from PDF")
+            logger.warning("No text extracted from PDF")
             return Result.failure(text_extraction_error("No text could be extracted from the PDF"))
 
-        print(f"DocumentEngine: Extracted {len(text_chunks)} text chunks")
+        logger.info("Extracted %d text chunks", len(text_chunks))
         return Result.success(text_chunks)
 
     def _process_text_pipeline(
         self, text_chunks: list[str], text_pipeline: "ITextPipeline", llm_chunk_size: int
     ) -> Result[list[str]]:
         """Process text through LLM cleaning and optimization pipeline."""
-        print(f"🔬 DocumentEngine: Using optimized chunking strategy (LLM chunk size: {llm_chunk_size})")
+        logger.debug("Using optimized chunking strategy (LLM chunk size: %d)", llm_chunk_size)
 
         try:
             # Step 1: Combine chunks for LLM processing
             combined_chunks = self._combine_chunks_for_llm(text_chunks, llm_chunk_size)
-            print(f"   → Combined {len(text_chunks)} original chunks into {len(combined_chunks)} LLM chunks")
+            logger.debug("Combined %d original chunks into %d LLM chunks", len(text_chunks), len(combined_chunks))
 
             # Step 2: Process through LLM cleaning
             cleaned_chunks = []
             for i, combined_chunk in enumerate(combined_chunks, 1):
-                print(
-                    f"🔬 DocumentEngine: Processing LLM chunk {i}/{len(combined_chunks)} ({len(combined_chunk)} chars)"
+                logger.debug(
+                    "Processing LLM chunk %d/%d (%d chars)", i, len(combined_chunks), len(combined_chunk)
                 )
-                print(f"   Combined text preview: '{combined_chunk[:100]}...'")
+                logger.debug("Combined text preview: '%s...'", combined_chunk[:100])
 
-                print("   → Calling text_pipeline.clean_text()...")
+                logger.debug("Calling text_pipeline.clean_text()...")
                 clean_result = text_pipeline.clean_text(combined_chunk)
                 if clean_result.is_failure:
                     return Result.failure(clean_result.error)  # type: ignore[arg-type]
 
                 cleaned = clean_result.value
                 if cleaned is not None:
-                    print(f"   → Cleaned text ({len(cleaned)} chars): '{cleaned[:100]}...'")
+                    logger.debug("Cleaned text (%d chars): '%s...'", len(cleaned), cleaned[:100])
                     cleaned_chunks.append(cleaned)
                 else:
-                    print("   → Cleaning returned None, skipping chunk")
+                    logger.debug("Cleaning returned None, skipping chunk")
 
             # Step 3: Re-combine all cleaned text and enhance with natural formatting
             all_cleaned_text = " ".join(cleaned_chunks)
-            print(f"   → Combined all cleaned text: {len(all_cleaned_text)} chars total")
+            logger.debug("Combined all cleaned text: %d chars total", len(all_cleaned_text))
 
-            print("   → Calling text_pipeline.enhance_with_natural_formatting() on combined text...")
+            logger.debug("Calling text_pipeline.enhance_with_natural_formatting() on combined text...")
             enhance_result = text_pipeline.enhance_with_natural_formatting(all_cleaned_text)
             if enhance_result.is_failure:
                 return Result.failure(enhance_result.error)  # type: ignore[arg-type]
@@ -214,15 +217,15 @@ class DocumentEngine(IDocumentEngine):
             enhanced_text = enhance_result.value
             if enhanced_text is None:
                 return Result.failure(text_extraction_error("Text enhancement returned None"))
-            print(f"   → Enhanced text ({len(enhanced_text)} chars): '{enhanced_text[:100]}...'")
+            logger.debug("Enhanced text (%d chars): '%s...'", len(enhanced_text), enhanced_text[:100])
 
             # Step 4: Split enhanced text back into optimal chunks for TTS
             processed_chunks = self._split_for_tts(enhanced_text)
-            print(f"   → Split enhanced text into {len(processed_chunks)} TTS-optimized chunks")
+            logger.debug("Split enhanced text into %d TTS-optimized chunks", len(processed_chunks))
 
-            print(
-                f"DocumentEngine: Processed through optimized pipeline: "
-                f"{len(text_chunks)} → {len(combined_chunks)} → {len(processed_chunks)} chunks"
+            logger.info(
+                "Processed through optimized pipeline: %d -> %d -> %d chunks",
+                len(text_chunks), len(combined_chunks), len(processed_chunks)
             )
 
             return Result.success(processed_chunks)
@@ -236,20 +239,20 @@ class DocumentEngine(IDocumentEngine):
         """Generate audio using appropriate strategy based on timing requirements."""
         try:
             if enable_timing:
-                print("DocumentEngine: Using timing-aware audio generation")
+                logger.debug("Using timing-aware audio generation")
                 audio_result = audio_engine.generate_with_timing(processed_chunks, output_name)
             else:
-                print("DocumentEngine: Using simple audio generation (no timing complexity)")
+                logger.debug("Using simple audio generation (no timing complexity)")
                 audio_result = audio_engine.generate_simple_audio(processed_chunks, output_name)
 
-            print(f"🔍 DEBUG: audio_result={audio_result}")
+            logger.debug("audio_result=%s", audio_result)
 
             if audio_result.is_failure:
                 return audio_result
 
             timed_result = audio_result.value
             if timed_result:
-                print(f"🔍 DEBUG: timed_result.audio_files={timed_result.audio_files}")
+                logger.debug("timed_result.audio_files=%s", timed_result.audio_files)
 
             if not timed_result or not timed_result.audio_files:
                 return Result.failure(audio_generation_error("Audio generation failed to produce files"))
@@ -287,7 +290,7 @@ class DocumentEngine(IDocumentEngine):
 
             # If direct extraction is poor, try OCR fallback
             if not text or len(text.strip()) < self.min_text_threshold:
-                print(f"DocumentEngine: Page {page_num} has low text quality, using OCR")
+                logger.debug("Page %d has low text quality, using OCR", page_num)
                 ocr_result = self._ocr_page(page)
 
                 if ocr_result.is_success and ocr_result.value is not None:
@@ -321,11 +324,11 @@ class DocumentEngine(IDocumentEngine):
             if ocr_result.is_success:
                 return Result.success(ocr_result.value or "")
             else:
-                print(f"DocumentEngine: OCR provider failed: {ocr_result.error}")
+                logger.warning("OCR provider failed: %s", ocr_result.error)
                 return Result.success("")  # Return empty string on OCR failure, not an error
 
         except Exception as e:
-            print(f"DocumentEngine: OCR failed for page: {e}")
+            logger.exception("OCR failed for page: %s", e)
             return Result.success("")  # Return empty string on failure
 
         finally:
@@ -413,7 +416,7 @@ class DocumentEngine(IDocumentEngine):
 
         # Fallback: if no chunks created, split by character count
         if not chunks and text.strip():
-            print("   → Sentence splitting failed, using character-based fallback")
+            logger.debug("Sentence splitting failed, using character-based fallback")
             for i in range(0, len(text), target_chunk_size):
                 chunk = text[i : i + target_chunk_size]
                 if chunk.strip():
