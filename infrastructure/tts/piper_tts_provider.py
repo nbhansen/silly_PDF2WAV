@@ -286,7 +286,8 @@ class PiperTTSProvider(ITTSEngine):  # FIXED: Only implement ITTSEngine
             if self.model_path is None:
                 raise ValueError("Piper model path is not configured")
             self.voice_instance = PiperVoice.load(self.model_path, config_path=self.config_path)
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to initialize Piper Python library: %s", e)
             self.voice_instance = None
 
     def _generate_with_python_lib(self, text: str) -> bytes:
@@ -307,7 +308,8 @@ class PiperTTSProvider(ITTSEngine):  # FIXED: Only implement ITTSEngine
 
             return audio_data
 
-        except Exception:
+        except Exception as e:
+            logger.debug("Python library generation failed, falling back to command line: %s", e)
             return self._generate_with_command_line(text)
 
     def _generate_with_command_line(self, text: str) -> bytes:
