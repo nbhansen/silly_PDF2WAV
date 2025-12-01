@@ -77,8 +77,15 @@ class TestPiperTTSProviderInitialization:
         assert provider.model_path and Path(provider.model_path).is_absolute()
         assert provider.config_path and Path(provider.config_path).is_absolute()
 
-    def test_init_with_missing_model_files(self, temp_models_dir: str) -> None:
-        """Should raise FileNotFoundError for missing model files."""
+    @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
+    @patch("subprocess.run")
+    def test_init_with_missing_model_files_defers_error(
+        self, mock_run: Mock, temp_models_dir: str
+    ) -> None:
+        """Should defer error for missing model files to generate_audio_data call."""
+        # Make Piper command line available so it proceeds to model check
+        mock_run.return_value = Mock(returncode=0)
+
         config = PiperConfig(
             model_name="en_US-lessac-medium",
             model_path="/nonexistent/model.onnx",
@@ -86,8 +93,20 @@ class TestPiperTTSProviderInitialization:
             download_dir=temp_models_dir,
         )
 
-        with pytest.raises(FileNotFoundError, match="Model file not found"):
-            PiperTTSProvider(config)
+        # Init should NOT raise - uses deferred error pattern
+        provider = PiperTTSProvider(config)
+
+        # Error should be stored for later
+        assert provider._initialization_error is not None
+        assert "not found" in provider._initialization_error.lower()
+
+        # Error should be returned on first generate call
+        result = provider.generate_audio_data("Test text")
+        assert result.is_failure
+        assert result.error is not None
+        # Error details should contain the actual error message
+        error_details = result.error.details or ""
+        assert "not found" in error_details.lower()
 
     def test_init_with_custom_project_root(self, basic_piper_config: PiperConfig) -> None:
         """Should accept custom project root for secure binary lookup."""
