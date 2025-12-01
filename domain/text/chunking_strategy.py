@@ -2,6 +2,49 @@
 """Text chunking strategies using Result[T] pattern for error handling.
 
 No exceptions thrown - all errors returned as Result[T].
+
+Algorithm Overview
+==================
+
+The chunking system splits text into optimal sizes for TTS processing while
+preserving natural speech boundaries. Two strategies are available:
+
+SentenceBasedChunking (default)
+-------------------------------
+Priority: Preserve sentence boundaries for natural speech flow.
+
+Algorithm:
+1. For each input text chunk:
+   a. If chunk <= max_chunk_size, keep as-is
+   b. If chunk > max_chunk_size, split on sentence boundaries using regex:
+      - Pattern: r'(?<=[.!?])\\s+' (split after .!? followed by whitespace)
+   c. Accumulate sentences into sub-chunks up to max_chunk_size
+   d. If a single sentence > max_chunk_size, fall back to word-based splitting
+
+Word-splitting fallback:
+   - Used when individual sentences exceed max_chunk_size
+   - Splits on whitespace boundaries
+   - Accumulates words until approaching max_chunk_size
+   - Preserves word integrity (no mid-word splits)
+
+WordBasedChunking
+-----------------
+Priority: Strict size limits over sentence preservation.
+
+Algorithm:
+1. For each input text chunk:
+   a. Split all text into individual words
+   b. Accumulate words into chunks up to max_chunk_size
+   c. Start new chunk when adding a word would exceed limit
+
+Trade-offs:
+- SentenceBasedChunking: Better speech quality, may produce slightly larger chunks
+- WordBasedChunking: Stricter size control, may break mid-sentence
+
+Configuration:
+- max_chunk_size: Target maximum characters per chunk (recommended: 2000-5000)
+- Smaller chunks = more TTS calls but better memory usage
+- Larger chunks = fewer calls but may hit TTS API limits
 """
 
 from abc import ABC, abstractmethod

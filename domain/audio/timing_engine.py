@@ -2,6 +2,54 @@
 """Timing engine using Result[T] pattern for type-safe error handling.
 
 No exceptions thrown - all errors returned as Result[T].
+
+Timing Algorithm Overview
+=========================
+
+The timing engine generates word-level timestamps for read-along synchronization.
+Two modes are available depending on TTS engine capabilities:
+
+Estimation Mode (default)
+-------------------------
+Used when TTS engine doesn't provide native timestamps (e.g., Piper TTS).
+
+Algorithm:
+1. Generate audio for entire text chunk
+2. Get total audio duration from WAV header
+3. Split text into sentences, then words
+4. Estimate word timings using character-weighted distribution:
+   - word_duration = (word_chars / total_chars) * total_duration
+   - Accounts for punctuation pauses (adds small delay after . ! ?)
+5. Generate TextSegment objects with estimated start_time and duration
+
+Estimation formula:
+   characters_per_second = total_chars / total_duration
+   word_duration = len(word) / characters_per_second
+   pause_after = 0.3 if word ends with [.!?] else 0.1
+
+Measurement Mode
+----------------
+Used when TTS engine provides native word timestamps (e.g., some cloud APIs).
+
+Algorithm:
+1. Call TTS engine's generate_audio_with_timestamps() method
+2. Extract native timestamp data from response
+3. Map timestamps directly to TextSegment objects
+4. No estimation needed - uses actual audio timings
+
+Trade-offs:
+- Estimation: Works with any TTS, ~10-15% timing variance, faster processing
+- Measurement: Precise timings, requires API support, may have rate limits
+
+Configuration:
+- mode: TimingMode.ESTIMATION or TimingMode.MEASUREMENT
+- measurement_interval: Batch size for measurement mode (seconds between batches)
+
+Output:
+- TimedAudioResult containing:
+  - audio_files: List of generated audio file paths
+  - combined_mp3: Path to combined audio file (if multiple chunks)
+  - timing_data: TimingMetadata with word-level TextSegments
 """
 
 from abc import ABC, abstractmethod
