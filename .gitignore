@@ -136,6 +136,7 @@ llm_tts_cleaned_chunk_*_debug.txt
 .local/
 .cache/
 .data/
+chroma_data/
 
 # --------------------------------------
 # Node.js (if using any frontend tools)
