@@ -1,5 +1,69 @@
 # application/config/system_config.py
-"""Refactored SystemConfig using composition of specialized configs."""
+"""SystemConfig - Central configuration management using composition.
+
+Configuration Hierarchy
+=======================
+
+SystemConfig is the single source of truth for all application settings.
+It uses composition of specialized config classes for separation of concerns.
+
+Config Structure (from config.yaml):
+------------------------------------
+tts:                    # TTSConfig - TTS engine selection and rate limiting
+  engine: "piper"       # "piper" (local) or "gemini" (cloud)
+  concurrent_requests   # Max parallel TTS requests
+  request_delay_seconds # Delay between requests (rate limiting)
+
+piper:                  # PiperConfig - Piper-specific settings
+  model_name            # Voice model (e.g., "en_US-lessac-medium")
+  download_dir          # Where to store downloaded models
+  length_scale          # Speech speed (1.0 = normal)
+
+gemini:                 # GeminiConfig - Gemini API settings (optional)
+  api_key               # API key (or set GEMINI_API_KEY env var)
+  model_name            # Model to use
+  use_measurement_mode  # Use precise timing vs estimation
+
+files:                  # FileConfig - File storage paths
+  upload_folder         # Where uploaded PDFs go
+  audio_folder          # Where generated audio goes
+  max_file_size_mb      # Upload size limit
+
+cleanup:                # FileCleanupConfig - Auto-cleanup scheduler
+  enabled               # Enable/disable cleanup
+  max_age_seconds       # Delete files older than this
+  check_interval_seconds # How often to check
+
+text_processing:        # TextProcessingConfig - Text pipeline settings
+  enable_cleaning       # Use LLM for text cleaning
+  enable_natural_formatting # Add speech pauses
+  enable_plain_english  # Simplify language
+  llm_chunk_size        # Chunk size for LLM processing
+
+performance:            # PerformanceConfig - Processing optimization
+  enable_async          # Use async TTS processing
+  audio_target_chunk_size # Target chars per audio chunk
+
+flask:                  # FlaskConfig - Web server settings
+  host, port, debug
+
+ocr:                    # OCRConfig - Tesseract settings
+  language, dpi, psm
+
+llm:                    # LLMConfig - LLM provider settings
+  model_name, max_tokens, temperature
+
+Dependencies
+------------
+- tts.engine determines which of piper/gemini config is active
+- text_processing.enable_cleaning requires llm config
+- cleanup requires files config (uses same folders)
+
+Environment Variables
+---------------------
+- GEMINI_API_KEY: API key for Gemini (alternative to config file)
+- FLASK_DEBUG: Override flask.debug setting
+"""
 
 from dataclasses import dataclass
 import os
