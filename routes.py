@@ -230,15 +230,6 @@ def _execute_document_processing_with_progress(
         update_progress(operation_id, "audio_generation", 60, "Generating audio from text...")
 
         # Use document engine for complete processing
-        # Type assertions for mypy
-        from domain.audio.audio_engine import IAudioEngine
-        from domain.document.document_engine import IDocumentEngine
-        from domain.text.text_pipeline import ITextPipeline
-
-        assert isinstance(services.document_engine, IDocumentEngine)
-        assert isinstance(services.audio_engine, IAudioEngine)
-        assert isinstance(text_pipeline, ITextPipeline)
-
         # The actual heavy processing happens here
         processing_result = services.document_engine.process_document(
             request_obj, services.audio_engine, text_pipeline, enable_timing, config.text_processing.llm_chunk_size
@@ -872,10 +863,6 @@ def _process_uploaded_file(uploaded_file: FileStorage, request_form: object) -> 
     if not page_range.is_full_document():
         services = _configure_processing_services()
         document_engine = services.document_engine
-        # Type assertion for mypy
-        from domain.document.document_engine import IDocumentEngine
-
-        assert isinstance(document_engine, IDocumentEngine)
         validation_result = document_engine.validate_page_range(str(pdf_path), page_range)
         if validation_result.is_failure:
             # Clean up file before returning error
@@ -981,14 +968,6 @@ def _execute_document_processing(
         get_logger("routes").info("Created custom TextPipeline with plain English conversion enabled")
 
     # Use document engine for complete processing
-    # Type assertions for mypy
-    from domain.audio.audio_engine import IAudioEngine
-    from domain.document.document_engine import IDocumentEngine
-    from domain.text.text_pipeline import ITextPipeline
-
-    assert isinstance(services.document_engine, IDocumentEngine)
-    assert isinstance(services.audio_engine, IAudioEngine)
-    assert isinstance(text_pipeline, ITextPipeline)
     processing_result = services.document_engine.process_document(
         request_obj, services.audio_engine, text_pipeline, enable_timing, config.text_processing.llm_chunk_size
     )
