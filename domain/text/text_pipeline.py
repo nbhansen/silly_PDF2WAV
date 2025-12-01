@@ -55,6 +55,16 @@ class TextPipeline(ITextPipeline):
         self.enable_natural_formatting = enable_natural_formatting
         self.enable_plain_english = enable_plain_english
 
+    def _maybe_apply_plain_english(self, text: str) -> str:
+        """Apply plain English conversion if enabled, returning original on failure."""
+        if not self.enable_plain_english or not self.llm_provider:
+            return text
+        plain_result = self._apply_plain_english_conversion(text)
+        if plain_result.is_success and plain_result.value is not None:
+            logger.debug("Plain English applied: %d chars", len(plain_result.value))
+            return plain_result.value
+        return text
+
     def clean_text(self, raw_text: str) -> Result[str]:
         """Clean and prepare text for TTS processing.
 
@@ -75,20 +85,7 @@ class TextPipeline(ITextPipeline):
                 logger.debug("Using basic cleanup (cleaning=%s, llm_provider=%s)", self.enable_cleaning, llm_available)
                 result = self._basic_text_cleanup(raw_text)
                 logger.debug("Basic cleanup result: %d chars", len(result))
-
-                # Stage 2: Apply plain English conversion if enabled
-                if self.enable_plain_english and self.llm_provider:
-                    plain_result = self._apply_plain_english_conversion(result)
-                    if plain_result.is_failure:
-                        # Fall back to basic cleaned text if plain English fails
-                        return Result.success(result)
-                    plain_result_value = plain_result.value
-                    if plain_result_value is not None:
-                        result = plain_result_value
-                        logger.debug("Plain English applied: %d chars", len(result))
-                    else:
-                        logger.debug("Plain English returned None, keeping original result")
-
+                result = self._maybe_apply_plain_english(result)
                 return Result.success(result)
 
             # Use LLM for advanced cleaning
@@ -108,13 +105,7 @@ class TextPipeline(ITextPipeline):
                     logger.debug("LLM output valid, applying basic cleanup")
                     final_result = self._basic_text_cleanup(cleaned)
                     logger.debug("Basic cleanup complete: %d chars", len(final_result))
-
-                    # Stage 2: Apply plain English conversion if enabled
-                    if self.enable_plain_english:
-                        plain_result = self._apply_plain_english_conversion(final_result)
-                        if plain_result.is_success and plain_result.value is not None:
-                            final_result = plain_result.value
-
+                    final_result = self._maybe_apply_plain_english(final_result)
                     logger.debug("Final result: %d chars", len(final_result))
                     return Result.success(final_result)
                 else:
@@ -134,14 +125,7 @@ class TextPipeline(ITextPipeline):
             logger.debug("All attempts failed, using basic cleanup")
             fallback_result = self._basic_text_cleanup(raw_text)
             logger.debug("Fallback result: %d chars", len(fallback_result))
-
-            # Stage 2: Apply plain English conversion if enabled
-            if self.enable_plain_english:
-                plain_result = self._apply_plain_english_conversion(fallback_result)
-                if plain_result.is_success and plain_result.value is not None:
-                    fallback_result = plain_result.value
-                    logger.debug("Plain English applied to fallback: %d chars", len(fallback_result))
-
+            fallback_result = self._maybe_apply_plain_english(fallback_result)
             return Result.success(fallback_result)
 
         except Exception as e:
