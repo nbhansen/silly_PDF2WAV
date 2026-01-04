@@ -1,0 +1,98 @@
+# PDF to Audio Converter - Configuration
+# Copy this file to config.yaml and customize it
+
+# TTS Configuration
+tts:
+  # Engine selection: "piper" (local, recommended) or "gemini" (cloud)
+  engine: "piper"
+  
+  # Rate limiting and concurrency
+  concurrent_requests: 4
+  request_delay_seconds: 2.0
+
+  # Piper TTS Settings (Local)
+  piper:
+    # Voice model to use
+    # Common options: en_US-lessac-medium, en_GB-alba-medium, en_US-ryan-high
+    model_name: "en_US-lessac-medium"
+    
+    # Directory to store voice models
+    models_dir: ".local/piper_models"
+    download_dir: "piper_models"
+    
+    # Use GPU if available (faster generation)
+    use_gpu: true
+    
+    # Speech speed (1.0 = normal, 0.8 = slower, 1.2 = faster)
+    length_scale: 1.0
+    
+    # Advanced audio settings
+    noise_scale: 0.667
+    noise_w: 0.8
+    sentence_silence: 0.2
+
+  # Gemini TTS Settings (Cloud)
+  gemini:
+    voice_name: "Kore"
+    model_name: "gemini-2.5-flash"
+    max_retries: 3
+
+# Text Processing Pipeline
+text_processing:
+  # Use LLM to clean and fix OCR errors
+  enable_text_cleaning: true
+  
+  # Add natural pauses (...) for better speech rhythm
+  enable_natural_formatting: true
+  
+  # Convert academic text to plain English (optional)
+  enable_plain_english_conversion: false
+  
+  # Chunk sizes for processing
+  chunk_size: 20000
+  llm_chunk_size: 50000
+  audio_target_chunk_size: 3000
+
+# File Storage Settings
+files:
+  upload_folder: "uploads"
+  audio_folder: "audio_outputs"
+  max_file_size_mb: 100
+  
+  # Auto-cleanup settings
+  cleanup:
+    enabled: true
+    max_file_age_hours: 24.0        # Delete files older than 24 hours
+    auto_cleanup_interval_hours: 6.0 # Run cleanup every 6 hours
+    max_disk_usage_mb: 1000          # Keep total storage under 1GB
+
+# Performance Tuning
+performance:
+  enable_async_audio: true
+  # Number of audio chunks to generate in parallel
+  # Higher = faster but more CPU/RAM usage
+  audio_concurrent_chunks: 4
+
+# Web Server Settings
+app:
+  debug: true
+  host: "127.0.0.1"
+  port: 5000
+
+# Secrets and API Keys
+secrets:
+  # Required for Text Cleaning and Gemini TTS
+  # Get one at: https://aistudio.google.com/app/apikey
+  google_ai_api_key: "YOUR_GOOGLE_AI_API_KEY"
+
+# OCR Settings (Tesseract)
+ocr:
+  dpi: 300
+  language: "eng"
+  threshold: 180
+
+# LLM Provider Settings (for text cleaning)
+llm:
+  model_name: "gemini-2.5-flash"
+  concurrent_requests: 3
+  request_delay_seconds: 0.5
