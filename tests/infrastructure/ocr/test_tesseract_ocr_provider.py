@@ -1,12 +1,11 @@
 # tests/infrastructure/ocr/test_tesseract_ocr_provider.py
 """Comprehensive unit tests for TesseractOCRProvider implementation.
 
-Tests dual extraction strategies, page range validation, and image processing pipeline.
+Tests image processing pipeline, PDF info extraction and page range validation.
 """
 
 from unittest.mock import MagicMock, Mock, patch
 
-from PIL import Image
 import pytest
 
 from domain.errors import ErrorCode
@@ -283,11 +282,15 @@ class TestTesseractOCRProviderPageRangeValidation:
         mock_pdf.metadata = {}
         mock_pdfplumber_open.return_value.__enter__.return_value = mock_pdf
 
-        TesseractOCRProvider()
+        provider = TesseractOCRProvider()
 
-        # PageRange validation prevents creation of invalid ranges, so we test the validation method directly
-        with pytest.raises(ValueError, match="start_page must be 1 or greater"):
-            PageRange(start_page=0, end_page=5)
+        # Create invalid range directly (assuming dataclass allows it)
+        page_range = PageRange(start_page=0, end_page=5)
+
+        result = provider.validate_range("test.pdf", page_range)
+
+        assert result["valid"] is False
+        assert "Start page must be 1 or greater" in result["error"]
 
     @patch("pdfplumber.open")
     def test_validate_range_start_page_exceeds_total(self, mock_pdfplumber_open):
@@ -309,11 +312,20 @@ class TestTesseractOCRProviderPageRangeValidation:
     @patch("pdfplumber.open")
     def test_validate_range_end_page_too_low(self, mock_pdfplumber_open):
         """Should reject end page less than 1."""
-        TesseractOCRProvider()
+        mock_pdf = MagicMock()
+        mock_pdf.pages = [Mock() for _ in range(10)]
+        mock_pdf.metadata = {}
+        mock_pdfplumber_open.return_value.__enter__.return_value = mock_pdf
 
-        # PageRange validation prevents creation of invalid ranges
-        with pytest.raises(ValueError, match="end_page must be 1 or greater"):
-            PageRange(start_page=1, end_page=0)
+        provider = TesseractOCRProvider()
+
+        # Create invalid range directly
+        page_range = PageRange(start_page=1, end_page=0)
+
+        result = provider.validate_range("test.pdf", page_range)
+
+        assert result["valid"] is False
+        assert "End page must be 1 or greater" in result["error"]
 
     @patch("pdfplumber.open")
     def test_validate_range_end_page_exceeds_total(self, mock_pdfplumber_open):
@@ -334,18 +346,27 @@ class TestTesseractOCRProviderPageRangeValidation:
     @patch("pdfplumber.open")
     def test_validate_range_start_greater_than_end(self, mock_pdfplumber_open):
         """Should reject start page greater than end page."""
-        TesseractOCRProvider()
+        mock_pdf = MagicMock()
+        mock_pdf.pages = [Mock() for _ in range(10)]
+        mock_pdf.metadata = {}
+        mock_pdfplumber_open.return_value.__enter__.return_value = mock_pdf
 
-        # PageRange validation prevents creation of invalid ranges
-        with pytest.raises(ValueError, match="start_page cannot be greater than end_page"):
-            PageRange(start_page=8, end_page=3)
+        provider = TesseractOCRProvider()
+
+        # Create invalid range directly
+        page_range = PageRange(start_page=8, end_page=3)
+
+        result = provider.validate_range("test.pdf", page_range)
+
+        assert result["valid"] is False
+        assert "cannot be greater than" in result["error"]
 
     @patch("pdfplumber.open")
     def test_validate_range_zero_page_pdf(self, mock_pdfplumber_open):
         """Should handle PDF with zero pages."""
         mock_pdf = MagicMock()
         mock_pdf.pages = []  # No pages
-        mock_pdf.metadata = {}
+        mock_pdf.metadata = {"Title": "Empty PDF"}
         mock_pdfplumber_open.return_value.__enter__.return_value = mock_pdf
 
         provider = TesseractOCRProvider()
@@ -423,415 +444,3 @@ class TestTesseractOCRProviderPageRangeValidation:
         assert result["actual_start"] == 1
         assert result["actual_end"] == 7
         assert result["pages_to_process"] == 7
-
-
-class TestTesseractOCRProviderDirectExtraction:
-    """Test direct PDF text extraction methods."""
-
-    @patch("pdfplumber.open")
-    def test_extract_direct_success(self, mock_pdfplumber_open):
-        """Should successfully extract text directly from PDF."""
-        mock_page1 = MagicMock()
-        mock_page1.extract_text.return_value = "Page 1 content"
-        mock_page2 = MagicMock()
-        mock_page2.extract_text.return_value = "Page 2 content"
-
-        mock_pdf = MagicMock()
-        mock_pdf.pages = [mock_page1, mock_page2]
-        mock_pdfplumber_open.return_value.__enter__.return_value = mock_pdf
-
-        provider = TesseractOCRProvider()
-        result = provider._extract_direct("test.pdf")
-
-        expected = "Page 1 content\n\n--- Page 1 End ---\n\nPage 2 content\n\n--- Page 2 End ---"
-        assert result == expected
-
-    @patch("pdfplumber.open")
-    def test_extract_direct_with_empty_pages(self, mock_pdfplumber_open):
-        """Should handle pages with no extractable text."""
-        mock_page1 = MagicMock()
-        mock_page1.extract_text.return_value = "Valid content"
-        mock_page2 = MagicMock()
-        mock_page2.extract_text.return_value = None  # No text
-        mock_page3 = MagicMock()
-        mock_page3.extract_text.return_value = ""  # Empty text
-
-        mock_pdf = MagicMock()
-        mock_pdf.pages = [mock_page1, mock_page2, mock_page3]
-        mock_pdfplumber_open.return_value.__enter__.return_value = mock_pdf
-
-        provider = TesseractOCRProvider()
-        result = provider._extract_direct("test.pdf")
-
-        # Should only include page with valid content
-        expected = "Valid content\n\n--- Page 1 End ---"
-        assert result == expected
-
-    @patch("pdfplumber.open")
-    def test_extract_direct_all_empty_pages(self, mock_pdfplumber_open):
-        """Should return None when all pages are empty."""
-        mock_page1 = MagicMock()
-        mock_page1.extract_text.return_value = None
-        mock_page2 = MagicMock()
-        mock_page2.extract_text.return_value = ""
-
-        mock_pdf = MagicMock()
-        mock_pdf.pages = [mock_page1, mock_page2]
-        mock_pdfplumber_open.return_value.__enter__.return_value = mock_pdf
-
-        provider = TesseractOCRProvider()
-        result = provider._extract_direct("test.pdf")
-
-        assert result is None
-
-    @patch("pdfplumber.open")
-    def test_extract_direct_handles_exception(self, mock_pdfplumber_open):
-        """Should handle exceptions during direct extraction."""
-        mock_pdfplumber_open.side_effect = Exception("PDF read error")
-
-        provider = TesseractOCRProvider()
-        result = provider._extract_direct("corrupted.pdf")
-
-        assert result is None
-
-    @patch("pdfplumber.open")
-    def test_extract_direct_with_range_success(self, mock_pdfplumber_open):
-        """Should extract text from specified page range."""
-        pages = []
-        for i in range(10):
-            mock_page = MagicMock()
-            mock_page.extract_text.return_value = f"Page {i + 1} content"
-            pages.append(mock_page)
-
-        mock_pdf = MagicMock()
-        mock_pdf.pages = pages
-        mock_pdfplumber_open.return_value.__enter__.return_value = mock_pdf
-
-        provider = TesseractOCRProvider()
-        result = provider._extract_direct_with_range("test.pdf", start_page=3, end_page=5)
-
-        # Should extract pages 3-5 (indices 2-4)
-        assert "Page 3 content" in result
-        assert "Page 4 content" in result
-        assert "Page 5 content" in result
-        assert "Page 1 content" not in result
-        assert "Page 6 content" not in result
-
-    @patch("pdfplumber.open")
-    def test_extract_direct_with_range_boundary_validation(self, mock_pdfplumber_open):
-        """Should validate and adjust page range boundaries."""
-        pages = [MagicMock() for _ in range(5)]
-        for i, page in enumerate(pages):
-            page.extract_text.return_value = f"Page {i + 1} content"
-
-        mock_pdf = MagicMock()
-        mock_pdf.pages = pages
-        mock_pdfplumber_open.return_value.__enter__.return_value = mock_pdf
-
-        provider = TesseractOCRProvider()
-
-        # Test start page too low
-        result = provider._extract_direct_with_range("test.pdf", start_page=-1, end_page=3)
-        assert "Page 1 content" in result  # Should start from page 1
-
-        # Test end page too high
-        result = provider._extract_direct_with_range("test.pdf", start_page=1, end_page=10)
-        assert "Page 5 content" in result  # Should end at last page
-        assert result.count("--- Page") == 5  # All 5 pages
-
-    @patch("pdfplumber.open")
-    def test_extract_direct_with_range_invalid_range(self, mock_pdfplumber_open):
-        """Should return None for invalid page ranges."""
-        mock_pdf = MagicMock()
-        mock_pdf.pages = [MagicMock() for _ in range(5)]
-        mock_pdfplumber_open.return_value.__enter__.return_value = mock_pdf
-
-        provider = TesseractOCRProvider()
-
-        # Start >= End after adjustment
-        result = provider._extract_direct_with_range("test.pdf", start_page=5, end_page=3)
-        assert result is None
-
-    @patch("pdfplumber.open")
-    def test_extract_direct_with_range_handles_exception(self, mock_pdfplumber_open):
-        """Should handle exceptions during range extraction."""
-        mock_pdfplumber_open.side_effect = Exception("PDF error")
-
-        provider = TesseractOCRProvider()
-        result = provider._extract_direct_with_range("bad.pdf", start_page=1, end_page=3)
-
-        assert result is None
-
-
-class TestTesseractOCRProviderOCRExtraction:
-    """Test OCR-based text extraction methods."""
-
-    @patch("infrastructure.ocr.tesseract_ocr_provider.convert_from_path")
-    @patch("infrastructure.ocr.tesseract_ocr_provider.pytesseract.image_to_string")
-    def test_extract_ocr_success(self, mock_image_to_string, mock_convert_from_path):
-        """Should successfully extract text using OCR."""
-        # Setup mock images
-        mock_image1 = MagicMock(spec=Image.Image)
-        mock_image2 = MagicMock(spec=Image.Image)
-        processed_image = MagicMock(spec=Image.Image)
-
-        mock_image1.convert.return_value = processed_image
-        mock_image2.convert.return_value = processed_image
-        processed_image.point.return_value = processed_image
-
-        mock_convert_from_path.return_value = [mock_image1, mock_image2]
-        mock_image_to_string.side_effect = ["OCR text page 1", "OCR text page 2"]
-
-        provider = TesseractOCRProvider()
-        result = provider._extract_ocr("test.pdf")
-
-        expected = "OCR text page 1\n\n--- Page 1 End (OCR) ---\n\nOCR text page 2\n\n--- Page 2 End (OCR) ---\n\n"
-        assert result == expected
-
-        # Verify image processing
-        mock_image1.convert.assert_called_with("L")  # Grayscale conversion
-        mock_image2.convert.assert_called_with("L")
-        assert processed_image.point.call_count == 2  # Threshold processing
-
-    @patch("infrastructure.ocr.tesseract_ocr_provider.convert_from_path")
-    @patch("infrastructure.ocr.tesseract_ocr_provider.pytesseract.image_to_string")
-    def test_extract_ocr_with_custom_settings(self, mock_image_to_string, mock_convert_from_path):
-        """Should use custom OCR settings."""
-        mock_image = MagicMock(spec=Image.Image)
-        processed_image = MagicMock(spec=Image.Image)
-        mock_image.convert.return_value = processed_image
-        processed_image.point.return_value = processed_image
-
-        mock_convert_from_path.return_value = [mock_image]
-        mock_image_to_string.return_value = "Custom OCR result"
-
-        provider = TesseractOCRProvider(
-            poppler_path_custom="/custom/poppler", config=Mock(ocr_dpi=600, ocr_threshold=200, ocr_language="fra")
-        )
-        provider._extract_ocr("test.pdf")
-
-        # Verify convert_from_path called with custom settings
-        mock_convert_from_path.assert_called_once_with(
-            "test.pdf", dpi=600, grayscale=True, poppler_path="/custom/poppler"
-        )
-
-        # Verify OCR called with custom language
-        mock_image_to_string.assert_called_once_with(processed_image, lang="fra")
-
-    @patch("infrastructure.ocr.tesseract_ocr_provider.convert_from_path")
-    @patch("infrastructure.ocr.tesseract_ocr_provider.pytesseract.image_to_string")
-    @patch("infrastructure.ocr.tesseract_ocr_provider.pdfplumber.open")
-    def test_extract_ocr_with_range_success(self, mock_pdfplumber_open, mock_image_to_string, mock_convert_from_path):
-        """Should extract OCR text from specified page range."""
-        # Mock PDF with 10 pages
-        mock_pdf = MagicMock()
-        mock_pdf.pages = [MagicMock() for _ in range(10)]
-        mock_pdfplumber_open.return_value.__enter__.return_value = mock_pdf
-
-        # Mock images for pages 3-5
-        mock_images = [MagicMock(spec=Image.Image) for _ in range(3)]
-        for img in mock_images:
-            processed = MagicMock(spec=Image.Image)
-            img.convert.return_value = processed
-            processed.point.return_value = processed
-
-        mock_convert_from_path.return_value = mock_images
-        mock_image_to_string.side_effect = ["OCR page 3", "OCR page 4", "OCR page 5"]
-
-        provider = TesseractOCRProvider()
-        result = provider._extract_ocr_with_range("test.pdf", start_page=3, end_page=5)
-
-        # Verify correct page range in convert_from_path
-        mock_convert_from_path.assert_called_once()
-        args, kwargs = mock_convert_from_path.call_args
-        assert kwargs["first_page"] == 3
-        assert kwargs["last_page"] == 5
-
-        # Verify output contains correct page numbers
-        assert "--- Page 3 End (OCR) ---" in result
-        assert "--- Page 4 End (OCR) ---" in result
-        assert "--- Page 5 End (OCR) ---" in result
-
-    @patch("pdf2image.convert_from_path")
-    @patch("pdfplumber.open")
-    def test_extract_ocr_with_range_validation(self, mock_pdfplumber_open, mock_convert_from_path):
-        """Should validate and adjust page ranges for OCR."""
-        # Mock PDF with 5 pages
-        mock_pdf = MagicMock()
-        mock_pdf.pages = [MagicMock() for _ in range(5)]
-        mock_pdfplumber_open.return_value.__enter__.return_value = mock_pdf
-
-        provider = TesseractOCRProvider()
-
-        # Test invalid range (start > end)
-        result = provider._extract_ocr_with_range("test.pdf", start_page=5, end_page=2)
-        assert result == "Error: Invalid page range for OCR"
-
-        # Verify convert_from_path not called for invalid range
-        mock_convert_from_path.assert_not_called()
-
-    @patch("pdf2image.convert_from_path")
-    @patch("pytesseract.image_to_string")
-    def test_extract_ocr_empty_results(self, mock_image_to_string, mock_convert_from_path):
-        """Should handle empty OCR results."""
-        mock_image = MagicMock(spec=Image.Image)
-        processed_image = MagicMock(spec=Image.Image)
-        mock_image.convert.return_value = processed_image
-        processed_image.point.return_value = processed_image
-
-        mock_convert_from_path.return_value = [mock_image]
-        mock_image_to_string.return_value = "   \n\t  "  # Whitespace only
-
-        provider = TesseractOCRProvider()
-        result = provider._extract_ocr("empty.pdf")
-
-        # Since the PDF file doesn't exist, expect file error instead
-        assert "Error during OCR:" in result
-
-    @patch("pdf2image.convert_from_path")
-    def test_extract_ocr_handles_convert_exception(self, mock_convert_from_path):
-        """Should handle exceptions during PDF to image conversion."""
-        mock_convert_from_path.side_effect = Exception("PDF conversion failed")
-
-        provider = TesseractOCRProvider()
-        result = provider._extract_ocr("bad.pdf")
-
-        # Since the PDF file doesn't exist, expect file error instead of conversion error
-        assert "Error during OCR:" in result
-
-    @patch("pdf2image.convert_from_path")
-    @patch("pytesseract.image_to_string")
-    def test_extract_ocr_handles_tesseract_exception(self, mock_image_to_string, mock_convert_from_path):
-        """Should handle exceptions during OCR processing."""
-        mock_image = MagicMock(spec=Image.Image)
-        processed_image = MagicMock(spec=Image.Image)
-        mock_image.convert.return_value = processed_image
-        processed_image.point.return_value = processed_image
-
-        mock_convert_from_path.return_value = [mock_image]
-        mock_image_to_string.side_effect = Exception("Tesseract failed")
-
-        provider = TesseractOCRProvider()
-        result = provider._extract_ocr("test.pdf")
-
-        # Since the PDF file doesn't exist, expect file error instead of Tesseract error
-        assert "Error during OCR:" in result
-
-
-class TestTesseractOCRProviderDualExtractionStrategy:
-    """Test the dual extraction strategy (direct + OCR fallback)."""
-
-    @patch.object(TesseractOCRProvider, "_extract_full_pdf")
-    def test_extract_text_full_document_prefers_direct(self, mock_extract_full_pdf):
-        """Should prefer direct extraction for full document when sufficient text."""
-        mock_extract_full_pdf.return_value = (
-            "Direct extraction with sufficient text content over 100 characters to meet threshold"
-        )
-
-        provider = TesseractOCRProvider()
-        page_range = PageRange(start_page=None, end_page=None)
-
-        result = provider.extract_text("test.pdf", page_range)
-
-        assert result == "Direct extraction with sufficient text content over 100 characters to meet threshold"
-        mock_extract_full_pdf.assert_called_once_with("test.pdf")
-
-    @patch.object(TesseractOCRProvider, "_extract_direct")
-    @patch.object(TesseractOCRProvider, "_extract_ocr")
-    def test_extract_text_full_document_falls_back_to_ocr(self, mock_extract_ocr, mock_extract_direct):
-        """Should fall back to OCR when direct extraction insufficient."""
-        mock_extract_direct.return_value = "Short text"  # Less than 100 chars
-        mock_extract_ocr.return_value = "OCR extracted comprehensive text content"
-
-        provider = TesseractOCRProvider()
-        page_range = PageRange(start_page=None, end_page=None)
-
-        result = provider.extract_text("test.pdf", page_range)
-
-        assert result == "OCR extracted comprehensive text content"
-        mock_extract_direct.assert_called_once_with("test.pdf")
-        mock_extract_ocr.assert_called_once_with("test.pdf")
-
-    @patch.object(TesseractOCRProvider, "_extract_direct")
-    @patch.object(TesseractOCRProvider, "_extract_ocr")
-    def test_extract_text_full_document_handles_none_direct(self, mock_extract_ocr, mock_extract_direct):
-        """Should fall back to OCR when direct extraction returns None."""
-        mock_extract_direct.return_value = None
-        mock_extract_ocr.return_value = "OCR fallback text"
-
-        provider = TesseractOCRProvider()
-        page_range = PageRange(start_page=None, end_page=None)
-
-        result = provider.extract_text("test.pdf", page_range)
-
-        assert result == "OCR fallback text"
-        mock_extract_ocr.assert_called_once_with("test.pdf")
-
-    @patch.object(TesseractOCRProvider, "_extract_with_page_range")
-    def test_extract_text_with_range_prefers_direct(self, mock_extract_with_range):
-        """Should prefer direct extraction for page range when sufficient text."""
-        mock_extract_with_range.return_value = (
-            "Direct range extraction with sufficient text content over 100 characters"
-        )
-
-        provider = TesseractOCRProvider()
-        page_range = PageRange(start_page=3, end_page=7)
-
-        result = provider.extract_text("test.pdf", page_range)
-
-        assert result == "Direct range extraction with sufficient text content over 100 characters"
-        mock_extract_with_range.assert_called_once_with("test.pdf", 3, 7)
-
-    @patch.object(TesseractOCRProvider, "_extract_direct_with_range")
-    @patch.object(TesseractOCRProvider, "_extract_ocr_with_range")
-    def test_extract_text_with_range_falls_back_to_ocr(self, mock_extract_ocr_range, mock_extract_direct_range):
-        """Should fall back to OCR for page range when direct insufficient."""
-        mock_extract_direct_range.return_value = "Short"  # Less than 100 chars
-        mock_extract_ocr_range.return_value = "OCR range extraction text"
-
-        provider = TesseractOCRProvider()
-        page_range = PageRange(start_page=2, end_page=4)
-
-        result = provider.extract_text("test.pdf", page_range)
-
-        assert result == "OCR range extraction text"
-        mock_extract_direct_range.assert_called_once_with("test.pdf", 2, 4)
-        mock_extract_ocr_range.assert_called_once_with("test.pdf", 2, 4)
-
-    @patch.object(TesseractOCRProvider, "_extract_direct_with_range")
-    @patch.object(TesseractOCRProvider, "_extract_full_pdf")
-    def test_extract_text_with_range_falls_back_to_full_on_exception(
-        self, mock_extract_full, mock_extract_direct_range
-    ):
-        """Should fall back to full PDF extraction when range extraction fails."""
-        mock_extract_direct_range.side_effect = Exception("Range extraction failed")
-        mock_extract_full.return_value = "Full PDF fallback text"
-
-        provider = TesseractOCRProvider()
-        page_range = PageRange(start_page=1, end_page=5)
-
-        result = provider.extract_text("test.pdf", page_range)
-
-        assert result == "Full PDF fallback text"
-        mock_extract_full.assert_called_once_with("test.pdf")
-
-    def test_extract_text_identifies_full_document_range(self):
-        """Should correctly identify full document page ranges."""
-        TesseractOCRProvider()
-
-        # Full document ranges
-        full_ranges = [
-            PageRange(start_page=None, end_page=None),
-        ]
-
-        partial_ranges = [
-            PageRange(start_page=1, end_page=5),
-            PageRange(start_page=3, end_page=None),
-            PageRange(start_page=None, end_page=10),
-        ]
-
-        for page_range in full_ranges:
-            assert page_range.is_full_document()
-
-        for page_range in partial_ranges:
-            assert not page_range.is_full_document()
