@@ -29,15 +29,16 @@ bandit -c pyproject.toml -r .          # Security scanning
 This is a **hexagonal architecture** PDF-to-audio converter Flask application:
 
 ### Layer Structure
-- **`application/`** - Configuration loading (`SystemConfig`), context management (`ApplicationContext`), logging
+- **`application/`** - Configuration, context, and orchestration services (`DocumentProcessingService`)
 - **`domain/`** - Pure business logic with no external dependencies
 - **`infrastructure/`** - External service implementations (TTS, OCR, LLM, file system)
 
 ### Core Processing Pipeline
-1. **DocumentEngine** (`domain/document/`) - PDF text extraction via OCR
-2. **TextPipeline** (`domain/text/`) - Text cleaning/enhancement via LLM, chunking strategies
-3. **AudioEngine** (`domain/audio/`) - TTS orchestration, audio file combination
-4. **TimingEngine** (`domain/audio/`) - Word-level timing for read-along sync
+1. **DocumentProcessingService** (`application/services/`) - Orchestrates the entire flow
+2. **DocumentEngine** (`domain/document/`) - PDF text extraction via OCR
+3. **TextPipeline** (`domain/text/`) - Text cleaning/enhancement via LLM, chunking strategies
+4. **AudioEngine** (`domain/audio/`) - TTS orchestration, audio file combination
+5. **TimingEngine** (`domain/audio/`) - Word-level timing for read-along sync
 
 ### Dependency Injection
 - **`ServiceContainer`** (`domain/container/service_container.py`) - Immutable DI container with lazy initialization
