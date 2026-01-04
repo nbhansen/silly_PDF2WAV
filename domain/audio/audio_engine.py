@@ -177,14 +177,8 @@ class AudioEngine(IAudioEngine):
         import asyncio
 
         try:
-            # Create and run async processing
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                audio_chunks = loop.run_until_complete(self._process_chunks_async(processed_chunks))
-                return audio_chunks
-            finally:
-                loop.close()
+            # Use asyncio.run() for cleaner event loop management (Python 3.7+)
+            return asyncio.run(self._process_chunks_async(processed_chunks))
         except Exception as e:
             logger.exception("Async processing failed: %s", e)
             return []

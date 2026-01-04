@@ -88,9 +88,15 @@ class ServiceContainer(IServiceContainer):
         from infrastructure.file.file_manager import FileManager
         from infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
         from infrastructure.ocr.tesseract_ocr_provider import TesseractOCRProvider
+        from application.services.document_service import DocumentProcessingService
 
         # Build all factories in a single immutable dict
         factories: dict[ServiceKey, ServiceFactory] = {
+            # Application Services
+            DocumentProcessingService: lambda: DocumentProcessingService(
+                service_container=self,
+                config=self.config
+            ),
             # File Manager
             FileManager: lambda: FileManager(
                 upload_folder=self.config.files.upload_folder, output_folder=self.config.files.audio_folder

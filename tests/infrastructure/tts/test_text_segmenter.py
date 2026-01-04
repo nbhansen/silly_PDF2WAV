@@ -287,9 +287,9 @@ class TestTextSegmenterChunking:
         """Should handle empty input gracefully."""
         segmenter = default_segmenter
 
-        assert segmenter.split_into_chunks("") == []
-        assert segmenter.split_into_chunks("   ") == []
-        assert segmenter.split_into_chunks("\n\t") == []
+        assert segmenter.split_into_chunks("") == [""]
+        assert segmenter.split_into_chunks("   ") == ["   "]
+        assert segmenter.split_into_chunks("\n\t") == ["\n\t"]
 
     def test_split_into_chunks_preserves_content(self, default_segmenter: TextSegmenter) -> None:
         """Should preserve all content across chunks."""

@@ -347,8 +347,9 @@ class TestRealProviderInteraction:
             assert Path(file_manager.output_folder).exists()
 
             # Should have file operation methods
-            assert hasattr(file_manager, 'save_uploaded_file')
-            assert hasattr(file_manager, 'cleanup_old_files')
+            assert hasattr(file_manager, 'save_output_file')
+            assert hasattr(file_manager, 'save_temp_file')
+            assert hasattr(file_manager, 'delete_file')
 
 
 class TestRealExternalServicesIntegration:
@@ -385,14 +386,23 @@ class TestRealExternalServicesIntegration:
         # Clean up
         Path(saved_path).unlink()
 
-    def test_real_tesseract_interface(self, real_tesseract_ocr) -> None:
+    def test_real_tesseract_ocr_methods(self, real_tesseract_ocr) -> None:
         """Should have proper OCR interface methods."""
-        # Verify the OCR provider has expected interface
-        assert hasattr(real_tesseract_ocr, 'extract_text')
-        assert callable(real_tesseract_ocr.extract_text)
+        # Verify the OCR provider has expected interface methods
+        assert hasattr(real_tesseract_ocr, 'perform_ocr')
+        assert hasattr(real_tesseract_ocr, 'get_pdf_info')
+        assert hasattr(real_tesseract_ocr, 'validate_range')
 
-        # Test with nonexistent file - should handle gracefully
-        result = real_tesseract_ocr.extract_text("/nonexistent/file.pdf", PageRange())
+        # Test get_pdf_info with nonexistent file - should return default info
+        # The implementation returns PDFInfo(total_pages=0, ...) on exception
+        info = real_tesseract_ocr.get_pdf_info("/nonexistent/file.pdf")
+        
+        assert info.total_pages == 0
+        assert info.title == "Unknown"
 
-        # Should return empty string or handle error gracefully
-        assert isinstance(result, str)
+        # Test validate_range with nonexistent file
+        # The implementation returns error dict on exception
+        result = real_tesseract_ocr.validate_range("/nonexistent/file.pdf", PageRange())
+        
+        assert result["valid"] is False
+        assert result["total_pages"] == 0

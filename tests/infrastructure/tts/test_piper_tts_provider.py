@@ -311,8 +311,10 @@ class TestPiperTTSProviderCommandLineGeneration:
     @patch("pathlib.Path.exists")
     @patch("pathlib.Path.open")
     @patch("pathlib.Path.stat")
+    @patch("pathlib.Path.mkdir")
     def test_generate_with_command_line_success(
         self,
+        mock_mkdir: Mock,
         mock_stat: Mock,
         mock_open: Mock,
         mock_exists: Mock,
@@ -328,7 +330,12 @@ class TestPiperTTSProviderCommandLineGeneration:
 
         mock_run.return_value = Mock(returncode=0, stderr="", stdout="")
         mock_exists.return_value = True
-        mock_stat.return_value = Mock(st_size=44100)  # Non-zero file size
+        
+        # FIX: Path.stat() needs to return object with integer st_mode
+        stat_result = Mock()
+        stat_result.st_size = 44100
+        stat_result.st_mode = 0o100644  # S_IFREG | 0644
+        mock_stat.return_value = stat_result
 
         # Mock file reading
         fake_audio_data = b"RIFF\x24\x08\x00\x00WAVEfmt "  # WAV header

@@ -5,7 +5,7 @@ Focuses on testing the high-cohesion, low-coupling design.
 """
 
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from application.config.app_configs import FlaskConfig
 from application.config.file_configs import FileCleanupConfig, FileConfig
@@ -137,20 +137,26 @@ class TestTimingEngine:
         mock_tts = MagicMock()
         mock_file_manager = MagicMock()
 
-        # Mock successful timestamp generation
+        # Mock successful timestamp generation AND standard generation
         mock_segments = [
             TextSegment(
                 text="Test", start_time=0.0, duration=1.0, segment_type="sentence", chunk_index=0, sentence_index=0
             )
         ]
         mock_tts.generate_audio_with_timestamps.return_value = Result.success((b"fake_audio", mock_segments))
+        mock_tts.generate_audio_data.return_value = Result.success(b"fake_audio")
+        
         mock_file_manager.save_output_file.return_value = "test.mp3"
 
         engine = TimingEngine(tts_engine=mock_tts, file_manager=mock_file_manager, mode=TimingMode.ESTIMATION)
 
-        result = engine.generate_with_timing(["test text"], "output")
+        # Mock combine_audio_chunks to avoid file system checks
+        with patch.object(engine, "_combine_audio_chunks", return_value="combined.mp3"):
+            result = engine.generate_with_timing(["test text"], "output")
 
-        assert isinstance(result, TimedAudioResult)
+            assert isinstance(result, Result)
+            assert result.is_success
+            assert isinstance(result.value, TimedAudioResult)
         mock_tts.generate_audio_with_timestamps.assert_called_once()
 
 
@@ -287,21 +293,27 @@ class TestArchitectureIntegration:
         # Create audio engine with timing engine
         audio_engine = AudioEngine(tts_engine=mock_tts, file_manager=mock_file_manager, timing_engine=timing_engine)
 
-        # Mock successful operation
+        # Mock successful operation for both interfaces
         mock_segments = [
             TextSegment(
                 text="Test", start_time=0.0, duration=1.0, segment_type="sentence", chunk_index=0, sentence_index=0
             )
         ]
         mock_tts.generate_audio_with_timestamps.return_value = Result.success((b"audio", mock_segments))
+        mock_tts.generate_audio_data.return_value = Result.success(b"audio")
+        
         mock_file_manager.save_output_file.return_value = "test.mp3"
 
-        result = audio_engine.generate_with_timing(["test"], "output")
+        # Mock combine_audio_chunks on timing engine to avoid file system checks
+        with patch.object(timing_engine, "_combine_audio_chunks", return_value="combined.mp3"):
+            result = audio_engine.generate_with_timing(["test"], "output")
 
-        assert isinstance(result, TimedAudioResult)
+            assert isinstance(result, Result)
+            assert result.is_success
+            assert isinstance(result.value, TimedAudioResult)
         # The audio engine now processes in chunks, so we expect chunk-based naming
-        assert len(result.audio_files) > 0
-        assert result.audio_files[0].startswith("output_chunk_")
+        assert len(result.value.audio_files) > 0
+        assert result.value.audio_files[0].startswith("output_chunk_")
 
     def test_text_pipeline_integration(self):
         """TextPipeline should integrate with other components."""

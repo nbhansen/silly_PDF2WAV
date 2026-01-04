@@ -32,3 +32,4 @@ types-PyYAML>=6.0.12
 
 
 # piper-tts might need binary install on some platforms like Fedora
+pytest-asyncio==0.23.5

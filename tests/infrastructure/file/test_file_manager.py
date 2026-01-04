@@ -61,10 +61,10 @@ class TestFileManagerInitialization:
         assert upload_path.exists()
         assert output_path.exists()
 
-    @patch("os.makedirs")
-    def test_init_handles_directory_creation_permission_error(self, mock_makedirs, temp_dir):
+    @patch("pathlib.Path.mkdir")
+    def test_init_handles_directory_creation_permission_error(self, mock_mkdir, temp_dir):
         """Should raise exception when directory creation fails due to permissions."""
-        mock_makedirs.side_effect = PermissionError("Permission denied")
+        mock_mkdir.side_effect = PermissionError("Permission denied")
 
         with pytest.raises(PermissionError):
             FileManager(str(temp_dir / "uploads"), str(temp_dir / "outputs"))
@@ -302,10 +302,10 @@ class TestFileManagerOutputFileOperations:
         with Path(filepath2).open("rb") as f:
             assert f.read() == second_content
 
-    @patch("builtins.open")
-    def test_save_output_file_handles_permission_error(self, mock_open, temp_dir):
+    @patch("pathlib.Path.write_bytes")
+    def test_save_output_file_handles_permission_error(self, mock_write, temp_dir):
         """Should raise appropriate error when file creation fails due to permissions."""
-        mock_open.side_effect = PermissionError("Permission denied")
+        mock_write.side_effect = PermissionError("Permission denied")
         manager = FileManager(str(temp_dir / "uploads"), str(temp_dir / "outputs"))
 
         with pytest.raises(PermissionError):
@@ -419,16 +419,17 @@ class TestFileManagerDeletion:
         finally:
             os.chdir(original_cwd)
 
-    @patch("os.remove")
-    def test_delete_file_handles_permission_error_during_deletion(self, mock_remove, temp_dir):
+    @patch("pathlib.Path.unlink")
+    def test_delete_file_handles_permission_error_during_deletion(self, mock_unlink, temp_dir):
         """Should handle permission errors during file deletion."""
-        mock_remove.side_effect = PermissionError("Permission denied")
+        mock_unlink.side_effect = PermissionError("Permission denied")
         manager = FileManager(str(temp_dir / "uploads"), str(temp_dir / "outputs"))
 
         # Create test file path within managed directory
         test_path = str(Path(manager.output_folder) / "test.txt")
 
-        with patch("os.path.exists", return_value=True), pytest.raises(PermissionError):
+        # We need exists to return True for unlink to be called
+        with patch("pathlib.Path.exists", return_value=True), pytest.raises(PermissionError):
             manager.delete_file(test_path)
 
 
@@ -464,12 +465,10 @@ class TestFileManagerErrorHandling:
         with pytest.raises((TypeError, ValueError)):
             manager.save_output_file(b"content", None)  # type: ignore
 
-    @patch("builtins.open")
-    def test_save_output_file_handles_disk_full_error(self, mock_open, temp_dir):
+    @patch("pathlib.Path.write_bytes")
+    def test_save_output_file_handles_disk_full_error(self, mock_write, temp_dir):
         """Should handle disk full errors during file writing."""
-        mock_file = MagicMock()
-        mock_open.return_value.__enter__.return_value = mock_file
-        mock_file.write.side_effect = OSError("No space left on device")
+        mock_write.side_effect = OSError("No space left on device")
 
         manager = FileManager(str(temp_dir / "uploads"), str(temp_dir / "outputs"))
 

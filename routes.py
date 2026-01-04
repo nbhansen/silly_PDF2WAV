@@ -26,6 +26,7 @@ from werkzeug.utils import secure_filename
 
 from application.config.system_config import SystemConfig
 from application.context.application_context import ApplicationContext
+from application.services.document_service import DocumentProcessingService
 from domain.container.service_container import ServiceContainer
 from domain.models import PageRange, ProcessingResult, TimingMetadata
 from infrastructure.file.file_manager import FileManager
@@ -46,28 +47,6 @@ from utils import (
 )
 
 
-@dataclass(frozen=True)
-class FileProcessingInfo:
-    """Information about processed uploaded file."""
-
-    original_filename: str
-    base_filename: str
-    pdf_path: str
-    page_range: PageRange
-    enable_plain_english: bool = False
-    error: Optional[str] = None
-
-
-@dataclass(frozen=True)
-class ProcessingServices:
-    """Collection of processing services."""
-
-    service_container: ServiceContainer
-    document_engine: "IDocumentEngine"
-    audio_engine: "IAudioEngine"
-    text_pipeline: "ITextPipeline"
-
-
 def background_process_document(
     operation_id: str,
     request_form: dict,
@@ -77,206 +56,41 @@ def background_process_document(
     app_context: ApplicationContext,
     app: Flask,
 ) -> None:
-    """Background processing function that reports progress.
+    """Background processing function that delegates to DocumentProcessingService.
 
     Args:
         operation_id: Unique ID for this operation
-        request_form: Form data as dict (not Flask object)
+        request_form: Form data as dict
         saved_file_path: Path where the uploaded file was saved
         original_filename: Original filename from upload
         enable_timing: Whether to enable timing data
         app_context: Application context
         app: Flask app instance
     """
-    # Use standard logging module directly to avoid Flask context issues in threads
-    import logging
-
-    logger = logging.getLogger("pdf_to_audio.routes")
-
     # Use the Flask app context for this thread
     with app.app_context():
-        # Store context in Flask app for access in helper functions
+        # Store context in Flask app for access in helper functions if needed
         app.config["APP_CONTEXT"] = app_context
 
         try:
-            logger.info(f"Starting background processing for operation {operation_id}, file: {original_filename}")
-            update_progress(operation_id, "starting", 5, "Initializing document processing...")
-
-            if is_operation_cancelled(operation_id):
-                logger.info(f"Operation {operation_id} cancelled during initialization")
-                return
-
-            # Process and validate uploaded file (10%)
-            logger.info(f"Validating uploaded file: {original_filename}")
-            update_progress(operation_id, "validating", 10, "Validating uploaded file...")
-            file_info = _process_saved_file(saved_file_path, original_filename, request_form, app_context.config)
-            if file_info.error:
-                logger.error(f"File validation failed for {original_filename}: {file_info.error}")
-                enhanced_error = get_processing_stage_error(
-                    "file_validation", Exception(file_info.error), file_info.original_filename
-                )
-                update_progress(
-                    operation_id, "error", 0, "File validation failed", is_error=True, error_message=enhanced_error
-                )
-                return
-
-            if is_operation_cancelled(operation_id):
-                logger.info(f"Operation {operation_id} cancelled after file validation")
-                return
-
-            # Configure processing services (15%)
-            logger.info("Setting up processing services (TTS, OCR, LLM)")
-            update_progress(operation_id, "configuring", 15, "Setting up processing services...")
-            services = _configure_processing_services()
-
-            if is_operation_cancelled(operation_id):
-                return
-
-            # Execute document processing with progress updates (20-95%)
-            update_progress(operation_id, "processing", 20, "Starting document processing...")
-            processing_result = _execute_document_processing_with_progress(
-                operation_id,
-                file_info.pdf_path,
-                file_info.base_filename,
-                file_info.page_range,
-                services,
-                enable_timing,
-                file_info.enable_plain_english,
-            )
-
-            if is_operation_cancelled(operation_id):
-                return
-
-            if processing_result is None:
-                enhanced_error = get_processing_stage_error(
-                    "audio_generation", Exception("Processing returned no results"), file_info.original_filename
-                )
-                update_progress(
-                    operation_id, "error", 0, "Document processing failed", is_error=True, error_message=enhanced_error
-                )
-                return
-
-            # Complete (100%)
-            update_progress(
-                operation_id,
-                "complete",
-                100,
-                "Processing complete!",
-                is_complete=True,
-                result_data={
-                    "base_filename": file_info.base_filename,
-                    "original_filename": file_info.original_filename,
-                    "processing_result": processing_result,
-                },
+            # Get service from container
+            service = app_context.service_container.get(DocumentProcessingService)
+            
+            # Delegate all orchestration logic to service
+            service.process_document_background(
+                operation_id=operation_id,
+                request_form=request_form,
+                saved_file_path=saved_file_path,
+                original_filename=original_filename,
+                enable_timing=enable_timing
             )
 
         except Exception as e:
+            get_logger("routes").exception(f"Background process wrapper failed: {e}")
             enhanced_error = get_processing_stage_error("processing", e, original_filename)
             update_progress(
                 operation_id, "error", 0, "Processing failed unexpectedly", is_error=True, error_message=enhanced_error
             )
-
-
-def _execute_document_processing_with_progress(
-    operation_id: str,
-    pdf_path: str,
-    base_filename: str,
-    page_range: PageRange,
-    services: ProcessingServices,
-    enable_timing: bool,
-    enable_plain_english: bool = False,
-) -> Optional[ProcessingResult]:
-    """Execute document processing with progress updates."""
-    try:
-        update_progress(operation_id, "text_extraction", 25, "Extracting text from PDF...")
-
-        # Override timing for Gemini TTS
-        config = get_app_config()
-        enable_timing = enable_timing and config.tts.engine.value != "gemini"
-
-        get_logger("routes").info(
-            "Processing %s for: %s", "with timing data" if enable_timing else "without timing", base_filename
-        )
-
-        # Create processing request
-        from domain.models import ProcessingRequest
-
-        request_obj = ProcessingRequest(pdf_path=pdf_path, output_name=base_filename, page_range=page_range)
-
-        if is_operation_cancelled(operation_id):
-            return None
-
-        update_progress(operation_id, "text_processing", 40, "Processing and cleaning text...")
-
-        # Create custom text pipeline if plain English is requested
-        text_pipeline = services.text_pipeline
-        if enable_plain_english:
-            # Create a new TextPipeline instance with plain English conversion enabled
-            from domain.text.text_pipeline import TextPipeline
-            from infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
-
-            llm_provider = services.service_container.get(GeminiLLMProvider) if config.gemini.api_key else None
-            text_pipeline = TextPipeline(
-                llm_provider=llm_provider,
-                enable_cleaning=config.text_processing.enable_cleaning,
-                enable_natural_formatting=config.text_processing.enable_natural_formatting,
-                enable_plain_english=True,
-            )
-            get_logger("routes").info("Created custom TextPipeline with plain English conversion enabled")
-
-        if is_operation_cancelled(operation_id):
-            return None
-
-        update_progress(operation_id, "audio_generation", 60, "Generating audio from text...")
-
-        # Use document engine for complete processing
-        # The actual heavy processing happens here
-        processing_result = services.document_engine.process_document(
-            request_obj, services.audio_engine, text_pipeline, enable_timing, config.text_processing.llm_chunk_size
-        )
-
-        if is_operation_cancelled(operation_id):
-            return None
-
-        update_progress(operation_id, "finalizing", 85, "Creating final audio file...")
-
-        # Import needed for both success and failure cases
-        from domain.errors import ApplicationError, ErrorCode
-        from domain.models import ProcessingResult
-
-        if processing_result.is_failure:
-            # Convert Result[T] error to ProcessingResult for backward compatibility
-            error = ApplicationError(
-                code=ErrorCode.AUDIO_GENERATION_FAILED, message=str(processing_result.error), retryable=True
-            )
-            result = ProcessingResult(
-                audio_files=None,
-                combined_mp3_file=None,
-                timing_data=None,
-                error=error,
-                debug_info={"processing_error": "Document engine processing failed"},
-            )
-            return result
-
-        # Convert TimedAudioResult to ProcessingResult for backward compatibility
-        audio_result = processing_result.value
-        assert audio_result is not None  # Type assertion for mypy
-
-        update_progress(operation_id, "combining", 95, "Finalizing output...")
-
-        result = ProcessingResult(
-            audio_files=audio_result.audio_files if audio_result.audio_files else {},
-            combined_mp3_file=audio_result.combined_mp3,
-            timing_data=audio_result.timing_data,
-            error=None,
-            debug_info={},
-        )
-
-        return result
-
-    except Exception as e:
-        get_logger("routes").error(f"Document processing failed: {e}", exc_info=True)
-        return None
 
 
 def get_app_context() -> ApplicationContext:
@@ -775,269 +589,6 @@ def register_routes(app: Flask) -> None:
 
         except Exception as e:
             return jsonify({"error": str(e)}), 500
-
-
-def process_upload_request(
-    request_form: object, uploaded_file: FileStorage, enable_timing: bool = False
-) -> tuple[Optional[ProcessingResult], str, str, Optional[str]]:
-    """Unified upload processing logic that preserves timing functionality."""
-    try:
-        # Process and validate uploaded file
-        file_info = _process_uploaded_file(uploaded_file, request_form)
-        if file_info.error:
-            return None, file_info.original_filename, file_info.base_filename, file_info.error
-
-        # Configure processing services
-        services = _configure_processing_services()
-
-        # Execute document processing
-        processing_result = _execute_document_processing(
-            file_info.pdf_path,
-            file_info.base_filename,
-            file_info.page_range,
-            services,
-            enable_timing,
-            file_info.enable_plain_english,
-        )
-
-        # Clean up uploaded file
-        with contextlib.suppress(Exception):
-            Path(file_info.pdf_path).unlink()
-
-        if not processing_result.success or not processing_result.audio_files:
-            return processing_result, file_info.original_filename, file_info.base_filename, None
-
-        # Handle timing data and finalize result
-        final_result = _handle_timing_data(processing_result, file_info.base_filename, enable_timing, services)
-
-        return final_result, file_info.original_filename, file_info.base_filename, None
-
-    except Exception as e:
-        get_logger("routes").error("Upload processing error: %s", str(e))
-        import traceback
-
-        traceback.print_exc()
-        return None, _get_safe_filename_from_locals(locals()), "", f"An unexpected error occurred: {e!s}"
-
-
-def _process_saved_file(
-    saved_file_path: str, original_filename: str, request_form: dict, config: SystemConfig
-) -> FileProcessingInfo:
-    """Process and validate a saved file, return file information or error."""
-    base_filename_no_ext = Path(original_filename).stem
-    pdf_path = Path(saved_file_path)
-
-    # Parse and validate page range and plain English setting
-    page_range = parse_page_range_from_form(request_form)
-    enable_plain_english = parse_plain_english_from_form(request_form)
-
-    if not page_range.is_full_document():
-        # Need to validate page range - but can't use _configure_processing_services() as it needs Flask context
-        # For now, skip validation in background thread (it will be caught during processing)
-        pass
-
-    return FileProcessingInfo(
-        original_filename=original_filename,
-        base_filename=base_filename_no_ext,
-        pdf_path=str(pdf_path),
-        page_range=page_range,
-        enable_plain_english=enable_plain_english,
-        error=None,
-    )
-
-
-def _process_uploaded_file(uploaded_file: FileStorage, request_form: object) -> FileProcessingInfo:
-    """Process and validate uploaded file, return file information or error."""
-    config = get_app_config()
-    if not uploaded_file.filename:
-        raise ValueError("No filename provided")
-    original_filename = secure_filename(uploaded_file.filename)
-    base_filename_no_ext = Path(original_filename).stem
-    pdf_path = Path(config.files.upload_folder) / original_filename
-    uploaded_file.save(str(pdf_path))
-
-    # Parse and validate page range and plain English setting
-    page_range = parse_page_range_from_form(request_form)
-    enable_plain_english = parse_plain_english_from_form(request_form)
-
-    if not page_range.is_full_document():
-        services = _configure_processing_services()
-        document_engine = services.document_engine
-        validation_result = document_engine.validate_page_range(str(pdf_path), page_range)
-        if validation_result.is_failure:
-            # Clean up file before returning error
-            with contextlib.suppress(Exception):
-                pdf_path.unlink()
-            return FileProcessingInfo(
-                original_filename=original_filename,
-                base_filename=base_filename_no_ext,
-                pdf_path=str(pdf_path),
-                page_range=page_range,
-                enable_plain_english=enable_plain_english,
-                error=f"Error: {validation_result.error}",
-            )
-
-        validation = validation_result.value
-        assert validation is not None  # Type assertion for mypy
-        if not validation.get("valid", False):
-            # Clean up file before returning error
-            with contextlib.suppress(Exception):
-                pdf_path.unlink()
-            return FileProcessingInfo(
-                original_filename=original_filename,
-                base_filename=base_filename_no_ext,
-                pdf_path=str(pdf_path),
-                page_range=page_range,
-                enable_plain_english=enable_plain_english,
-                error=f"Error: {validation.get('error', 'Invalid page range')}",
-            )
-
-    return FileProcessingInfo(
-        original_filename=original_filename,
-        base_filename=base_filename_no_ext,
-        pdf_path=str(pdf_path),
-        page_range=page_range,
-        enable_plain_english=enable_plain_english,
-    )
-
-
-def _configure_processing_services() -> ProcessingServices:
-    """Configure and return all required processing services."""
-    from domain.audio.audio_engine import IAudioEngine
-    from domain.container.service_container import ServiceContainer
-    from domain.document.document_engine import IDocumentEngine
-    from domain.text.text_pipeline import ITextPipeline
-
-    service_container = get_pdf_service()
-
-    # Type assertion for proper type checking
-    assert isinstance(service_container, ServiceContainer), "Service container must be ServiceContainer instance"
-
-    # Debug: Log available services
-    logger = get_logger("routes")
-    logger.info(f"Available services: {list(service_container._factories.keys())}")
-
-    document_engine = service_container.get(IDocumentEngine)
-    audio_engine = service_container.get(IAudioEngine)
-    text_pipeline = service_container.get(ITextPipeline)
-
-    return ProcessingServices(
-        service_container=service_container,
-        document_engine=document_engine,
-        audio_engine=audio_engine,
-        text_pipeline=text_pipeline,
-    )
-
-
-def _execute_document_processing(
-    pdf_path: str,
-    base_filename: str,
-    page_range: PageRange,
-    services: ProcessingServices,
-    enable_timing: bool,
-    enable_plain_english: bool = False,
-) -> ProcessingResult:
-    """Execute the core document processing workflow."""
-    # Override timing for Gemini TTS
-    config = get_app_config()
-    enable_timing = enable_timing and config.tts.engine.value != "gemini"
-
-    get_logger("routes").info(
-        "Processing %s for: %s", "with timing data" if enable_timing else "without timing", base_filename
-    )
-
-    # Create processing request
-    from domain.models import ProcessingRequest
-
-    request_obj = ProcessingRequest(pdf_path=pdf_path, output_name=base_filename, page_range=page_range)
-
-    # Create custom text pipeline if plain English is requested
-    text_pipeline = services.text_pipeline
-    if enable_plain_english:
-        # Create a new TextPipeline instance with plain English conversion enabled
-        from domain.text.text_pipeline import TextPipeline
-        from infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
-
-        llm_provider = services.service_container.get(GeminiLLMProvider) if config.gemini.api_key else None
-        text_pipeline = TextPipeline(
-            llm_provider=llm_provider,
-            enable_cleaning=config.text_processing.enable_cleaning,
-            enable_natural_formatting=config.text_processing.enable_natural_formatting,
-            enable_plain_english=True,
-        )
-        get_logger("routes").info("Created custom TextPipeline with plain English conversion enabled")
-
-    # Use document engine for complete processing
-    processing_result = services.document_engine.process_document(
-        request_obj, services.audio_engine, text_pipeline, enable_timing, config.text_processing.llm_chunk_size
-    )
-
-    # Import needed for both success and failure cases
-    from domain.errors import ApplicationError, ErrorCode
-    from domain.models import ProcessingResult
-
-    if processing_result.is_failure:
-        # Convert Result[T] error to ProcessingResult for backward compatibility
-        error = ApplicationError(
-            code=ErrorCode.AUDIO_GENERATION_FAILED, message=str(processing_result.error), retryable=True
-        )
-        return ProcessingResult(
-            audio_files=None,
-            combined_mp3_file=None,
-            timing_data=None,
-            error=error,
-            debug_info={"processing_error": "Document engine processing failed"},
-        )
-
-    # Convert TimedAudioResult to ProcessingResult for backward compatibility
-    audio_result = processing_result.value
-    assert audio_result is not None  # Type assertion for mypy
-    return ProcessingResult(
-        audio_files=audio_result.audio_files,
-        combined_mp3_file=audio_result.combined_mp3,
-        timing_data=audio_result.timing_data,
-        error=None,
-        debug_info={"audio_generation": "success"},
-    )
-
-
-def _handle_timing_data(
-    processing_result: ProcessingResult, base_filename: str, enable_timing: bool, services: ProcessingServices
-) -> ProcessingResult:
-    """Handle timing data saving and add debug information to result."""
-    timing_data = processing_result.timing_data if processing_result.success else None
-
-    # Save timing data if available and requested
-    if enable_timing and timing_data:
-        save_timing_data(base_filename, timing_data)
-
-    # Create new result with updated debug info
-    from dataclasses import replace
-
-    updated_debug_info = dict(processing_result.debug_info or {})
-
-    # Add timing information to debug info
-    if enable_timing and timing_data:
-        updated_debug_info.update({"timing_data_created": True, "timing_segments": len(timing_data.text_segments)})
-    else:
-        updated_debug_info.update({"timing_data_created": False, "timing_segments": 0})
-
-    # Add file management stats to debug info
-    try:
-        file_manager = services.service_container.get(FileManager)
-        if file_manager:
-            updated_debug_info["file_management"] = "available"
-            updated_debug_info["cleanup_enabled"] = get_app_config().enable_file_cleanup
-    except Exception:  # nosec B110 # noqa: S110
-        pass  # Don't fail upload if file stats fail
-
-    return replace(processing_result, debug_info=updated_debug_info)
-
-
-def _get_safe_filename_from_locals(local_vars: dict[str, object]) -> str:
-    """Safely extract filename from local variables for error handling."""
-    filename = local_vars.get("original_filename", "unknown")
-    return str(filename)  # Ensure we return a string
 
 
 def render_upload_result(
