@@ -361,9 +361,10 @@ class AudioEngine(IAudioEngine):
             return Result.failure(audio_generation_error(f"Failed to get audio duration: {e}"))
 
     def _combine_wav_chunks(self, audio_chunks: list[bytes]) -> bytes:
-        """Combine multiple WAV audio chunks into a single WAV file.
+        """Combine multiple audio chunks.
 
-        Pure function - returns empty bytes on error.
+        If WAV (RIFF header), uses wave module to combine properly.
+        Otherwise (e.g. MP3), concatenates bytes directly.
         """
         try:
             import io
@@ -374,6 +375,11 @@ class AudioEngine(IAudioEngine):
 
             if len(audio_chunks) == 1:
                 return audio_chunks[0]
+
+            # Check for RIFF header to determine if it's WAV
+            if not audio_chunks[0].startswith(b"RIFF"):
+                logger.debug("Chunks do not appear to be WAV (no RIFF header), using direct concatenation")
+                return b"".join(audio_chunks)
 
             # Read the first chunk to get audio parameters
             first_chunk = io.BytesIO(audio_chunks[0])
@@ -390,16 +396,21 @@ class AudioEngine(IAudioEngine):
                 # Append audio data from each chunk
                 for chunk_data in audio_chunks:
                     chunk_buffer = io.BytesIO(chunk_data)
-                    with wave.open(chunk_buffer, "rb") as chunk_wav:
-                        frames = chunk_wav.readframes(chunk_wav.getnframes())
-                        output_wav.writeframes(frames)
+                    try:
+                        with wave.open(chunk_buffer, "rb") as chunk_wav:
+                            frames = chunk_wav.readframes(chunk_wav.getnframes())
+                            output_wav.writeframes(frames)
+                    except wave.Error:
+                        # Fallback for mixed content? Should not happen if first chunk was RIFF
+                        logger.warning("Failed to read chunk as WAV during combination")
+                        continue
 
             return output_buffer.getvalue()
 
         except Exception as e:
             logger.exception("Error combining audio chunks: %s", e)
-            # Fallback: return the first chunk if combination fails
-            return audio_chunks[0] if audio_chunks else b""
+            # Fallback: return the first chunk or concatenation if combination fails
+            return b"".join(audio_chunks) if audio_chunks else b""
 
     def combine_audio_files(self, file_paths: list[str], output_path: str) -> Result[str]:
         """Combine multiple audio files using ffmpeg.
