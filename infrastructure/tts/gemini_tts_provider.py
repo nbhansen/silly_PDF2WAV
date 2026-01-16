@@ -2,6 +2,8 @@
 """Gemini TTS Provider implementation using Google Gen AI SDK."""
 
 import logging
+import io
+import wave
 from typing import Optional
 
 from google import genai
@@ -68,8 +70,8 @@ class GeminiTTSProvider(ITTSEngine):
                 )
             )
 
-            # Prompt engineering to ensure exact reading
-            prompt = f"Please read the following text aloud exactly as written, without adding any introductory or concluding remarks:\n\n{text}"
+            # Direct text input for TTS models
+            prompt = text
 
             response = self.client.models.generate_content(
                 model=self.model_name,
@@ -100,7 +102,8 @@ class GeminiTTSProvider(ITTSEngine):
                 )
             )
 
-            prompt = f"Please read the following text aloud exactly as written, without adding any introductory or concluding remarks:\n\n{text}"
+            # Direct text input for TTS models
+            prompt = text
 
             # Use async client
             response = await self.client.aio.models.generate_content(
@@ -128,9 +131,33 @@ class GeminiTTSProvider(ITTSEngine):
             # Check for inline_data with audio mime type
             if part.inline_data and part.inline_data.mime_type and part.inline_data.mime_type.startswith("audio"):
                 if part.inline_data.data:
-                    return Result.success(part.inline_data.data)
+                    audio_data = part.inline_data.data
+                    # If PCM, add WAV header
+                    if "pcm" in part.inline_data.mime_type:
+                        # Extract sample rate if possible, otherwise default to 24000
+                        sample_rate = 24000
+                        if "rate=" in part.inline_data.mime_type:
+                            try:
+                                rate_str = part.inline_data.mime_type.split("rate=")[1]
+                                sample_rate = int(rate_str.split(";")[0])
+                            except (IndexError, ValueError):
+                                pass
+                        
+                        return Result.success(self._add_wav_header(audio_data, sample_rate))
+                    
+                    return Result.success(audio_data)
         
         return Result.failure(tts_engine_error("No audio data found in Gemini response"))
+
+    def _add_wav_header(self, pcm_data: bytes, sample_rate: int = 24000, channels: int = 1, bit_depth: int = 16) -> bytes:
+        """Add WAV header to raw PCM data."""
+        with io.BytesIO() as wav_io:
+            with wave.open(wav_io, "wb") as wav_file:
+                wav_file.setnchannels(channels)
+                wav_file.setsampwidth(bit_depth // 8)
+                wav_file.setframerate(sample_rate)
+                wav_file.writeframes(pcm_data)
+            return wav_io.getvalue()
 
     def get_output_format(self) -> str:
         """Get the output format for generated audio."""

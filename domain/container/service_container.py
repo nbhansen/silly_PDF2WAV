@@ -144,8 +144,11 @@ class ServiceContainer(IServiceContainer):
         if self.config.gemini and self.config.gemini.api_key:
             api_key = self.config.gemini.api_key
             if api_key is not None:  # Type guard for mypy
+                # Use LLM config for model name, falling back to gemini config if not set
+                # But prefer llm.model_name for text tasks
+                model_name = self.config.llm.model_name or self.config.gemini.model_name
                 factories[GeminiLLMProvider] = lambda: GeminiLLMProvider(
-                    model_name=self.config.gemini.model_name, api_key=api_key
+                    model_name=model_name, api_key=api_key
                 )
 
         return factories

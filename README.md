@@ -24,7 +24,7 @@ This tool converts PDF documents to audio files so you can listen to academic pa
 
 ```mermaid
 graph TD
-    A[User Uploads PDF] --> B[Web Server (Flask)];
+    A[User Uploads PDF] --> B["Web Server (Flask)"];
     B --> C[DocumentProcessingService];
     C --> D["1. Text Extraction (DocumentEngine)<br/>- OCR Fallback"];
     D --> E["2. Text Cleaning (TextPipeline)<br/>- Optional LLM Enhancement"];

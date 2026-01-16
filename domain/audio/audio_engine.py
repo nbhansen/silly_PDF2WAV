@@ -354,7 +354,7 @@ class AudioEngine(IAudioEngine):
             # Fallback to file size estimation
             file_size = Path(file_path).stat().st_size
             # Rough estimation: 1 second per 44KB for 22kHz audio
-            estimated_duration = file_size / (22050 * 2)  # 22kHz * 2 bytes per sample
+            estimated_duration = file_size / (24000 * 2)  # 24kHz * 2 bytes per sample
             return Result.success(estimated_duration)
 
         except Exception as e:
@@ -647,9 +647,9 @@ class AudioEngine(IAudioEngine):
                 "-codec:a",
                 "libmp3lame",
                 "-b:a",
-                "128k",  # Good quality bitrate
+                "192k",  # High quality bitrate
                 "-ar",
-                "22050",  # Sample rate
+                "44100",  # Standard high quality sample rate
                 mp3_path,
                 "-y",  # Overwrite if exists
             ]
