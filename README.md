@@ -20,6 +20,19 @@ This tool converts PDF documents to audio files so you can listen to academic pa
 - **Web Interface**: Simple upload -> process -> download workflow
 - **Audio Output**: Generates MP3 files ready for any device
 
+## Workflow Diagram
+
+```mermaid
+graph TD
+    A[User Uploads PDF] --> B[Web Server (Flask)];
+    B --> C[DocumentProcessingService];
+    C --> D["1. Text Extraction (DocumentEngine)<br/>- OCR Fallback"];
+    D --> E["2. Text Cleaning (TextPipeline)<br/>- Optional LLM Enhancement"];
+    E --> F["3. Audio Generation (AudioEngine)<br/>- TTS Conversion"];
+    F --> G[MP3 Audio File];
+    G --> H[User Listens/Downloads];
+```
+
 ## Current TTS Voices Available
 
 - `en_US-lessac-medium` - US voice, neutral
