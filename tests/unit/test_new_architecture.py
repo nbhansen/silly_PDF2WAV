@@ -14,7 +14,7 @@ from application.config.system_config import SystemConfig
 from domain.audio.audio_engine import AudioEngine
 from domain.audio.timing_engine import ITimingEngine, TimingEngine, TimingMode
 from domain.config.tts_config import GeminiConfig, TTSConfig, TTSEngine
-from domain.container.service_container import ServiceContainer, create_service_container_builder
+from application.container.service_container import ServiceContainer, create_service_container_builder
 from domain.errors import Result
 from domain.interfaces import IAudioEngine, ITextPipeline
 from domain.models import TextSegment, TimedAudioResult

@@ -9,7 +9,7 @@ import logging
 from typing import Optional, Protocol
 
 from application.config.system_config import SystemConfig
-from domain.container.service_container import ServiceContainer
+from application.container.service_container import ServiceContainer
 from infrastructure.file.cleanup_scheduler import FileCleanupScheduler
 
 

@@ -14,7 +14,7 @@ from application.config.file_configs import FileCleanupConfig, FileConfig
 from application.config.processing_configs import LLMConfig, OCRConfig, PerformanceConfig, TextProcessingConfig
 from application.config.system_config import SystemConfig
 from domain.config.tts_config import TTSConfig, TTSEngine
-from domain.container.service_container import ServiceContainer, create_service_container_builder
+from application.container.service_container import ServiceContainer, create_service_container_builder
 from domain.models import TextSegment
 from domain.text.chunking_strategy import SentenceBasedChunking, WordBasedChunking
 
