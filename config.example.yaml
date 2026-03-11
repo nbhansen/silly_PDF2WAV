@@ -49,7 +49,6 @@ text_processing:
   enable_plain_english_conversion: false
   
   # Chunk sizes for processing
-  chunk_size: 20000
   llm_chunk_size: 50000
   audio_target_chunk_size: 3000
 

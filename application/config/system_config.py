@@ -38,7 +38,7 @@ text_processing:        # TextProcessingConfig - Text pipeline settings
   enable_cleaning       # Use LLM for text cleaning
   enable_natural_formatting # Add speech pauses
   enable_plain_english  # Simplify language
-  llm_chunk_size        # Chunk size for LLM processing
+  llm_chunk_size        # Max chars per chunk sent to LLM for cleaning
 
 performance:            # PerformanceConfig - Processing optimization
   enable_async          # Use async TTS processing
@@ -314,7 +314,6 @@ class SystemConfig:
             enable_plain_english=cls._parse_bool_value(
                 get_config("text_processing.enable_plain_english_conversion", False), False
             ),
-            chunk_size=cls._parse_int_value(get_config("text_processing.chunk_size", 20000), 20000, 1000, 100000),
             llm_chunk_size=cls._parse_int_value(
                 get_config("text_processing.llm_chunk_size", 50000), 50000, 10000, 200000
             ),
