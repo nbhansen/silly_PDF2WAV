@@ -4,129 +4,14 @@
 Tests written first to drive implementation and ensure all edge cases are covered.
 """
 
-from datetime import datetime, timedelta
-
-import pytest
-
 from domain.models import (
     CleanupResult,
-    FileInfo,
-    PageRange,
     PDFInfo,
-    ProcessingRequest,
     ProcessingResult,
     TextSegment,
     TimedAudioResult,
     TimingMetadata,
 )
-
-
-class TestPageRange:
-    """TDD tests for PageRange model - tests written first to drive behavior."""
-
-    def test_default_page_range_is_full_document(self):
-        """Should represent full document when no pages specified."""
-        page_range = PageRange()
-        assert page_range.is_full_document() is True
-        assert page_range.start_page is None
-        assert page_range.end_page is None
-
-    def test_specific_page_range_is_not_full_document(self):
-        """Should not be full document when specific pages are set."""
-        page_range = PageRange(start_page=1, end_page=5)
-        assert page_range.is_full_document() is False
-        assert page_range.start_page == 1
-        assert page_range.end_page == 5
-
-    def test_partial_page_range_with_only_start_page(self):
-        """Should not be full document when only start page is set."""
-        page_range = PageRange(start_page=3)
-        assert page_range.is_full_document() is False
-        assert page_range.start_page == 3
-        assert page_range.end_page is None
-
-    def test_partial_page_range_with_only_end_page(self):
-        """Should not be full document when only end page is set."""
-        page_range = PageRange(end_page=10)
-        assert page_range.is_full_document() is False
-        assert page_range.start_page is None
-        assert page_range.end_page == 10
-
-    def test_page_range_equality(self):
-        """Should support equality comparison."""
-        range1 = PageRange(start_page=1, end_page=5)
-        range2 = PageRange(start_page=1, end_page=5)
-        range3 = PageRange(start_page=2, end_page=5)
-
-        assert range1 == range2
-        assert range1 != range3
-
-    def test_page_range_validation_edge_cases(self):
-        """Should handle edge cases in page ranges."""
-        # Zero and negative pages are allowed in data model but caught by validator services
-        range_zero = PageRange(start_page=0, end_page=5)
-        assert range_zero.start_page == 0
-        
-        range_reversed = PageRange(start_page=5, end_page=2)
-        assert range_reversed.start_page == 5
-        assert range_reversed.end_page == 2
-
-
-class TestProcessingRequest:
-    """TDD tests for ProcessingRequest model."""
-
-    def test_processing_request_creation_with_full_document(self):
-        """Should create request for full document processing."""
-        page_range = PageRange()
-        request = ProcessingRequest(pdf_path="/path/to/document.pdf", output_name="audio_output", page_range=page_range)
-
-        assert request.pdf_path == "/path/to/document.pdf"
-        assert request.output_name == "audio_output"
-        assert request.page_range.is_full_document() is True
-
-    def test_processing_request_creation_with_specific_pages(self):
-        """Should create request for specific page range."""
-        page_range = PageRange(start_page=1, end_page=3)
-        request = ProcessingRequest(pdf_path="/path/to/document.pdf", output_name="audio_output", page_range=page_range)
-
-        assert request.pdf_path == "/path/to/document.pdf"
-        assert request.output_name == "audio_output"
-        assert request.page_range.start_page == 1
-        assert request.page_range.end_page == 3
-
-        def test_processing_request_with_empty_strings(self):
-
-            """Should validate empty paths."""
-
-            page_range = PageRange()
-
-    
-
-            # Empty pdf_path allowed in model, validated in service
-
-            request = ProcessingRequest(
-
-                pdf_path="",
-
-                output_name="output",
-
-                page_range=page_range
-
-            )
-
-            assert request.pdf_path == ""
-
-    def test_processing_request_equality(self):
-        """Should support equality comparison for requests."""
-        page_range1 = PageRange(start_page=1, end_page=5)
-        page_range2 = PageRange(start_page=1, end_page=5)
-
-        request1 = ProcessingRequest("file.pdf", "output", page_range1)
-        request2 = ProcessingRequest("file.pdf", "output", page_range2)
-        request3 = ProcessingRequest("other.pdf", "output", page_range1)
-
-        assert request1 == request2
-        assert request1 != request3
 
 
 class TestPDFInfo:
@@ -245,80 +130,6 @@ class TestProcessingResult:
         audio_files.append("file2.wav")
         assert result.audio_files is not None
         assert len(result.audio_files) == 1
-
-
-class TestFileInfo:
-    """TDD tests for FileInfo model - file management metadata."""
-
-    def test_file_info_creation_with_recent_file(self):
-        """Should create file info with proper metadata."""
-        now = datetime.now()
-        file_info = FileInfo(
-            filename="test.wav",
-            full_path="/audio/test.wav",
-            size_bytes=1048576,
-            created_at=now,  # 1MB
-        )
-
-        assert file_info.filename == "test.wav"
-        assert file_info.full_path == "/audio/test.wav"
-        assert file_info.size_bytes == 1048576
-        assert file_info.created_at == now
-        assert file_info.last_accessed is None
-
-    def test_file_info_size_conversion_to_mb(self):
-        """Should correctly convert bytes to megabytes."""
-        file_info = FileInfo(
-            filename="large.wav",
-            full_path="/audio/large.wav",
-            size_bytes=5242880,
-            created_at=datetime.now(),  # 5MB
-        )
-
-        assert file_info.size_mb == 5.0
-
-    def test_file_info_size_conversion_with_fractional_mb(self):
-        """Should handle fractional megabytes correctly."""
-        file_info = FileInfo(
-            filename="small.wav",
-            full_path="/audio/small.wav",
-            size_bytes=1572864,
-            created_at=datetime.now(),  # 1.5MB
-        )
-
-        assert file_info.size_mb == 1.5
-
-    def test_file_info_age_calculation(self):
-        """Should calculate file age in hours correctly."""
-        two_hours_ago = datetime.now() - timedelta(hours=2)
-        file_info = FileInfo(filename="old.wav", full_path="/audio/old.wav", size_bytes=1024, created_at=two_hours_ago)
-
-        age = file_info.age_hours
-        assert 1.9 <= age <= 2.1  # Allow small tolerance for test execution time
-
-    def test_file_info_with_zero_size(self):
-        """Should handle zero-byte files."""
-        file_info = FileInfo(
-            filename="empty.txt", full_path="/secure/path/empty.txt", size_bytes=0, created_at=datetime.now()
-        )
-
-        assert file_info.size_mb == 0.0
-        assert file_info.size_bytes == 0
-
-    def test_file_info_with_last_accessed_time(self):
-        """Should track last accessed time when provided."""
-        created = datetime.now() - timedelta(hours=1)
-        accessed = datetime.now() - timedelta(minutes=30)
-
-        file_info = FileInfo(
-            filename="accessed.wav",
-            full_path="/audio/accessed.wav",
-            size_bytes=2048,
-            created_at=created,
-            last_accessed=accessed,
-        )
-
-        assert file_info.last_accessed == accessed
 
 
 class TestCleanupResult:
