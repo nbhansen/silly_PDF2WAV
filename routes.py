@@ -5,18 +5,14 @@ dependency injection, eliminating global state.
 """
 
 import contextlib
-from dataclasses import dataclass
 import json
 import logging
 import os
 from pathlib import Path
 import threading
 import time
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import Any, Optional, Union
 import uuid
-
-if TYPE_CHECKING:
-    from domain.interfaces import IAudioEngine, IDocumentEngine, ITextPipeline
 
 from flask import Flask, Response, current_app, jsonify, render_template, request, send_from_directory, url_for
 from werkzeug.datastructures import FileStorage
@@ -26,22 +22,17 @@ from application.config.system_config import SystemConfig
 from application.context.application_context import ApplicationContext
 from application.services.document_service import DocumentProcessingService
 from domain.container.service_container import ServiceContainer
-from domain.models import PageRange, ProcessingResult, TimingMetadata
+from domain.models import PageRange, ProcessingResult
 from infrastructure.file.file_manager import FileManager
 from progress_store import (
-    ProgressStatus,
     cancel_operation,
     get_progress,
-    is_operation_cancelled,
     update_progress,
 )
 from utils import (
     allowed_file,
-    clean_text_for_display,
     get_contextual_error_message,
     get_processing_stage_error,
-    parse_page_range_from_form,
-    parse_plain_english_from_form,
 )
 
 
@@ -73,7 +64,7 @@ def background_process_document(
         try:
             # Get service from container
             service = app_context.service_container.get(DocumentProcessingService)
-            
+
             # Delegate all orchestration logic to service
             service.process_document_background(
                 operation_id=operation_id,
@@ -96,7 +87,7 @@ def get_app_context() -> ApplicationContext:
     return current_app.config["APP_CONTEXT"]  # type: ignore[no-any-return]
 
 
-def get_pdf_service() -> object:  # Returns service container
+def get_pdf_service() -> ServiceContainer:
     """Get PDF service from context."""
     return get_app_context().service_container
 
@@ -297,11 +288,8 @@ def register_routes(app: Flask) -> None:
             file.save(str(temp_path))
 
             # Use document engine to get PDF info
-            from domain.container.service_container import ServiceContainer
             from domain.interfaces import IDocumentEngine
 
-            # Type assertion for proper type checking
-            assert isinstance(service, ServiceContainer), "Service must be ServiceContainer instance"
             document_engine = service.get(IDocumentEngine)
             pdf_info_result = document_engine.get_pdf_info(str(temp_path))
 
@@ -346,9 +334,12 @@ def register_routes(app: Flask) -> None:
 
         return file, None
 
-    @app.route("/upload", methods=["POST"])
-    def upload_file() -> Union[str, tuple[str, int]]:
-        """Regular upload WITHOUT timing data."""
+    def _handle_upload(enable_timing: bool) -> Union[str, tuple[str, int]]:
+        """Shared upload handler for both regular and timing-enabled uploads.
+
+        Args:
+            enable_timing: Whether to enable timing data for read-along functionality.
+        """
         file, error = _validate_upload_request()
         if error or file is None:
             return error or "No file provided"
@@ -357,7 +348,8 @@ def register_routes(app: Flask) -> None:
         operation_id = str(uuid.uuid4())
 
         # Initialize progress tracking
-        update_progress(operation_id, "starting", 0, "Upload received, starting processing...")
+        timing_suffix = " with timing data" if enable_timing else ""
+        update_progress(operation_id, "starting", 0, f"Upload received, starting processing{timing_suffix}...")
 
         # Save file first before passing to thread (FileStorage closes after request)
         config = get_app_config()
@@ -380,7 +372,7 @@ def register_routes(app: Flask) -> None:
                 form_data,
                 str(saved_path),
                 original_filename,
-                False,
+                enable_timing,
                 get_app_context(),
                 current_app._get_current_object(),
             ),
@@ -389,7 +381,12 @@ def register_routes(app: Flask) -> None:
         thread.start()
 
         # Return processing page immediately
-        return render_template("processing.html", operation_id=operation_id, enable_timing=False)
+        return render_template("processing.html", operation_id=operation_id, enable_timing=enable_timing)
+
+    @app.route("/upload", methods=["POST"])
+    def upload_file() -> Union[str, tuple[str, int]]:
+        """Regular upload WITHOUT timing data."""
+        return _handle_upload(enable_timing=False)
 
     @app.route("/upload-with-timing", methods=["POST"])
     def upload_file_with_timing() -> Union[str, tuple[str, int]]:
@@ -397,80 +394,33 @@ def register_routes(app: Flask) -> None:
         config = get_app_config()
         if config.tts.engine.value == "gemini":
             return "Read-along mode is not available with Gemini TTS. Please use regular upload or switch to Piper TTS."
-
-        file, error = _validate_upload_request()
-        if error or file is None:
-            return error or "No file provided"
-
-        # Generate unique operation ID
-        operation_id = str(uuid.uuid4())
-
-        # Initialize progress tracking
-        update_progress(operation_id, "starting", 0, "Upload received, starting processing with timing data...")
-
-        # Save file first before passing to thread (FileStorage closes after request)
-        config = get_app_config()
-        if not file.filename:
-            return "No filename provided", 400
-        original_filename = secure_filename(file.filename)
-        saved_path = Path(config.files.upload_folder) / f"{operation_id}_{original_filename}"
-        file.save(str(saved_path))
-
-        # Convert form data to dict (Flask objects don't work in threads)
-        form_data = dict(request.form)
-
-        # Start background processing WITH timing and app context
-        from flask import current_app
-
-        thread = threading.Thread(
-            target=background_process_document,
-            args=(
-                operation_id,
-                form_data,
-                str(saved_path),
-                original_filename,
-                True,
-                get_app_context(),
-                current_app._get_current_object(),
-            ),
-            daemon=True,
-        )
-        thread.start()
-
-        # Return processing page immediately
-        return render_template("processing.html", operation_id=operation_id, enable_timing=True)
+        return _handle_upload(enable_timing=True)
 
     @app.route("/admin/file_stats")
     def get_file_stats() -> Union[Response, tuple[Response, int]]:
         """Get file management statistics (admin endpoint)."""
         service = get_pdf_service()
-        if not is_processor_available() or not service:
+        if not is_processor_available():
             return jsonify({"error": "Service not available"}), 500
 
         try:
-            if hasattr(service, "file_manager") and service.file_manager:
-                # Use the FileManager's get_stats method if it exists
-                if hasattr(service.file_manager, "get_stats"):
-                    stats = service.file_manager.get_stats()
-                    return jsonify(stats)
-                else:
-                    # Fallback: create basic stats manually
-                    audio_dir = Path(app.config["AUDIO_FOLDER"])
-                    if audio_dir.exists():
-                        files = list(audio_dir.iterdir())
-                        total_size = sum(f.stat().st_size for f in files if f.is_file())
-
-                        stats = {
-                            "total_files": len(files),
-                            "total_size_mb": total_size / (1024 * 1024),
-                            "directory": str(audio_dir),
-                            "cleanup_enabled": get_app_config().enable_file_cleanup,
-                        }
-                        return jsonify(stats)
-                    else:
-                        return jsonify({"error": "Audio directory not found"}), 404
-            else:
+            if not service.has(FileManager):
                 return jsonify({"error": "File management not available"}), 404
+
+            audio_dir = Path(app.config["AUDIO_FOLDER"])
+            if not audio_dir.exists():
+                return jsonify({"error": "Audio directory not found"}), 404
+
+            files = list(audio_dir.iterdir())
+            total_size = sum(f.stat().st_size for f in files if f.is_file())
+
+            stats = {
+                "total_files": len(files),
+                "total_size_mb": total_size / (1024 * 1024),
+                "directory": str(audio_dir),
+                "cleanup_enabled": get_app_config().enable_file_cleanup,
+            }
+            return jsonify(stats)
 
         except Exception as e:
             get_logger("routes").error("Admin file_stats error: %s", str(e))
@@ -480,53 +430,40 @@ def register_routes(app: Flask) -> None:
     def manual_cleanup() -> Union[Response, tuple[Response, int]]:
         """Trigger manual file cleanup (admin endpoint)."""
         service = get_pdf_service()
-        if not is_processor_available() or not service:
+        if not is_processor_available():
             return jsonify({"error": "Service not available"}), 500
 
         try:
-            max_age_hours = float(request.form.get("max_age_hours", 24.0))
-
-            if hasattr(service, "file_manager") and service.file_manager:
-                # Use direct file cleanup if method exists
-                if hasattr(service.file_manager, "cleanup_old_files"):
-                    result = service.file_manager.cleanup_old_files(max_age_hours)
-                    return jsonify(result)
-                else:
-                    # Fallback: manual cleanup logic
-                    audio_dir = Path(app.config["AUDIO_FOLDER"])
-                    cutoff_time = time.time() - (max_age_hours * 3600)
-
-                    removed_files = 0
-                    bytes_freed = 0
-                    errors = []
-
-                    try:
-                        for filepath in Path(audio_dir).iterdir():
-                            if filepath.is_file():
-                                file_age = filepath.stat().st_mtime
-                                if file_age < cutoff_time:
-                                    try:
-                                        file_size = filepath.stat().st_size
-                                        filepath.unlink()
-                                        removed_files += 1
-                                        bytes_freed += file_size
-                                        get_logger("routes").info("Cleaned up old file: %s", filepath.name)
-                                    except Exception as e:
-                                        errors.append(f"Failed to remove {filepath.name}: {e!s}")
-
-                        result = {
-                            "files_removed": removed_files,
-                            "bytes_freed": bytes_freed,
-                            "mb_freed": bytes_freed / (1024 * 1024),
-                            "errors": errors,
-                            "max_age_hours": max_age_hours,
-                        }
-                        return jsonify(result)
-
-                    except Exception as e:
-                        return jsonify({"error": f"Cleanup failed: {e!s}"}), 500
-            else:
+            if not service.has(FileManager):
                 return jsonify({"error": "File management not available"}), 404
+
+            max_age_hours = float(request.form.get("max_age_hours", 24.0))
+            audio_dir = Path(app.config["AUDIO_FOLDER"])
+            cutoff_time = time.time() - (max_age_hours * 3600)
+
+            removed_files = 0
+            bytes_freed = 0
+            errors: list[str] = []
+
+            for filepath in audio_dir.iterdir():
+                if filepath.is_file() and filepath.stat().st_mtime < cutoff_time:
+                    try:
+                        file_size = filepath.stat().st_size
+                        filepath.unlink()
+                        removed_files += 1
+                        bytes_freed += file_size
+                        get_logger("routes").info("Cleaned up old file: %s", filepath.name)
+                    except Exception as e:
+                        errors.append(f"Failed to remove {filepath.name}: {e!s}")
+
+            result = {
+                "files_removed": removed_files,
+                "bytes_freed": bytes_freed,
+                "mb_freed": bytes_freed / (1024 * 1024),
+                "errors": errors,
+                "max_age_hours": max_age_hours,
+            }
+            return jsonify(result)
 
         except Exception as e:
             get_logger("routes").error("Admin cleanup error: %s", str(e))
@@ -536,18 +473,17 @@ def register_routes(app: Flask) -> None:
     def trigger_scheduler_cleanup() -> Union[Response, tuple[Response, int]]:
         """Trigger scheduler's manual cleanup."""
         try:
-            service = get_pdf_service()
+            context = get_app_context()
+            scheduler = context.cleanup_scheduler
 
-            # The scheduler should be available through composition root
-            if hasattr(service, "cleanup_scheduler") and service.cleanup_scheduler:
-                # Trigger manual cleanup if method exists
-                if hasattr(service.cleanup_scheduler, "run_manual_cleanup"):
-                    result = service.cleanup_scheduler.run_manual_cleanup()
-                    return jsonify(result)
-                else:
-                    return jsonify({"error": "Manual cleanup not supported by scheduler"}), 404
-            else:
+            if scheduler is None:
                 return jsonify({"error": "Cleanup scheduler not available"}), 500
+
+            if hasattr(scheduler, "run_manual_cleanup"):
+                result = scheduler.run_manual_cleanup()
+                return jsonify(result)
+            else:
+                return jsonify({"error": "Manual cleanup not supported by scheduler"}), 404
 
         except Exception as e:
             get_logger("routes").error("Scheduler cleanup error: %s", str(e))
@@ -562,26 +498,20 @@ def register_routes(app: Flask) -> None:
             def is_flask_reloader() -> bool:
                 return os.environ.get("WERKZEUG_RUN_MAIN") != "true"
 
-            info = {
+            has_file_manager = service.has(FileManager)
+
+            info: dict[str, Any] = {
                 "processor_available": is_processor_available(),
-                "service_exists": service is not None,
-                "has_file_manager_attr": hasattr(service, "file_manager") if service else False,
-                "file_manager_exists": (
-                    service.file_manager is not None if (service and hasattr(service, "file_manager")) else False
-                ),
-                "service_type": service.__class__.__name__ if service else "None",
+                "service_exists": True,
+                "has_file_manager": has_file_manager,
+                "service_type": service.__class__.__name__,
                 "file_cleanup_enabled": get_app_config().enable_file_cleanup,
                 "is_reloader_process": is_flask_reloader(),
             }
 
-            if service and hasattr(service, "file_manager") and service.file_manager:
-                info["file_manager_type"] = service.file_manager.__class__.__name__
-                try:
-                    if hasattr(service.file_manager, "get_stats"):
-                        stats = service.file_manager.get_stats()
-                        info["file_stats"] = stats
-                except Exception as e:
-                    info["file_stats_error"] = str(e)
+            if has_file_manager:
+                file_manager = service.get(FileManager)
+                info["file_manager_type"] = file_manager.__class__.__name__
 
             return jsonify(info)
 
@@ -637,42 +567,3 @@ def render_upload_result(
         return enhanced_error_message
 
 
-def save_timing_data(base_filename: str, timing_metadata: TimingMetadata) -> None:
-    """Save timing metadata as JSON file."""
-    # Convert to JSON-serializable format
-    timing_json = {
-        "total_duration": timing_metadata.total_duration,
-        "audio_files": timing_metadata.audio_files,
-        "text_segments": [
-            {
-                "text": clean_text_for_display(segment.text),  # Clean SSML markup
-                "start_time": segment.start_time,
-                "duration": segment.duration,
-                "segment_type": segment.segment_type,
-                "chunk_index": segment.chunk_index,
-                "sentence_index": segment.sentence_index,
-            }
-            for segment in timing_metadata.text_segments
-        ],
-    }
-
-    timing_filename = f"{base_filename}_timing.json"
-    timing_path = Path(get_app_config().audio_folder) / timing_filename
-
-    try:
-        with timing_path.open("w", encoding="utf-8") as f:
-            json.dump(timing_json, f, indent=2, ensure_ascii=False)
-
-        get_logger("routes").info("Saved timing data: %s", timing_filename)
-
-        # Register timing file with file manager if available
-        service = get_pdf_service()
-        if hasattr(service, "file_manager") and service.file_manager:
-            try:
-                if hasattr(service.file_manager, "schedule_cleanup"):
-                    service.file_manager.schedule_cleanup(timing_filename, 2.0)  # Same cleanup as audio
-            except Exception:  # nosec B110 # noqa: S110
-                pass
-
-    except Exception as e:
-        get_logger("routes").error("Failed to save timing data: %s", str(e))
