@@ -16,9 +16,7 @@ from typing import TYPE_CHECKING, Any, Optional, Union
 import uuid
 
 if TYPE_CHECKING:
-    from domain.audio.audio_engine import IAudioEngine
-    from domain.document.document_engine import IDocumentEngine
-    from domain.text.text_pipeline import ITextPipeline
+    from domain.interfaces import IAudioEngine, IDocumentEngine, ITextPipeline
 
 from flask import Flask, Response, current_app, jsonify, render_template, request, send_from_directory, url_for
 from werkzeug.datastructures import FileStorage
@@ -300,7 +298,7 @@ def register_routes(app: Flask) -> None:
 
             # Use document engine to get PDF info
             from domain.container.service_container import ServiceContainer
-            from domain.document.document_engine import IDocumentEngine
+            from domain.interfaces import IDocumentEngine
 
             # Type assertion for proper type checking
             assert isinstance(service, ServiceContainer), "Service must be ServiceContainer instance"

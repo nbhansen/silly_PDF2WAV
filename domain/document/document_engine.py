@@ -4,11 +4,10 @@
 No exceptions thrown - all errors returned as Result[T].
 """
 
-from abc import ABC, abstractmethod
 from contextlib import suppress
 import io
 import logging
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Any, Optional
 
 import pdfplumber
 
@@ -18,41 +17,10 @@ from ..errors import (
     audio_generation_error,
     text_extraction_error,
 )
-from ..interfaces import IFileManager, IOCRProvider
+from ..interfaces import IAudioEngine, IDocumentEngine, IFileManager, IOCRProvider, ITextPipeline
 from ..models import PageRange, PDFInfo, ProcessingRequest, TimedAudioResult
 
-if TYPE_CHECKING:
-    from ..audio.audio_engine import IAudioEngine
-    from ..text.text_pipeline import ITextPipeline
-
 logger = logging.getLogger(__name__)
-
-
-class IDocumentEngine(ABC):
-    """Interface for document processing operations using Result[T] pattern."""
-
-    @abstractmethod
-    def get_pdf_info(self, pdf_path: str) -> Result[PDFInfo]:
-        """Get PDF metadata and information."""
-
-    @abstractmethod
-    def validate_page_range(self, pdf_path: str, page_range: PageRange) -> Result[dict[str, Any]]:
-        """Validate requested page range."""
-
-    @abstractmethod
-    def extract_text(self, pdf_path: str, pages: Optional[list[int]] = None) -> Result[list[str]]:
-        """Extract text from PDF with OCR fallback."""
-
-    @abstractmethod
-    def process_document(
-        self,
-        request: ProcessingRequest,
-        audio_engine: "IAudioEngine",
-        text_pipeline: "ITextPipeline",
-        enable_timing: bool = False,
-        llm_chunk_size: int = 50000,
-    ) -> Result[TimedAudioResult]:
-        """Complete document processing workflow."""
 
 
 class DocumentEngine(IDocumentEngine):
@@ -124,8 +92,8 @@ class DocumentEngine(IDocumentEngine):
     def process_document(
         self,
         request: ProcessingRequest,
-        audio_engine: "IAudioEngine",
-        text_pipeline: "ITextPipeline",
+        audio_engine: IAudioEngine,
+        text_pipeline: ITextPipeline,
         enable_timing: bool = False,
         llm_chunk_size: int = 50000,
     ) -> Result[TimedAudioResult]:
@@ -182,7 +150,7 @@ class DocumentEngine(IDocumentEngine):
         return Result.success(text_chunks)
 
     def _process_text_pipeline(
-        self, text_chunks: list[str], text_pipeline: "ITextPipeline", llm_chunk_size: int
+        self, text_chunks: list[str], text_pipeline: ITextPipeline, llm_chunk_size: int
     ) -> Result[list[str]]:
         """Process text through LLM cleaning and optimization pipeline."""
         logger.debug("Using optimized chunking strategy (LLM chunk size: %d)", llm_chunk_size)
@@ -241,7 +209,7 @@ class DocumentEngine(IDocumentEngine):
             return Result.from_exception(e, ErrorCode.TEXT_CLEANING_FAILED, retryable=True)
 
     def _generate_audio_output(
-        self, processed_chunks: list[str], output_name: str, enable_timing: bool, audio_engine: "IAudioEngine"
+        self, processed_chunks: list[str], output_name: str, enable_timing: bool, audio_engine: IAudioEngine
     ) -> Result[TimedAudioResult]:
         """Generate audio using appropriate strategy based on timing requirements."""
         try:

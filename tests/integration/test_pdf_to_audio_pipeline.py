@@ -17,12 +17,10 @@ from application.config.app_configs import FlaskConfig
 from application.config.file_configs import FileCleanupConfig, FileConfig
 from application.config.processing_configs import LLMConfig, OCRConfig, PerformanceConfig, TextProcessingConfig
 from application.config.system_config import SystemConfig
-from domain.audio.audio_engine import IAudioEngine
 from domain.config.tts_config import PiperConfig, TTSConfig, TTSEngine
-from domain.document.document_engine import IDocumentEngine
 from domain.container.service_container import create_service_container
+from domain.interfaces import IAudioEngine, IDocumentEngine, ITextPipeline
 from domain.models import PageRange, PDFInfo, ProcessingRequest, ProcessingResult
-from domain.text.text_pipeline import ITextPipeline
 
 
 @pytest.fixture

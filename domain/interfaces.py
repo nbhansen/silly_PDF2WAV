@@ -5,55 +5,12 @@ implementations, facilitating testing and modularity.
 """
 
 from abc import ABC, abstractmethod
-from enum import Enum, auto
 from typing import Any, Optional
 
 from .errors import Result
-from .models import PageRange, PDFInfo, TextSegment
-
-
-class SSMLCapability(Enum):
-    """Defines the SSML capability levels an engine might support."""
-
-    NONE = auto()  # No SSML support - plain text only
-    BASIC = auto()  # Basic SSML tags (break, emphasis)
-    ADVANCED = auto()  # Advanced SSML (prosody, say-as, marks)
-    FULL = auto()  # Full SSML support including all features
-
+from .models import PageRange, PDFInfo, ProcessingRequest, TimedAudioResult
 
 # --- Core Service Interfaces ---
-
-
-class IDocumentProcessor(ABC):
-    """Consolidated interface for document text processing operations."""
-
-    @abstractmethod
-    def extract_text(self, filepath: str, pages: Optional[list[int]] = None) -> list[str]:
-        """Extract text from document with optional page filtering."""
-
-    @abstractmethod
-    def validate_page_range(self, filepath: str, start: Optional[int], end: Optional[int]) -> dict[str, Any]:
-        """Validate page range against document."""
-
-
-class ITextProcessor(ABC):
-    """Consolidated interface for text cleaning and preparation."""
-
-    @abstractmethod
-    def clean_text(self, raw_text: str) -> str:
-        """Clean and prepare text for TTS."""
-
-    @abstractmethod
-    def enhance_with_natural_formatting(self, text: str) -> str:
-        """Add natural formatting enhancements to text."""
-
-    @abstractmethod
-    def split_into_sentences(self, text: str) -> list[str]:
-        """Split text into sentences for processing."""
-
-    @abstractmethod
-    def strip_ssml(self, text: str) -> str:
-        """Remove SSML tags from text."""
 
 
 class IFileManager(ABC):
@@ -137,99 +94,77 @@ class ITTSEngine(ABC):
         """Check if this TTS engine supports SSML markup."""
 
 
-# --- Enhanced TTS Interface ---
+# --- Domain Engine Interfaces ---
 
 
-class IEnhancedTTSEngine(ITTSEngine):
-    """Enhanced TTS interface that consolidates audio processing capabilities.
-
-    Replaces separate IAudioProcessor and IEngineCapabilityDetector interfaces.
-    """
+class IDocumentEngine(ABC):
+    """Interface for document processing operations using Result[T] pattern."""
 
     @abstractmethod
-    def supports_ssml(self) -> bool:
-        """Check if engine supports SSML."""
+    def get_pdf_info(self, pdf_path: str) -> Result[PDFInfo]:
+        """Get PDF metadata and information."""
 
     @abstractmethod
-    def get_ssml_capability(self) -> SSMLCapability:
-        """Get SSML capability level."""
+    def validate_page_range(self, pdf_path: str, page_range: PageRange) -> Result[dict[str, Any]]:
+        """Validate requested page range."""
 
     @abstractmethod
-    def supports_timestamps(self) -> bool:
-        """Check if engine supports native timestamp generation."""
+    def extract_text(self, pdf_path: str, pages: Optional[list[int]] = None) -> Result[list[str]]:
+        """Extract text from PDF with OCR fallback."""
 
     @abstractmethod
-    def get_audio_format(self) -> str:
-        """Get preferred audio output format."""
+    def process_document(
+        self,
+        request: ProcessingRequest,
+        audio_engine: "IAudioEngine",
+        text_pipeline: "ITextPipeline",
+        enable_timing: bool = False,
+        llm_chunk_size: int = 50000,
+    ) -> Result[TimedAudioResult]:
+        """Complete document processing workflow."""
+
+
+class IAudioEngine(ABC):
+    """Interface for audio operations using Result[T] pattern."""
 
     @abstractmethod
-    def requires_rate_limiting(self) -> bool:
-        """Check if engine requires rate limiting."""
+    def generate_with_timing(self, text_chunks: list[str], output_filename: str) -> Result[TimedAudioResult]:
+        """Generate audio with timing data from text chunks."""
 
     @abstractmethod
-    def get_recommended_delay(self) -> float:
-        """Get recommended delay between requests."""
-
-
-# --- Specialized TTS Interface ---
-
-
-class ITimestampedTTSEngine(ITTSEngine):
-    """An interface for TTS engines that can return synchronization timestamps.
-
-    along with the generated audio. This is the 'ideal path'.
-    """
+    def generate_simple_audio(self, text_chunks: list[str], output_filename: str) -> Result[TimedAudioResult]:
+        """Generate audio without timing complexity - for regular uploads."""
 
     @abstractmethod
-    def generate_audio_with_timestamps(self, text_to_speak: str) -> Result[tuple[bytes, list[TextSegment]]]:
-        """Generates audio and returns precise timing data from the engine.
-
-        Args:
-            text_to_speak (str): The SSML or plain text to synthesize.
-
-        Returns:
-            Result[Tuple[bytes, List[TextSegment]]]: Success with audio and timing data or failure with error.
-        """
-
-
-# --- Audio Processing Interfaces ---
-
-
-class IAudioProcessor(ABC):
-    """Interface for audio file processing operations (FFmpeg, etc.)."""
+    async def generate_audio_async(
+        self, text_chunks: list[str], output_name: str, output_dir: str
+    ) -> tuple[list[str], Optional[str]]:
+        """Generate audio files concurrently with coordination."""
 
     @abstractmethod
-    def check_ffmpeg_availability(self) -> bool:
-        """Check if FFmpeg is available on the system."""
+    def process_audio_file(self, file_path: str) -> Result[float]:
+        """Process audio file and return duration."""
 
     @abstractmethod
-    def combine_audio_files(self, audio_files: list[str], output_path: str) -> Result[str]:
-        """Combine multiple audio files into a single file."""
+    def combine_audio_files(self, file_paths: list[str], output_path: str) -> Result[str]:
+        """Combine multiple audio files into one."""
+
+
+class ITextPipeline(ABC):
+    """Interface for text processing operations using Result[T] pattern."""
 
     @abstractmethod
-    def convert_audio_format(self, input_path: str, output_path: str, format: str) -> Result[str]:
-        """Convert audio file to specified format."""
+    def clean_text(self, raw_text: str) -> Result[str]:
+        """Clean and prepare text for TTS."""
 
     @abstractmethod
-    def get_audio_duration(self, audio_path: str) -> Result[float]:
-        """Get duration of audio file in seconds."""
-
-
-class IEngineCapabilityDetector(ABC):
-    """Interface for detecting TTS engine capabilities."""
+    async def clean_text_async(self, raw_text: str) -> Result[str]:
+        """Clean and prepare text for TTS asynchronously with rate limiting."""
 
     @abstractmethod
-    def detect_ssml_capability(self, engine: ITTSEngine) -> SSMLCapability:
-        """Detect SSML capability level of an engine."""
+    def enhance_with_natural_formatting(self, text: str) -> Result[str]:
+        """Add natural formatting enhancements to text."""
 
     @abstractmethod
-    def supports_timestamps(self, engine: ITTSEngine) -> bool:
-        """Check if engine supports native timestamp generation."""
-
-    @abstractmethod
-    def get_recommended_rate_limit(self, engine: ITTSEngine) -> float:
-        """Get recommended rate limiting delay for engine."""
-
-    @abstractmethod
-    def requires_async_processing(self, engine: ITTSEngine) -> bool:
-        """Determine if engine should use async processing."""
+    def split_into_sentences(self, text: str) -> Result[list[str]]:
+        """Split text into sentences for processing."""

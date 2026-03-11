@@ -4,37 +4,17 @@
 No exceptions thrown - all errors returned as Result[T].
 """
 
-from abc import ABC, abstractmethod
 import logging
 import re
 from typing import TYPE_CHECKING, Optional
 
 from ..errors import ApplicationError, ErrorCode, Result
+from ..interfaces import ITextPipeline
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from ..interfaces import ILLMProvider
-
-
-class ITextPipeline(ABC):
-    """Interface for text processing operations using Result[T] pattern."""
-
-    @abstractmethod
-    def clean_text(self, raw_text: str) -> Result[str]:
-        """Clean and prepare text for TTS."""
-
-    @abstractmethod
-    async def clean_text_async(self, raw_text: str) -> Result[str]:
-        """Clean and prepare text for TTS asynchronously with rate limiting."""
-
-    @abstractmethod
-    def enhance_with_natural_formatting(self, text: str) -> Result[str]:
-        """Add natural formatting enhancements to text."""
-
-    @abstractmethod
-    def split_into_sentences(self, text: str) -> Result[list[str]]:
-        """Split text into sentences for processing."""
 
 
 class TextPipeline(ITextPipeline):

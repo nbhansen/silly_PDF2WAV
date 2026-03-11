@@ -11,13 +11,14 @@ from application.config.app_configs import FlaskConfig
 from application.config.file_configs import FileCleanupConfig, FileConfig
 from application.config.processing_configs import LLMConfig, OCRConfig, PerformanceConfig, TextProcessingConfig
 from application.config.system_config import SystemConfig
-from domain.audio.audio_engine import AudioEngine, IAudioEngine
+from domain.audio.audio_engine import AudioEngine
 from domain.audio.timing_engine import ITimingEngine, TimingEngine, TimingMode
 from domain.config.tts_config import GeminiConfig, TTSConfig, TTSEngine
 from domain.container.service_container import ServiceContainer, create_service_container_builder
 from domain.errors import Result
+from domain.interfaces import IAudioEngine, ITextPipeline
 from domain.models import TextSegment, TimedAudioResult
-from domain.text.text_pipeline import ITextPipeline, TextPipeline
+from domain.text.text_pipeline import TextPipeline
 
 
 def create_test_config(tts_engine: str = "piper") -> SystemConfig:

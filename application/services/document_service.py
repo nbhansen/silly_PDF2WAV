@@ -56,9 +56,8 @@ class DocumentProcessingService:
                 return
 
             # 2. Execute processing (20-95%)
-            from domain.document.document_engine import IDocumentEngine
-            from domain.audio.audio_engine import IAudioEngine
-            from domain.text.text_pipeline import ITextPipeline, TextPipeline
+            from domain.interfaces import IAudioEngine, IDocumentEngine, ITextPipeline
+            from domain.text.text_pipeline import TextPipeline
             from infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
 
             document_engine = self.container.get(IDocumentEngine)
