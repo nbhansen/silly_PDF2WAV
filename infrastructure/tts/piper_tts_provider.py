@@ -1,4 +1,3 @@
-# infrastructure/tts/piper_tts_provider.py - Fixed imports
 from contextlib import suppress
 
 # Import logger for debugging home user issues
@@ -16,7 +15,7 @@ import urllib.request
 
 from domain.config import PiperConfig
 from domain.errors import Result, tts_engine_error
-from domain.interfaces import ITTSEngine  # FIXED: Removed ISSMLProcessor
+from domain.interfaces import ITTSEngine
 
 logger = logging.getLogger("piper_tts")
 
@@ -30,7 +29,7 @@ except ImportError:
     PIPER_VOICE_AVAILABLE = False
 
 
-class PiperTTSProvider(ITTSEngine):  # FIXED: Only implement ITTSEngine
+class PiperTTSProvider(ITTSEngine):
     """Piper TTS Provider with basic SSML support."""
 
     def __init__(

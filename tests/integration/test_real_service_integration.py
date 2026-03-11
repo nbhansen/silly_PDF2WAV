@@ -20,7 +20,7 @@ from domain.audio.audio_engine import IAudioEngine
 from domain.config.tts_config import PiperConfig, TTSConfig, TTSEngine
 from domain.document.document_engine import IDocumentEngine
 from domain.errors import Result
-from domain.factories.service_factory import create_pdf_service_from_env
+from domain.container.service_container import create_service_container
 from domain.models import PageRange, ProcessingRequest
 from domain.text.text_pipeline import ITextPipeline
 from infrastructure.file.file_manager import FileManager
@@ -75,7 +75,7 @@ class TestServiceFactoryIntegration:
         """Should create all core services without excessive mocking."""
         # Only mock Piper availability check - rest should be real
         with patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True):
-            container = create_pdf_service_from_env(integration_config)
+            container = create_service_container(integration_config)
 
             # Verify all main services are created
             audio_engine = container.get(IAudioEngine)
@@ -97,7 +97,7 @@ class TestServiceFactoryIntegration:
     def test_service_container_dependency_injection(self, integration_config: SystemConfig) -> None:
         """Should properly inject dependencies between services."""
         with patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True):
-            container = create_pdf_service_from_env(integration_config)
+            container = create_service_container(integration_config)
 
             # Get services that should share dependencies
             audio_engine = container.get(IAudioEngine)
@@ -117,7 +117,7 @@ class TestServiceFactoryIntegration:
         """Should create correct TTS engine based on configuration."""
         # Test Piper engine selection
         with patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True):
-            container = create_pdf_service_from_env(integration_config)
+            container = create_service_container(integration_config)
 
             audio_engine = container.get(IAudioEngine)
             assert audio_engine is not None
@@ -128,7 +128,7 @@ class TestServiceFactoryIntegration:
     def test_configuration_propagation(self, integration_config: SystemConfig) -> None:
         """Should properly propagate configuration to all services."""
         with patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True):
-            container = create_pdf_service_from_env(integration_config)
+            container = create_service_container(integration_config)
 
             text_pipeline = container.get(ITextPipeline)
             file_manager = container.get(FileManager)
@@ -147,7 +147,7 @@ class TestServiceInteractionIntegration:
     def test_document_engine_ocr_integration(self, integration_config: SystemConfig) -> None:
         """Should integrate real document engine with OCR provider."""
         with patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True):
-            container = create_pdf_service_from_env(integration_config)
+            container = create_service_container(integration_config)
 
             document_engine = container.get(IDocumentEngine)
 
@@ -162,7 +162,7 @@ class TestServiceInteractionIntegration:
     def test_audio_engine_tts_integration(self, integration_config: SystemConfig) -> None:
         """Should integrate real audio engine with TTS provider."""
         with patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True):
-            container = create_pdf_service_from_env(integration_config)
+            container = create_service_container(integration_config)
 
             audio_engine = container.get(IAudioEngine)
 
@@ -177,7 +177,7 @@ class TestServiceInteractionIntegration:
     def test_file_manager_directory_creation(self, integration_config: SystemConfig) -> None:
         """Should properly create and manage directories."""
         with patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True):
-            container = create_pdf_service_from_env(integration_config)
+            container = create_service_container(integration_config)
 
             file_manager = container.get(FileManager)
 
@@ -265,7 +265,7 @@ class TestErrorHandlingIntegration:
         # This tests that errors are handled gracefully rather than crashing
         try:
             with patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True):
-                container = create_pdf_service_from_env(invalid_config)
+                container = create_service_container(invalid_config)
                 # If it succeeds, services should still be created
                 assert container is not None
         except Exception as e:
@@ -279,7 +279,7 @@ class TestErrorHandlingIntegration:
         with patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False):
             # This might fail or fall back to alternative - both are valid behaviors
             try:
-                container = create_pdf_service_from_env(integration_config)
+                container = create_service_container(integration_config)
                 # If successful, should have valid services
                 assert container is not None
             except Exception:
@@ -300,7 +300,7 @@ class TestRealProviderInteraction:
                 with patch("pathlib.Path.exists") as mock_exists:
                     mock_exists.return_value = True
 
-                    container = create_pdf_service_from_env(integration_config)
+                    container = create_service_container(integration_config)
                     audio_engine = container.get(IAudioEngine)
 
                     # Should have real TTS engine that implements interface
@@ -321,7 +321,7 @@ class TestRealProviderInteraction:
     def test_text_pipeline_real_processing(self, integration_config: SystemConfig) -> None:
         """Should create text pipeline that does real text processing."""
         with patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True):
-            container = create_pdf_service_from_env(integration_config)
+            container = create_service_container(integration_config)
             text_pipeline = container.get(ITextPipeline)
 
             # Text pipeline should be real implementation
@@ -335,7 +335,7 @@ class TestRealProviderInteraction:
     def test_file_manager_real_operations(self, integration_config: SystemConfig) -> None:
         """Should create file manager that does real file operations."""
         with patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True):
-            container = create_pdf_service_from_env(integration_config)
+            container = create_service_container(integration_config)
             file_manager = container.get(FileManager)
 
             # File manager should be real implementation

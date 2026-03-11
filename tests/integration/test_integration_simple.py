@@ -9,7 +9,7 @@ from application.config.file_configs import FileCleanupConfig, FileConfig
 from application.config.processing_configs import LLMConfig, OCRConfig, PerformanceConfig, TextProcessingConfig
 from application.config.system_config import SystemConfig
 from domain.config.tts_config import GeminiConfig, TTSConfig, TTSEngine
-from domain.factories.service_factory import create_pdf_service_from_env
+from domain.container.service_container import create_service_container
 from domain.models import PageRange, ProcessingRequest
 
 
@@ -51,7 +51,7 @@ def test_service_factory_creation():
         patch("infrastructure.tts.piper_tts_provider.PiperTTSProvider"),
     ):
         config = create_test_config()
-        container = create_pdf_service_from_env(config)
+        container = create_service_container(config)
 
         # Verify all main services are available
         from domain.audio.audio_engine import IAudioEngine

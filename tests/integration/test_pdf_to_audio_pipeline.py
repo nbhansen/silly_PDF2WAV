@@ -20,7 +20,7 @@ from application.config.system_config import SystemConfig
 from domain.audio.audio_engine import IAudioEngine
 from domain.config.tts_config import PiperConfig, TTSConfig, TTSEngine
 from domain.document.document_engine import IDocumentEngine
-from domain.factories.service_factory import create_pdf_service_from_env
+from domain.container.service_container import create_service_container
 from domain.models import PageRange, PDFInfo, ProcessingRequest, ProcessingResult
 from domain.text.text_pipeline import ITextPipeline
 
@@ -163,7 +163,7 @@ class TestPDFToAudioPipelineCore:
         pdf_path.write_bytes(test_pdf_content)
 
         with patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True):
-            container = create_pdf_service_from_env(pipeline_config)
+            container = create_service_container(pipeline_config)
             document_engine = container.get(IDocumentEngine)
 
             # Test PDF info extraction
@@ -197,7 +197,7 @@ class TestPDFToAudioPipelineCore:
         """
 
         with patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True):
-            container = create_pdf_service_from_env(pipeline_config)
+            container = create_service_container(pipeline_config)
             text_pipeline = container.get(ITextPipeline)
 
             # Test text processing
@@ -242,7 +242,7 @@ class TestPDFToAudioPipelineCore:
         test_text = "This is a test sentence for audio generation."
 
         with patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True):
-            container = create_pdf_service_from_env(pipeline_config)
+            container = create_service_container(pipeline_config)
             audio_engine = container.get(IAudioEngine)
 
             # Test audio generation engine existence
@@ -255,7 +255,7 @@ class TestPDFToAudioPipelineCore:
         nonexistent_path = "/nonexistent/directory/missing.pdf"
 
         with patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True):
-            container = create_pdf_service_from_env(pipeline_config)
+            container = create_service_container(pipeline_config)
             document_engine = container.get(IDocumentEngine)
 
             # Should handle missing file gracefully - specific implementation detail:
@@ -276,7 +276,7 @@ class TestPDFToAudioPipelineCore:
         empty_texts = ["", "   ", "\n\n\t", "  \n  \t  "]
 
         with patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True):
-            container = create_pdf_service_from_env(pipeline_config)
+            container = create_service_container(pipeline_config)
             text_pipeline = container.get(ITextPipeline)
 
             for empty_text in empty_texts:
@@ -305,7 +305,7 @@ class TestPDFToAudioPipelineCore:
     def test_chunking_efficiency(self, pipeline_config: SystemConfig) -> None:
         """Should chunk text efficiently for different sizes."""
         with patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True):
-            container = create_pdf_service_from_env(pipeline_config)
+            container = create_service_container(pipeline_config)
             text_pipeline = container.get(ITextPipeline)
 
             # Test various text sizes
@@ -344,7 +344,7 @@ class TestPDFToAudioFileManagement:
         upload_dir, audio_dir = pipeline_test_dirs
 
         with patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True):
-            container = create_pdf_service_from_env(pipeline_config)
+            container = create_service_container(pipeline_config)
 
             from infrastructure.file.file_manager import FileManager
             file_manager = container.get(FileManager)

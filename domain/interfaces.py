@@ -192,11 +192,7 @@ class ITimestampedTTSEngine(ITTSEngine):
         """
 
 
-# --- Legacy interfaces removed during refactor ---
-# ITimingStrategy was consolidated into TimingEngine
-
-
-# --- Phase 2 New Abstractions ---
+# --- Audio Processing Interfaces ---
 
 
 class IAudioProcessor(ABC):
@@ -217,9 +213,6 @@ class IAudioProcessor(ABC):
     @abstractmethod
     def get_audio_duration(self, audio_path: str) -> Result[float]:
         """Get duration of audio file in seconds."""
-
-
-# ITimingCalculator was consolidated into TimingEngine
 
 
 class IEngineCapabilityDetector(ABC):
