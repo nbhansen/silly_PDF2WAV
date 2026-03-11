@@ -15,7 +15,6 @@ from application.config.system_config import SystemConfig
 from application.context.application_context import ApplicationContext
 from domain.container.service_container import ServiceContainer
 from infrastructure.file.cleanup_scheduler import FileCleanupScheduler
-from infrastructure.file.file_manager import FileManager
 
 
 def create_service_container(config: SystemConfig, logger_factory: ThreadSafeLoggerFactory) -> ServiceContainer:
@@ -63,7 +62,9 @@ def create_app(config_path: Optional[Path] = None) -> Flask:
     # Create cleanup scheduler if enabled
     cleanup_scheduler = None
     if app_config.cleanup.enabled:
-        file_manager = FileManager(app_config.files.upload_folder, app_config.files.audio_folder)
+        from infrastructure.file.file_manager import FileManager
+
+        file_manager = service_container.get(FileManager)
         cleanup_scheduler = FileCleanupScheduler(
             file_manager=file_manager,
             max_file_age_seconds=int(app_config.cleanup.max_file_age_hours * 3600),
