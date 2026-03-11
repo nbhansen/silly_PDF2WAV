@@ -41,121 +41,137 @@ Please be respectful and considerate of others when contributing to this project
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/nbhansen/pdf_to_audio_app.git
-   cd pdf_to_audio_app
+   git clone <repository-url>
+   cd silly_PDF2WAV
    ```
 
-2. Create and activate a virtual environment:
+2. Install system dependencies:
+   ```bash
+   # Fedora
+   sudo dnf install tesseract ffmpeg espeak-ng python3-virtualenv
+
+   # Ubuntu/Debian
+   sudo apt install tesseract-ocr ffmpeg espeak-ng python3-venv
+
+   # Arch
+   sudo pacman -S tesseract ffmpeg espeak-ng python
+   ```
+
+3. Create and activate a virtual environment:
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
-3. Install dependencies:
+4. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-4. Copy and configure the application:
+5. Copy and configure the application:
    ```bash
    cp config.example.yaml config.yaml
    # Edit config.yaml with your settings (API keys, preferences)
    ```
 
-5. Run tests to verify setup:
+6. Run tests to verify setup:
    ```bash
-   ./test-tdd.sh
+   python -m pytest tests/unit/
+   ```
+
+7. Install pre-commit hooks:
+   ```bash
+   pre-commit install
    ```
 
 ### Code Style
 
-- Follow PEP 8 guidelines
-- Use type hints with proper TYPE_CHECKING guards for circular imports
-- Write comprehensive docstrings for all functions and classes
-- Add robust validation to domain models using `__post_init__`
-- Use the Strategy pattern for configurable behaviors (like text chunking)
-- Separate concerns clearly (TTS vs LLM, text processing vs audio generation)
-- Maintain clean architecture principles with proper dependency injection
+- Line length: 120 characters
+- Strict mypy type checking — use type hints on all functions
+- Google-style docstrings
+- Use `TYPE_CHECKING` guards for circular imports
+- First-party import order: `application`, `domain`, `infrastructure`
+
+Run all checks:
+```bash
+pre-commit run --all-files             # All linting/formatting checks
+ruff check . --fix && ruff format .    # Lint + format
+mypy .                                 # Type checking
+```
 
 ### Architecture Guidelines
 
-- **Domain Layer**: No external dependencies, pure business logic
-- **Modular Factories**: Use specialized factories (`audio_factory.py`, `text_factory.py`, `tts_factory.py`)
-- **Strategy Pattern**: Implement configurable strategies for chunking, timing, etc.
-- **Validation**: All domain models must have robust validation with clear error messages
-- **Separation**: Keep TTS engines and LLM services clearly separated
-- **Interfaces**: Define clear interfaces in `domain/interfaces.py` for all external dependencies
+This project uses **hexagonal architecture** — dependencies always point inward toward the domain layer.
+
+- **`domain/`** — Pure business logic with no external dependencies. Contains interfaces, models, errors, and core engines.
+- **`infrastructure/`** — Implements interfaces defined in `domain/interfaces.py`. Contains TTS providers, OCR, LLM, and file management.
+- **`application/`** — Orchestrates domain + infrastructure. Contains configuration, DI context, and service coordination.
+
+Key patterns:
+- **`Result[T]`** (`domain/errors.py`) — Return `Result.success(value)` or `Result.failure(ApplicationError(...))` instead of raising exceptions
+- **Deferred error handling** — TTS provider constructors never raise; initialization errors are stored and returned as `Result.failure()` on first use
+- **Immutable DI** — `ServiceContainer` (`domain/container/service_container.py`) uses lazy initialization with factory lambdas
+- **Interfaces** — Define clear interfaces in `domain/interfaces.py` for all external dependencies
 
 ### Testing
 
-The project follows Test-Driven Development (TDD) principles:
+The project uses pytest with markers for test categorization:
 
-1. **Write tests first** for new features (TDD cycle)
-2. **Run the full test suite**:
+1. **Run the test suite**:
    ```bash
-   ./test-tdd.sh              # All 205+ TDD tests
-   python run_tests.py all    # All tests with coverage
+   python -m pytest                       # All tests
+   python -m pytest tests/unit/           # Unit tests only
+   python -m pytest tests/integration/    # Integration tests
+   python -m pytest tests/benchmarks/     # Benchmarks
+   python -m pytest -k "test_name"        # Specific test
+   python -m pytest -m unit               # By marker
    ```
 
-3. **Test Categories**:
-   - **Domain Models**: Validation, immutability, edge cases
-   - **Text Processing**: Chunking strategies, pipeline logic
-   - **Audio Processing**: Engine integration, timing strategies
-   - **Architecture**: Factory integration, service creation
-   - **Integration**: Complete end-to-end workflows
+2. **Test Categories** (markers defined in `pyproject.toml`):
+   - `unit` — Fast tests with no external dependencies
+   - `integration` — Tests with mocked external services
+   - `external` — Tests requiring real external services (manual)
+   - `slow` — Tests taking more than 5 seconds
+   - `benchmark` — Performance benchmark tests
 
-4. **Test Requirements**:
-   - All new domain models must have comprehensive validation tests
-   - All new strategies must implement the interface and pass strategy tests
-   - All new factories must be tested for proper service creation
-   - Integration tests must verify complete workflows
-
-5. **Test Commands**:
-   ```bash
-   ./test-commit.sh           # Pre-commit validation
-   python run_tests.py models # Domain model tests
-   python run_tests.py architecture # Factory and architecture tests
-   ```
+3. **Test Requirements**:
+   - New domain logic should have unit tests
+   - New infrastructure implementations should verify interface contracts
+   - Integration tests should verify end-to-end workflows
 
 ### Documentation
 
 - Update README.md if architectural changes are made
 - Add docstrings to new functions and classes following Google style
 - Update CLAUDE.md for development guidance changes
-- Update TESTING.md for new test categories or commands
-- Add comments for complex code sections, especially strategy implementations
-- Document factory changes and new service integrations
 
 ### Adding New Features
 
+#### Adding a New TTS Provider
+1. Create `infrastructure/tts/your_provider.py` implementing `ITTSEngine` from `domain/interfaces.py`
+2. Add configuration dataclass to `domain/config/tts_config.py`
+3. Add factory branch in `ServiceContainer._create_tts_engine()`
+4. Write unit tests and integration tests
+
 #### Text Processing Features
 1. Define interface in `domain/interfaces.py`
-2. Implement in `domain/text/` (for text-specific logic)
+2. Implement in `domain/text/`
 3. Add infrastructure provider if needed
-4. Wire through `text_factory.py`
-5. Write comprehensive TDD tests
+4. Wire through `ServiceContainer`
+5. Write tests
 
 #### Audio Processing Features
 1. Define interface if needed
 2. Implement in `domain/audio/`
-3. Wire through `audio_factory.py`
-4. Add timing strategy if applicable
-5. Test with both TTS engines
-
-#### New Chunking Strategies
-1. Implement `ChunkingStrategy` interface
-2. Add to `ChunkingService` registry
-3. Add configuration option
-4. Write strategy-specific tests
-5. Test integration with audio generation
+3. Wire through `ServiceContainer`
+4. Test with both TTS engines
 
 ## Pull Request Process
 
-1. Update the README.md with details of changes if needed
-2. Update the CHANGELOG.md with a summary of changes
-3. Ensure all tests pass
-4. Ensure code style checks pass
-5. The PR will be merged once you have the sign-off of at least one maintainer
+1. Ensure all tests pass (`python -m pytest`)
+2. Ensure code style checks pass (`pre-commit run --all-files`)
+3. Update documentation if needed
+4. The PR will be merged once you have the sign-off of at least one maintainer
 
 ## Questions?
 

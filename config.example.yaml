@@ -20,8 +20,8 @@ tts:
     models_dir: ".local/piper_models"
     download_dir: "piper_models"
     
-    # Use GPU if available (faster generation)
-    use_gpu: true
+    # GPU acceleration (not yet implemented, has no effect)
+    use_gpu: false
     
     # Speech speed (1.0 = normal, 0.8 = slower, 1.2 = faster)
     length_scale: 1.0
