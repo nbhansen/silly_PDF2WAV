@@ -12,12 +12,15 @@
 
 This tool converts PDF documents to audio files so you can listen to academic papers, research documents, or any text-heavy PDFs while commuting, exercising, or wherever you prefer listening over reading. Perfect for turning dense research papers into listening-friendly MP3s for your phone, car, or sharing with others.
 
-## What Actually Works
+## Features
 
-- **PDF Processing**: Extract text from PDFs using OCR (Tesseract)
-- **Text Cleaning**: LLM-powered text processing for better narration (Gemini API)
-- **Text-to-Speech**: Local neural TTS with natural voices (Piper TTS)
-- **Web Interface**: Simple upload -> process -> download workflow
+- **PDF Processing**: Extract text from PDFs using pdfplumber with OCR fallback (Tesseract)
+- **Text Cleaning**: Optional LLM-powered text processing for better narration (Gemini API)
+- **Text-to-Speech**: Two TTS backends:
+  - **Piper TTS** — Local neural TTS with natural voices (no API key needed)
+  - **Gemini TTS** — Cloud-based TTS via Google's Gemini API
+- **Web Interface**: Simple upload → process → download workflow
+- **Read-Along Mode**: Word-level timing data with synchronized text highlighting (Piper only)
 - **Audio Output**: Generates MP3 files ready for any device
 
 ## Workflow Diagram
@@ -33,14 +36,14 @@ graph TD
     G --> H[User Listens/Downloads];
 ```
 
-## Current TTS Voices Available
+## Current TTS Voices Available (Piper)
 
 - `en_US-lessac-medium` - US voice, neutral
 - `en_GB-alba-medium` - British female voice
 - `en_US-ryan-high` - US male voice (auto-downloads)
 - `en_GB-cori-high` - British voice (auto-downloads)
 
-**Note**: The system is currently configured for **Piper TTS only**. While there's a Gemini TTS skeleton in the codebase, it's just a placeholder and doesn't actually generate audio - stick with Piper for real results.
+Voice models are auto-downloaded from Hugging Face on first use. Switch voices by changing `model_name` in config.yaml.
 
 ## Quick Start (Fedora/Linux)
 
@@ -48,13 +51,13 @@ graph TD
 
 ```bash
 # Fedora
-sudo dnf install tesseract ffmpeg python3-virtualenv
+sudo dnf install tesseract ffmpeg espeak-ng python3-virtualenv
 
 # Ubuntu/Debian
-sudo apt install tesseract-ocr ffmpeg python3-venv
+sudo apt install tesseract-ocr ffmpeg espeak-ng python3-venv
 
 # Arch
-sudo pacman -S tesseract ffmpeg python
+sudo pacman -S tesseract ffmpeg espeak-ng python
 ```
 
 ### 2. Setup Application
@@ -72,7 +75,7 @@ pip install -r requirements.txt
 
 # Copy and edit configuration
 cp config.example.yaml config.yaml
-# Edit config.yaml - set your Google AI API key for text cleaning
+# Edit config.yaml - set your Google AI API key for text cleaning (optional)
 ```
 
 ### 3. Run the Application
@@ -84,76 +87,86 @@ python app.py
 
 Open http://localhost:5000 in your browser, upload a PDF, and get an MP3 back!
 
-## Configuration Notes
+## Configuration
 
 The `config.yaml` file controls everything:
 
 ```yaml
 tts:
-  engine: "piper"  # WORKS - Use this
-  # engine: "gemini"  # PLACEHOLDER ONLY - Don't use this
+  engine: "piper"   # Local neural TTS (no API key needed)
+  # engine: "gemini" # Cloud TTS (requires Google AI API key)
 
   piper:
     model_name: "en_GB-alba-medium"  # British female voice
-    models_dir: "voices"             # Where voice models are stored
+    models_dir: ".local/piper_models"
 ```
 
-**Voice Models**: The system auto-downloads voice models from Hugging Face when first used. You can switch voices by changing the `model_name` in config.yaml.
+**Text Cleaning** (optional): Requires a Google AI API key for LLM text processing. Get one free at https://aistudio.google.com/app/apikey
 
-**Text Cleaning**: Requires a Google AI API key for the LLM text processing. Get one free at https://aistudio.google.com/app/apikey
+### Environment Variables
+
+When running in a container, override config using environment variables prefixed with `PDF2WAV_`:
+
+- `PDF2WAV_TTS_ENGINE` — `piper` or `gemini`
+- `PDF2WAV_SECRETS_GOOGLE_AI_API_KEY` — Your Google AI API key
+- `PDF2WAV_APP_PORT` — Port to run on (default 5000)
 
 ## Project Structure
 
 ```
-pdf_to_audio_app/
-├── application/           # App config and startup
-├── domain/               # Core business logic
-│   ├── audio/           # Audio processing engine
-│   ├── text/            # Text chunking and processing
-│   ├── document/        # PDF processing engine
-│   └── interfaces.py    # Abstract interfaces
-├── infrastructure/      # External service implementations
+silly_PDF2WAV/
+├── app.py                 # Flask entry point
+├── app_factory.py         # Application factory with DI
+├── routes.py              # Flask route handlers
+├── application/           # App config, context, orchestration
+│   ├── config/            # SystemConfig, logging
+│   ├── context/           # ApplicationContext (DI wrapper)
+│   └── services/          # DocumentProcessingService
+├── domain/                # Core business logic (no external deps)
+│   ├── audio/             # AudioEngine, TimingEngine
+│   ├── text/              # TextPipeline, chunking strategies
+│   ├── document/          # DocumentEngine (PDF processing)
+│   ├── container/         # ServiceContainer (immutable DI)
+│   ├── interfaces.py      # Abstract interfaces
+│   └── errors.py          # Result[T] pattern
+├── infrastructure/        # External service implementations
 │   ├── tts/
-│   │   ├── piper_tts_provider.py     # Real Piper TTS
-│   │   └── gemini_tts_provider.py    # Placeholder only
-│   ├── llm/            # Gemini text cleaning (works)
-│   └── ocr/            # Tesseract OCR (works)
-└── tests/              # 200+ tests
+│   │   ├── piper_tts_provider.py   # Piper TTS (local)
+│   │   └── gemini_tts_provider.py  # Gemini TTS (cloud)
+│   ├── llm/               # Gemini LLM for text cleaning
+│   ├── ocr/               # Tesseract OCR
+│   └── file/              # File management, cleanup scheduler
+└── tests/                 # Unit, integration, and benchmark tests
 ```
 
-## API Usage
+## API Endpoints
 
-- `GET /` - Upload interface
-- `POST /upload` - Process PDF -> MP3
-- `POST /upload-with-timing` - Process with word-level timing data
-- `GET /read-along/<filename>` - View with synchronized highlighting
+- `GET /` — Upload interface
+- `POST /upload` — Process PDF → MP3
+- `POST /upload-with-timing` — Process with word-level timing data
+- `GET /read-along/<filename>` — Synchronized reading interface
+- `GET /api/timing/<filename>` — Timing metadata as JSON
+- `GET /api/progress/<operation_id>` — Processing progress
 
 ## Testing
 
 ```bash
-source venv/bin/activate
-python -m pytest                    # All tests
-python -m pytest tests/unit/        # Unit tests
-python -m pytest tests/integration/ # Integration tests
+python -m pytest                       # All tests
+python -m pytest tests/unit/           # Unit tests only
+python -m pytest tests/integration/    # Integration tests
+python -m pytest -k "test_name"        # Specific test
+pre-commit run --all-files             # Linting + formatting + type checks
 ```
 
 ## Troubleshooting
 
-**"Audio generation failed"**: Make sure you're using `engine: "piper"` in config.yaml, not `"gemini"`
+**"Audio generation failed"**: Check your TTS engine config in config.yaml and ensure system dependencies are installed.
 
-**"No audio output"**: Check that voice models downloaded correctly in the `voices/` directory
+**"No audio output"**: Check that voice models downloaded correctly (look in `.local/piper_models/` or the configured `models_dir`).
 
-**"Text cleaning failed"**: Verify your Google AI API key is set correctly in config.yaml
+**"Text cleaning failed"**: Verify your Google AI API key is set correctly, or disable text cleaning in config.yaml.
 
-**Import errors**: Always use `source venv/bin/activate` before running any commands
-
-## What's Next
-
-The codebase has a clean hexagonal architecture that makes it easy to add:
-- Additional TTS providers (OpenAI, Azure, etc.)
-- More voice models and languages
-- Better SSML support for pronunciation
-- Batch processing capabilities
+**Import errors**: Always use `source venv/bin/activate` before running any commands.
 
 ## License
 
