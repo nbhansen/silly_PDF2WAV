@@ -253,6 +253,7 @@ class TestPDFToAudioPipelineCore:
             # The current implementation catches exceptions and returns success with default values
             if pdf_info_result.is_success:
                 pdf_info = pdf_info_result.value
+                assert pdf_info is not None
                 assert pdf_info.total_pages == 0
                 assert pdf_info.title == "Unknown"
             else:
