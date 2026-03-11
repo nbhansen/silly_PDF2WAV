@@ -60,6 +60,8 @@ Uses `Result[T]` pattern (`domain/errors.py`) for explicit success/failure handl
 
 TTS providers use **deferred error handling**: constructor never raises, stores initialization errors internally, returns failure `Result` on first `generate_audio_data()` call.
 
+All providers (TTS, LLM, etc.) must use the `_initialization_error: Optional[str]` pattern for deferred error handling. The constructor stores error messages in `self._initialization_error`, and each public method checks this field first, returning `Result.failure()` with the stored message before attempting any work. The `self.client = None` check is kept as a fallback after the `_initialization_error` check. See `piper_tts_provider.py` for the reference implementation.
+
 ## Configuration
 
 Configuration is loaded into `SystemConfig` dataclass from YAML. Key config sections:
