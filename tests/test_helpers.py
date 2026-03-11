@@ -4,9 +4,8 @@ import tempfile
 from typing import Optional
 
 from domain.audio.timing_engine import ITimingEngine
-from domain.errors import Result, audio_generation_error, llm_provider_error, tts_engine_error
+from domain.errors import Result, llm_provider_error, tts_engine_error
 from domain.interfaces import (
-    IAudioProcessor,
     ILLMProvider,
     ITTSEngine,
 )
@@ -112,37 +111,6 @@ class FakeFileManager:
                 Path(filepath).unlink()
         self.saved_files.clear()
         self.temp_files.clear()
-
-
-class FakeAudioProcessor(IAudioProcessor):
-    """Fake audio processor for testing."""
-
-    def __init__(self, ffmpeg_available: bool = True):
-        self._ffmpeg_available = ffmpeg_available
-
-    def check_ffmpeg_availability(self) -> bool:
-        """Check if FFmpeg is available for processing."""
-        return self._ffmpeg_available
-
-    def combine_audio_files(self, audio_files: list[str], output_path: str) -> Result[str]:
-        """Combine multiple audio files into one."""
-        if not self._ffmpeg_available:
-            return Result.failure(audio_generation_error("FFmpeg not available"))
-        if not audio_files:
-            return Result.failure(audio_generation_error("No audio files to combine"))
-        # Simulate combining files
-        return Result.success(output_path)
-
-    def convert_audio_format(self, _input_path: str, output_path: str, _format: str) -> Result[str]:
-        """Convert audio file to specified format."""
-        if not self._ffmpeg_available:
-            return Result.failure(audio_generation_error("FFmpeg not available"))
-        return Result.success(output_path)
-
-    def get_audio_duration(self, audio_path: str) -> Result[float]:
-        """Get duration of audio file in seconds."""
-        # Return a fake duration based on file path
-        return Result.success(2.5)
 
 
 class FakeTimingEngine(ITimingEngine):

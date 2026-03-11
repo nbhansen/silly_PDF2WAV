@@ -65,7 +65,7 @@ from ..interfaces import IFileManager, ITTSEngine
 from ..models import TextSegment, TimedAudioResult, TimingMetadata
 
 if TYPE_CHECKING:
-    from ..text.text_pipeline import ITextPipeline
+    from ..interfaces import ITextPipeline
 
 
 @dataclasses.dataclass(frozen=True)

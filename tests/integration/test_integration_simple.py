@@ -54,9 +54,7 @@ def test_service_factory_creation():
         container = create_service_container(config)
 
         # Verify all main services are available
-        from domain.audio.audio_engine import IAudioEngine
-        from domain.document.document_engine import IDocumentEngine
-        from domain.text.text_pipeline import ITextPipeline
+        from domain.interfaces import IAudioEngine, IDocumentEngine, ITextPipeline
         from infrastructure.file.file_manager import FileManager
 
         assert container.get(IAudioEngine) is not None

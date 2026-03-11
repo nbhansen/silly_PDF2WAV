@@ -4,7 +4,6 @@
 No exceptions thrown - all errors returned as Result[T].
 """
 
-from abc import ABC, abstractmethod
 import asyncio
 from collections.abc import Awaitable, Coroutine
 from concurrent.futures import ThreadPoolExecutor
@@ -14,40 +13,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Union
 
 from ..errors import Result, audio_generation_error
-
-logger = logging.getLogger(__name__)
-from ..interfaces import IFileManager, ITTSEngine
+from ..interfaces import IAudioEngine, IFileManager, ITTSEngine
 from ..models import TimedAudioResult
 from ..text.chunking_strategy import ChunkingMode, IChunkingStrategy, create_chunking_strategy
 
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
     from .timing_engine import ITimingEngine
-
-
-class IAudioEngine(ABC):
-    """Interface for audio operations using Result[T] pattern."""
-
-    @abstractmethod
-    def generate_with_timing(self, text_chunks: list[str], output_filename: str) -> Result[TimedAudioResult]:
-        """Generate audio with timing data from text chunks."""
-
-    @abstractmethod
-    def generate_simple_audio(self, text_chunks: list[str], output_filename: str) -> Result[TimedAudioResult]:
-        """Generate audio without timing complexity - for regular uploads."""
-
-    @abstractmethod
-    async def generate_audio_async(
-        self, text_chunks: list[str], output_name: str, output_dir: str
-    ) -> tuple[list[str], Optional[str]]:
-        """Generate audio files concurrently with coordination."""
-
-    @abstractmethod
-    def process_audio_file(self, file_path: str) -> Result[float]:
-        """Process audio file and return duration."""
-
-    @abstractmethod
-    def combine_audio_files(self, file_paths: list[str], output_path: str) -> Result[str]:
-        """Combine multiple audio files into one."""
 
 
 class AudioEngine(IAudioEngine):

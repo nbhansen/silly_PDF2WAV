@@ -7,7 +7,8 @@ Tests pure text processing logic without external dependencies.
 from unittest.mock import Mock
 
 from domain.errors import Result
-from domain.text.text_pipeline import ITextPipeline, TextPipeline
+from domain.interfaces import ITextPipeline
+from domain.text.text_pipeline import TextPipeline
 
 
 class TestTextPipelineBasicFunctionality:

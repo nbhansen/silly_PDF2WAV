@@ -44,7 +44,7 @@ class ApplicationContext:
         logger = logging.getLogger(__name__)
         try:
             # Check if we can get an audio engine (main processing component)
-            from domain.audio.audio_engine import IAudioEngine
+            from domain.interfaces import IAudioEngine
 
             audio_service = self.service_container.get(IAudioEngine)
             result = audio_service is not None
@@ -57,7 +57,7 @@ class ApplicationContext:
     @property
     def pdf_service(self) -> object:
         """Get PDF processing service (audio engine)."""
-        from domain.audio.audio_engine import IAudioEngine
+        from domain.interfaces import IAudioEngine
 
         return self.service_container.get(IAudioEngine)
 
