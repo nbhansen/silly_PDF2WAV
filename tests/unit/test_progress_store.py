@@ -4,9 +4,12 @@ Tests thread safety, error handling, and edge cases for progress tracking.
 """
 
 from concurrent.futures import ThreadPoolExecutor
+import threading
 import time
 
-from progress_store import (
+import pytest
+
+from application.services.progress_store import (
     ProgressStatus,
     ThreadSafeProgressStore,
     cancel_operation,
