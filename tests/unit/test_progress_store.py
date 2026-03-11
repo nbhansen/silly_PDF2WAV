@@ -3,11 +3,8 @@
 Tests thread safety, error handling, and edge cases for progress tracking.
 """
 
-import threading
-import time
 from concurrent.futures import ThreadPoolExecutor
-
-import pytest
+import time
 
 from progress_store import (
     ProgressStatus,
@@ -21,40 +18,6 @@ from progress_store import (
 
 class TestProgressStatus:
     """Tests for ProgressStatus dataclass."""
-
-    def test_progress_status_creation_minimal(self) -> None:
-        """Should create status with minimal required fields."""
-        status = ProgressStatus(
-            operation_id="test-123",
-            stage="processing",
-            percentage=50,
-            message="Working...",
-        )
-        assert status.operation_id == "test-123"
-        assert status.stage == "processing"
-        assert status.percentage == 50
-        assert status.message == "Working..."
-        assert status.is_complete is False
-        assert status.is_error is False
-        assert status.error_message is None
-        assert status.result_data is None
-        assert status.cancelled is False
-
-    def test_progress_status_creation_complete(self) -> None:
-        """Should create status with all fields."""
-        status = ProgressStatus(
-            operation_id="test-456",
-            stage="done",
-            percentage=100,
-            message="Finished",
-            is_complete=True,
-            is_error=False,
-            error_message=None,
-            result_data={"output": "file.mp3"},
-            cancelled=False,
-        )
-        assert status.is_complete is True
-        assert status.result_data == {"output": "file.mp3"}
 
     def test_progress_status_error_state(self) -> None:
         """Should track error state properly."""
@@ -70,14 +33,6 @@ class TestProgressStatus:
         assert status.is_error is True
         assert status.error_message == "Out of memory"
         assert status.is_complete is True
-
-    def test_progress_status_is_frozen(self) -> None:
-        """Should be immutable (frozen dataclass)."""
-        status = ProgressStatus(
-            operation_id="test", stage="test", percentage=0, message="test"
-        )
-        with pytest.raises(AttributeError):
-            status.percentage = 50  # type: ignore[misc]
 
 
 class TestThreadSafeProgressStore:

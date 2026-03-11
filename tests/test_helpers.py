@@ -1,19 +1,16 @@
 # tests/test_helpers.py
 from pathlib import Path
 import tempfile
-from typing import Any, Optional
+from typing import Optional
 
 from domain.audio.timing_engine import ITimingEngine
 from domain.errors import Result, audio_generation_error, llm_provider_error, tts_engine_error
 from domain.interfaces import (
     IAudioProcessor,
-    IDocumentProcessor,
-    IEngineCapabilityDetector,
     ILLMProvider,
     ITTSEngine,
-    SSMLCapability,
 )
-from domain.models import PageRange, PDFInfo, ProcessingRequest, TimedAudioResult, TimingMetadata
+from domain.models import PageRange, ProcessingRequest, TimedAudioResult, TimingMetadata
 
 
 class FakeTTSEngine(ITTSEngine):
@@ -65,26 +62,6 @@ class FakeLLMProvider(ILLMProvider):
     async def generate_content_async(self, prompt: str) -> Result[str]:
         """Async version for interface compliance."""
         return self.generate_content(prompt)
-
-
-class FakeDocumentProcessor(IDocumentProcessor):
-    """Fake document processor for testing purposes."""
-
-    def __init__(self, text_to_return: str = "Default extracted text", pdf_info: Optional[PDFInfo] = None):
-        self.text_to_return = text_to_return
-        self.pdf_info = pdf_info or PDFInfo(total_pages=1, title="Test PDF", author="Test Author")
-        self.extraction_calls: list[tuple[str, Optional[list[int]]]] = []
-
-    def extract_text(self, filepath: str, pages: Optional[list[int]] = None) -> list[str]:
-        """Extract fake text from document for testing."""
-        self.extraction_calls.append((filepath, pages))
-        return [self.text_to_return]
-
-    def validate_page_range(
-        self, filepath: str, start: Optional[int] = None, end: Optional[int] = None
-    ) -> dict[str, Any]:
-        """Validate page range against fake document info."""
-        return {"valid": True, "total_pages": self.pdf_info.total_pages}
 
 
 def create_test_request(pdf_path="test.pdf", output_name="test_output", page_range=None):
@@ -199,41 +176,6 @@ class FakeTimingEngine(ITimingEngine):
         return TimedAudioResult(
             audio_files=[f"{output_filename}.wav"], combined_mp3=f"{output_filename}.mp3", timing_data=timing_metadata
         )
-
-
-class FakeEngineCapabilityDetector(IEngineCapabilityDetector):
-    """Fake engine capability detector for testing."""
-
-    def detect_ssml_capability(self, engine) -> SSMLCapability:
-        """Detect SSML capability of the engine."""
-        return SSMLCapability.BASIC
-
-    def supports_timestamps(self, engine) -> bool:
-        """Check if engine supports timestamp generation."""
-        return False
-
-    def get_recommended_rate_limit(self, engine) -> float:
-        """Get recommended rate limit for the engine."""
-        return 1.0
-
-    def requires_async_processing(self, engine) -> bool:
-        """Check if engine requires async processing."""
-        return True
-
-    def get_engine_characteristics(self, engine) -> dict[str, Any]:
-        """Get engine characteristics and capabilities."""
-        return {
-            "name": engine.__class__.__name__,
-            "ssml_capability": SSMLCapability.BASIC,
-            "supports_timestamps": False,
-            "recommended_rate_limit": 1.0,
-            "requires_async": True,
-            "is_cloud_service": True,
-            "output_format": "wav",
-        }
-
-    def register_engine_capabilities(self, _engine_name: str, _capabilities: dict[str, Any]) -> None:
-        """Register engine capabilities (no-op for testing)."""
 
 
 # Alias for backward compatibility with tests
