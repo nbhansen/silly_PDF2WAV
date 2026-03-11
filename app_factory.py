@@ -13,7 +13,7 @@ from application.config.logging_config import LoggingConfig
 from application.config.logging_factory import ThreadSafeLoggerFactory
 from application.config.system_config import SystemConfig
 from application.context.application_context import ApplicationContext
-from domain.container.service_container import ServiceContainer
+from application.container.service_container import ServiceContainer
 from infrastructure.file.cleanup_scheduler import FileCleanupScheduler
 
 

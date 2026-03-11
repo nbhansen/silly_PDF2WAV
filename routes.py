@@ -20,6 +20,7 @@ from werkzeug.utils import secure_filename
 
 from application.config.system_config import SystemConfig
 from application.context.application_context import ApplicationContext
+from application.container.service_container import ServiceContainer
 from application.services.document_service import DocumentProcessingService
 from application.services.error_formatting import (
     get_contextual_error_message,
@@ -30,7 +31,6 @@ from application.services.progress_store import (
     get_progress,
     update_progress,
 )
-from domain.container.service_container import ServiceContainer
 from domain.models import PageRange, ProcessingResult
 from infrastructure.file.file_manager import FileManager
 from utils import (
