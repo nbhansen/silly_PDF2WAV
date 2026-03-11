@@ -19,8 +19,8 @@ from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
 from application.config.system_config import SystemConfig
-from application.context.application_context import ApplicationContext
 from application.container.service_container import ServiceContainer
+from application.context.application_context import ApplicationContext
 from application.services.document_service import DocumentProcessingService
 from application.services.error_formatting import (
     get_contextual_error_message,
@@ -73,7 +73,7 @@ def background_process_document(
                 request_form=request_form,
                 saved_file_path=saved_file_path,
                 original_filename=original_filename,
-                enable_timing=enable_timing
+                enable_timing=enable_timing,
             )
 
         except Exception as e:
@@ -567,5 +567,3 @@ def render_upload_result(
         assert result.error is not None, "Error result should have error details"
         enhanced_error_message = get_contextual_error_message(result.error, get_app_config(), original_filename)
         return enhanced_error_message
-
-

@@ -17,8 +17,8 @@ from application.config.file_configs import FileCleanupConfig, FileConfig
 from application.config.processing_configs import LLMConfig, OCRConfig, PerformanceConfig, TextProcessingConfig
 from application.config.system_config import SystemConfig
 from domain.config.tts_config import PiperConfig, TTSConfig, TTSEngine
-from domain.errors import Result
 from domain.container.service_container import create_service_container
+from domain.errors import Result
 from domain.interfaces import IAudioEngine, IDocumentEngine, ITextPipeline
 from domain.models import PageRange, ProcessingRequest
 from infrastructure.file.file_manager import FileManager
@@ -104,8 +104,8 @@ class TestServiceFactoryIntegration:
 
             # Services should use the same file manager instance (dependency injection)
             # This tests that the service container is working properly
-            assert hasattr(audio_engine, '_file_manager') or hasattr(audio_engine, 'file_manager')
-            assert hasattr(document_engine, '_file_manager') or hasattr(document_engine, 'file_manager')
+            assert hasattr(audio_engine, "_file_manager") or hasattr(audio_engine, "file_manager")
+            assert hasattr(document_engine, "_file_manager") or hasattr(document_engine, "file_manager")
 
             # File manager should have correct configuration
             assert file_manager.upload_folder == integration_config.files.upload_folder
@@ -121,7 +121,7 @@ class TestServiceFactoryIntegration:
             assert audio_engine is not None
 
             # Audio engine should have a TTS engine
-            assert hasattr(audio_engine, '_tts_engine') or hasattr(audio_engine, 'tts_engine')
+            assert hasattr(audio_engine, "_tts_engine") or hasattr(audio_engine, "tts_engine")
 
     def test_configuration_propagation(self, integration_config: SystemConfig) -> None:
         """Should properly propagate configuration to all services."""
@@ -150,10 +150,12 @@ class TestServiceInteractionIntegration:
             document_engine = container.get(IDocumentEngine)
 
             # Document engine should have real OCR provider
-            assert hasattr(document_engine, '_ocr_provider') or hasattr(document_engine, 'ocr_provider')
+            assert hasattr(document_engine, "_ocr_provider") or hasattr(document_engine, "ocr_provider")
 
             # OCR provider should be real TesseractOCRProvider
-            ocr_provider = getattr(document_engine, '_ocr_provider', None) or getattr(document_engine, 'ocr_provider', None)
+            ocr_provider = getattr(document_engine, "_ocr_provider", None) or getattr(
+                document_engine, "ocr_provider", None
+            )
             assert ocr_provider is not None
             assert not isinstance(ocr_provider, Mock)
 
@@ -165,10 +167,10 @@ class TestServiceInteractionIntegration:
             audio_engine = container.get(IAudioEngine)
 
             # Audio engine should have real TTS engine
-            assert hasattr(audio_engine, '_tts_engine') or hasattr(audio_engine, 'tts_engine')
+            assert hasattr(audio_engine, "_tts_engine") or hasattr(audio_engine, "tts_engine")
 
             # TTS engine should be real implementation
-            tts_engine = getattr(audio_engine, '_tts_engine', None) or getattr(audio_engine, 'tts_engine', None)
+            tts_engine = getattr(audio_engine, "_tts_engine", None) or getattr(audio_engine, "tts_engine", None)
             assert tts_engine is not None
             assert not isinstance(tts_engine, Mock)
 
@@ -195,9 +197,7 @@ class TestDomainModelIntegration:
         """Should create and validate processing requests with real services."""
         # Create a processing request
         request = ProcessingRequest(
-            pdf_path="test_document.pdf",
-            output_name="test_output",
-            page_range=PageRange(start_page=1, end_page=5)
+            pdf_path="test_document.pdf", output_name="test_output", page_range=PageRange(start_page=1, end_page=5)
         )
 
         # Request should be properly formed
@@ -223,10 +223,7 @@ class TestDomainModelIntegration:
         assert "test error" in str(failure_result.error.details)
 
         # Test ProcessingResult integration
-        processing_result = ProcessingResult.success_result(
-            audio_files=["test.mp3"],
-            combined_mp3="combined.mp3"
-        )
+        processing_result = ProcessingResult.success_result(audio_files=["test.mp3"], combined_mp3="combined.mp3")
 
         assert processing_result.success is True
         assert processing_result.audio_files is not None
@@ -302,14 +299,14 @@ class TestRealProviderInteraction:
                     audio_engine = container.get(IAudioEngine)
 
                     # Should have real TTS engine that implements interface
-                    tts_engine = getattr(audio_engine, '_tts_engine', None) or getattr(audio_engine, 'tts_engine', None)
+                    tts_engine = getattr(audio_engine, "_tts_engine", None) or getattr(audio_engine, "tts_engine", None)
 
                     if tts_engine:
                         # Test interface compliance
-                        assert hasattr(tts_engine, 'generate_audio_data')
-                        assert hasattr(tts_engine, 'get_output_format')
-                        assert hasattr(tts_engine, 'supports_ssml')
-                        assert hasattr(tts_engine, 'prefers_sync_processing')
+                        assert hasattr(tts_engine, "generate_audio_data")
+                        assert hasattr(tts_engine, "get_output_format")
+                        assert hasattr(tts_engine, "supports_ssml")
+                        assert hasattr(tts_engine, "prefers_sync_processing")
 
                         # Test interface methods work
                         assert isinstance(tts_engine.get_output_format(), str)
@@ -327,8 +324,8 @@ class TestRealProviderInteraction:
             assert not isinstance(text_pipeline, Mock)
 
             # Should have proper interface methods
-            assert hasattr(text_pipeline, 'clean_text')
-            assert hasattr(text_pipeline, 'split_into_sentences')
+            assert hasattr(text_pipeline, "clean_text")
+            assert hasattr(text_pipeline, "split_into_sentences")
 
     def test_file_manager_real_operations(self, integration_config: SystemConfig) -> None:
         """Should create file manager that does real file operations."""
@@ -345,9 +342,9 @@ class TestRealProviderInteraction:
             assert Path(file_manager.output_folder).exists()
 
             # Should have file operation methods
-            assert hasattr(file_manager, 'save_output_file')
-            assert hasattr(file_manager, 'save_temp_file')
-            assert hasattr(file_manager, 'delete_file')
+            assert hasattr(file_manager, "save_output_file")
+            assert hasattr(file_manager, "save_temp_file")
+            assert hasattr(file_manager, "delete_file")
 
 
 class TestRealExternalServicesIntegration:
@@ -359,13 +356,13 @@ class TestRealExternalServicesIntegration:
         result = real_piper_tts.generate_audio_data(test_text)
 
         # Should return Result pattern
-        assert hasattr(result, 'is_success')
+        assert hasattr(result, "is_success")
         if result.is_success:
             audio_data = result.value
             assert audio_data is not None
             assert len(audio_data) > 0
             # WAV files start with RIFF header
-            assert audio_data[:4] == b'RIFF', "Expected WAV audio format"
+            assert audio_data[:4] == b"RIFF", "Expected WAV audio format"
 
     def test_real_file_manager_saves_and_retrieves(self, real_file_manager) -> None:
         """Should save and retrieve files with real FileManager."""
@@ -377,7 +374,7 @@ class TestRealExternalServicesIntegration:
         assert Path(saved_path).exists()
 
         # Read it back
-        with open(saved_path, 'rb') as f:
+        with open(saved_path, "rb") as f:
             retrieved_content = f.read()
         assert retrieved_content == test_content
 
@@ -387,20 +384,20 @@ class TestRealExternalServicesIntegration:
     def test_real_tesseract_ocr_methods(self, real_tesseract_ocr) -> None:
         """Should have proper OCR interface methods."""
         # Verify the OCR provider has expected interface methods
-        assert hasattr(real_tesseract_ocr, 'perform_ocr')
-        assert hasattr(real_tesseract_ocr, 'get_pdf_info')
-        assert hasattr(real_tesseract_ocr, 'validate_range')
+        assert hasattr(real_tesseract_ocr, "perform_ocr")
+        assert hasattr(real_tesseract_ocr, "get_pdf_info")
+        assert hasattr(real_tesseract_ocr, "validate_range")
 
         # Test get_pdf_info with nonexistent file - should return default info
         # The implementation returns PDFInfo(total_pages=0, ...) on exception
         info = real_tesseract_ocr.get_pdf_info("/nonexistent/file.pdf")
-        
+
         assert info.total_pages == 0
         assert info.title == "Unknown"
 
         # Test validate_range with nonexistent file
         # The implementation returns error dict on exception
         result = real_tesseract_ocr.validate_range("/nonexistent/file.pdf", PageRange())
-        
+
         assert result["valid"] is False
         assert result["total_pages"] == 0

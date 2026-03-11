@@ -1,10 +1,10 @@
 # infrastructure/tts/gemini_tts_provider.py
 """Gemini TTS Provider implementation using Google Gen AI SDK."""
 
-import logging
 import io
-import wave
+import logging
 from typing import Optional
+import wave
 
 from google import genai
 from google.genai import types
@@ -28,11 +28,14 @@ class GeminiTTSProvider(ITTSEngine):
         requests_per_minute: int = 30,
     ):
         """Initialize Gemini TTS Provider.
-        
+
         Args:
             model_name: Gemini model (e.g. gemini-2.0-flash-exp)
             api_key: Google AI API Key
             voice_name: Voice to use (e.g. "Kore", "Puck", "Charon", "Fenrir", "Aoede")
+            min_request_interval: Minimum seconds between API requests
+            max_concurrent_requests: Maximum number of concurrent API requests
+            requests_per_minute: Rate limit for API requests per minute
         """
         self.model_name = model_name
         self.api_key = api_key
@@ -70,21 +73,15 @@ class GeminiTTSProvider(ITTSEngine):
                 response_modalities=["AUDIO"],
                 speech_config=types.SpeechConfig(
                     voice_config=types.VoiceConfig(
-                        prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                            voice_name=self.voice_name
-                        )
+                        prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=self.voice_name)
                     )
-                )
+                ),
             )
 
             # Direct text input for TTS models
             prompt = text
 
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt,
-                config=config
-            )
+            response = self.client.models.generate_content(model=self.model_name, contents=prompt, config=config)
 
             return self._extract_audio_from_response(response)
 
@@ -107,11 +104,9 @@ class GeminiTTSProvider(ITTSEngine):
                 response_modalities=["AUDIO"],
                 speech_config=types.SpeechConfig(
                     voice_config=types.VoiceConfig(
-                        prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                            voice_name=self.voice_name
-                        )
+                        prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=self.voice_name)
                     )
-                )
+                ),
             )
 
             # Direct text input for TTS models
@@ -119,9 +114,7 @@ class GeminiTTSProvider(ITTSEngine):
 
             # Use async client
             response = await self.client.aio.models.generate_content(
-                model=self.model_name,
-                contents=prompt,
-                config=config
+                model=self.model_name, contents=prompt, config=config
             )
 
             return self._extract_audio_from_response(response)
@@ -141,27 +134,33 @@ class GeminiTTSProvider(ITTSEngine):
 
         for part in candidate.content.parts:
             # Check for inline_data with audio mime type
-            if part.inline_data and part.inline_data.mime_type and part.inline_data.mime_type.startswith("audio"):
-                if part.inline_data.data:
-                    audio_data = part.inline_data.data
-                    # If PCM, add WAV header
-                    if "pcm" in part.inline_data.mime_type:
-                        # Extract sample rate if possible, otherwise default to 24000
-                        sample_rate = 24000
-                        if "rate=" in part.inline_data.mime_type:
-                            try:
-                                rate_str = part.inline_data.mime_type.split("rate=")[1]
-                                sample_rate = int(rate_str.split(";")[0])
-                            except (IndexError, ValueError):
-                                pass
-                        
-                        return Result.success(self._add_wav_header(audio_data, sample_rate))
-                    
-                    return Result.success(audio_data)
-        
+            if (
+                part.inline_data
+                and part.inline_data.mime_type
+                and part.inline_data.mime_type.startswith("audio")
+                and part.inline_data.data
+            ):
+                audio_data = part.inline_data.data
+                # If PCM, add WAV header
+                if "pcm" in part.inline_data.mime_type:
+                    # Extract sample rate if possible, otherwise default to 24000
+                    sample_rate = 24000
+                    if "rate=" in part.inline_data.mime_type:
+                        try:
+                            rate_str = part.inline_data.mime_type.split("rate=")[1]
+                            sample_rate = int(rate_str.split(";")[0])
+                        except (IndexError, ValueError):
+                            pass
+
+                    return Result.success(self._add_wav_header(audio_data, sample_rate))
+
+                return Result.success(audio_data)
+
         return Result.failure(tts_engine_error("No audio data found in Gemini response"))
 
-    def _add_wav_header(self, pcm_data: bytes, sample_rate: int = 24000, channels: int = 1, bit_depth: int = 16) -> bytes:
+    def _add_wav_header(
+        self, pcm_data: bytes, sample_rate: int = 24000, channels: int = 1, bit_depth: int = 16
+    ) -> bytes:
         """Add WAV header to raw PCM data."""
         with io.BytesIO() as wav_io:
             with wave.open(wav_io, "wb") as wav_file:

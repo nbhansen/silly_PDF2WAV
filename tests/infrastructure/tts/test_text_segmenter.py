@@ -266,7 +266,7 @@ class TestTextSegmenterChunking:
         # Each chunk should contain complete sentences where possible
         for chunk in chunks:
             # Should end with sentence punctuation or be the last chunk
-            assert chunk.endswith(('.', '!', '?')) or chunk == chunks[-1]
+            assert chunk.endswith((".", "!", "?")) or chunk == chunks[-1]
 
     def test_split_into_chunks_handles_long_sentences(self, default_segmenter: TextSegmenter) -> None:
         """Should split long sentences by words when necessary."""

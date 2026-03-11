@@ -31,16 +31,12 @@ def _get_user_friendly_error_message(error: ApplicationError) -> str:
     if error.code == ErrorCode.FILE_NOT_FOUND:
         return "The uploaded file could not be found or accessed."
     elif error.code == ErrorCode.TEXT_EXTRACTION_FAILED:
-        return (
-            "Could not extract text from the PDF. The file might be corrupted, "
-            "image-only, or password-protected."
-        )
+        return "Could not extract text from the PDF. The file might be corrupted, image-only, or password-protected."
     elif error.code == ErrorCode.TEXT_CLEANING_FAILED:
         return "Failed to process the extracted text for audio conversion."
     elif error.code == ErrorCode.AUDIO_GENERATION_FAILED:
         return (
-            "Failed to generate audio from the text. "
-            "This might be a temporary issue with the text-to-speech service."
+            "Failed to generate audio from the text. This might be a temporary issue with the text-to-speech service."
         )
     elif error.code == ErrorCode.TTS_ENGINE_ERROR:
         return "Text-to-speech service encountered an error. This might be temporary."
@@ -65,34 +61,19 @@ def _get_retry_suggestion(error: ApplicationError, config: SystemConfig) -> str:
                 "the text-to-speech service might be temporarily unavailable."
             )
         elif error.code == ErrorCode.LLM_PROVIDER_ERROR:
-            return (
-                "Please try again in a few moments, or disable text cleaning "
-                "in your configuration."
-            )
+            return "Please try again in a few moments, or disable text cleaning in your configuration."
         elif error.code == ErrorCode.TEXT_CLEANING_FAILED:
             if config.text_processing.enable_cleaning:
-                return (
-                    "Try again or consider disabling text cleaning "
-                    "if the problem persists."
-                )
+                return "Try again or consider disabling text cleaning if the problem persists."
             else:
-                return (
-                    "Text cleaning is already disabled. "
-                    "This might be a temporary issue - please try again."
-                )
+                return "Text cleaning is already disabled. This might be a temporary issue - please try again."
         else:
             return "This error might be temporary. Please try again."
     else:
         if error.code == ErrorCode.TEXT_EXTRACTION_FAILED:
-            return (
-                "Try a different PDF file, or ensure the PDF is not "
-                "password-protected or image-only."
-            )
+            return "Try a different PDF file, or ensure the PDF is not password-protected or image-only."
         elif error.code == ErrorCode.FILE_SIZE_ERROR:
-            return (
-                f"Please use a smaller PDF file "
-                f"(maximum {config.files.max_file_size_mb}MB)."
-            )
+            return f"Please use a smaller PDF file (maximum {config.files.max_file_size_mb}MB)."
         elif error.code == ErrorCode.INVALID_PAGE_RANGE:
             return "Please check the page numbers and try again."
 
@@ -171,8 +152,7 @@ def _get_enhanced_error_message(error: ApplicationError) -> str:
             )
         else:
             return (
-                "Could not extract text from the PDF. The file might be "
-                "corrupted, image-only, or password-protected."
+                "Could not extract text from the PDF. The file might be corrupted, image-only, or password-protected."
             )
 
     elif error.code in [ErrorCode.TTS_ENGINE_ERROR, ErrorCode.AUDIO_GENERATION_FAILED]:
@@ -187,10 +167,7 @@ def _get_enhanced_error_message(error: ApplicationError) -> str:
                 "connection - the model may need to be downloaded automatically."
             )
         elif context == "network_error":
-            return (
-                "Cannot connect to the text-to-speech service. "
-                "Check your internet connection and try again."
-            )
+            return "Cannot connect to the text-to-speech service. Check your internet connection and try again."
         elif context == "timeout":
             return (
                 "Audio generation timed out. This usually happens with very "
@@ -210,14 +187,10 @@ def _get_enhanced_error_message(error: ApplicationError) -> str:
 
     elif error.code == ErrorCode.LLM_PROVIDER_ERROR:
         if context == "rate_limited":
-            return (
-                "Text processing rate limit reached. "
-                "Please wait a moment before trying again."
-            )
+            return "Text processing rate limit reached. Please wait a moment before trying again."
         elif context == "network_error":
             return (
-                "Cannot connect to the text processing service. "
-                "Check your internet connection and API configuration."
+                "Cannot connect to the text processing service. Check your internet connection and API configuration."
             )
         else:
             return "Text cleaning service encountered an error. This might be temporary."
@@ -232,10 +205,7 @@ def _get_enhanced_retry_suggestion(error: ApplicationError, config: SystemConfig
 
     if error.code == ErrorCode.TEXT_EXTRACTION_FAILED:
         if context == "password_protected":
-            return (
-                "Remove the password from your PDF using a PDF editor, "
-                "or try a different PDF file."
-            )
+            return "Remove the password from your PDF using a PDF editor, or try a different PDF file."
         elif context == "image_only":
             return (
                 "Try using a PDF that contains selectable text, or use OCR "
@@ -247,17 +217,11 @@ def _get_enhanced_retry_suggestion(error: ApplicationError, config: SystemConfig
                 "or try re-downloading/re-saving the file."
             )
         else:
-            return (
-                "Try a different PDF file, or ensure the PDF is not "
-                "password-protected or image-only."
-            )
+            return "Try a different PDF file, or ensure the PDF is not password-protected or image-only."
 
     elif error.code in [ErrorCode.TTS_ENGINE_ERROR, ErrorCode.AUDIO_GENERATION_FAILED]:
         if context == "rate_limited":
-            return (
-                "Wait 2-5 minutes before trying again. For large documents, "
-                "consider processing smaller page ranges."
-            )
+            return "Wait 2-5 minutes before trying again. For large documents, consider processing smaller page ranges."
         elif context == "model_missing":
             return (
                 "Ensure you have a stable internet connection. The voice model "
@@ -275,10 +239,7 @@ def _get_enhanced_retry_suggestion(error: ApplicationError, config: SystemConfig
                 "take several minutes."
             )
         elif context == "resource_exhaustion":
-            return (
-                "Close other applications to free up memory, or try "
-                "processing a smaller document (fewer pages)."
-            )
+            return "Close other applications to free up memory, or try processing a smaller document (fewer pages)."
         elif error.retryable:
             return (
                 "Please try again in a few moments. If the problem persists, "
@@ -294,23 +255,14 @@ def _get_enhanced_retry_suggestion(error: ApplicationError, config: SystemConfig
                 f"splitting it into smaller files."
             )
         else:
-            return (
-                f"Please use a smaller PDF file "
-                f"(maximum {config.files.max_file_size_mb}MB)."
-            )
+            return f"Please use a smaller PDF file (maximum {config.files.max_file_size_mb}MB)."
 
     # Check for system resource issues
     if context == "disk_space":
         free_space = _get_available_disk_space()
-        return (
-            f"Free up at least 500MB of disk space "
-            f"(currently {free_space}MB available) and try again."
-        )
+        return f"Free up at least 500MB of disk space (currently {free_space}MB available) and try again."
     elif context == "permission_denied":
-        return (
-            "Check file permissions and ensure the application "
-            "has write access to its folders."
-        )
+        return "Check file permissions and ensure the application has write access to its folders."
 
     # Use original function for other cases
     return _get_retry_suggestion(error, config)
@@ -345,16 +297,11 @@ def get_contextual_error_message(
     enhanced_suggestion = _get_enhanced_retry_suggestion(error, config)
 
     # Add filename context if available
-    file_context = (
-        f"Error processing '{filename}': " if filename else "Processing error: "
-    )
+    file_context = f"Error processing '{filename}': " if filename else "Processing error: "
 
     # Combine message with suggestion
     if enhanced_suggestion:
-        return (
-            f"{file_context}{enhanced_message}<br><br>"
-            f"\U0001f4a1 <strong>What to try:</strong> {enhanced_suggestion}"
-        )
+        return f"{file_context}{enhanced_message}<br><br>\U0001f4a1 <strong>What to try:</strong> {enhanced_suggestion}"
     return f"{file_context}{enhanced_message}"
 
 
@@ -375,30 +322,16 @@ def get_processing_stage_error(
         "configuration": f"Configuration error{file_info}",
     }
 
-    base_message = stage_messages.get(
-        stage, f"Processing failed at {stage}{file_info}"
-    )
+    base_message = stage_messages.get(stage, f"Processing failed at {stage}{file_info}")
     error_detail = str(error)
 
     # Add specific suggestions based on stage and error type
-    if stage == "text_extraction" and (
-        "password" in error_detail.lower()
-        or "encrypted" in error_detail.lower()
-    ):
-        return (
-            f"{base_message}: The PDF is password-protected. "
-            "Please remove the password and try again."
-        )
+    if stage == "text_extraction" and ("password" in error_detail.lower() or "encrypted" in error_detail.lower()):
+        return f"{base_message}: The PDF is password-protected. Please remove the password and try again."
     elif stage == "audio_generation" and "model" in error_detail.lower():
-        return (
-            f"{base_message}: Voice model unavailable. "
-            "Check your internet connection for automatic download."
-        )
+        return f"{base_message}: Voice model unavailable. Check your internet connection for automatic download."
     elif stage == "file_validation" and "size" in error_detail.lower():
-        return (
-            f"{base_message}: File is too large. "
-            "Try compressing or splitting the PDF."
-        )
+        return f"{base_message}: File is too large. Try compressing or splitting the PDF."
     else:
         return f"{base_message}: {error_detail}"
 
@@ -407,20 +340,12 @@ def get_error_code_suggestion(error_code: ErrorCode) -> str:
     """Get a brief suggestion string for a given error code."""
     suggestions = {
         ErrorCode.FILE_NOT_FOUND: "Check that the file was uploaded correctly.",
-        ErrorCode.TEXT_EXTRACTION_FAILED: (
-            "Try a different PDF or ensure it's not password-protected."
-        ),
-        ErrorCode.TEXT_CLEANING_FAILED: (
-            "Try disabling text cleaning in settings."
-        ),
-        ErrorCode.AUDIO_GENERATION_FAILED: (
-            "Try again or check TTS service status."
-        ),
+        ErrorCode.TEXT_EXTRACTION_FAILED: ("Try a different PDF or ensure it's not password-protected."),
+        ErrorCode.TEXT_CLEANING_FAILED: ("Try disabling text cleaning in settings."),
+        ErrorCode.AUDIO_GENERATION_FAILED: ("Try again or check TTS service status."),
         ErrorCode.TTS_ENGINE_ERROR: "Check TTS configuration and try again.",
         ErrorCode.LLM_PROVIDER_ERROR: "Check API key and network connection.",
-        ErrorCode.INVALID_PAGE_RANGE: (
-            "Verify page numbers are within document range."
-        ),
+        ErrorCode.INVALID_PAGE_RANGE: ("Verify page numbers are within document range."),
         ErrorCode.FILE_SIZE_ERROR: "Use a smaller PDF file.",
         ErrorCode.UNSUPPORTED_FILE_TYPE: "Only PDF files are supported.",
     }

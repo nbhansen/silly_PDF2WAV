@@ -8,24 +8,25 @@ import contextlib
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from application.context.application_context import ApplicationContext
-    from domain.models import PageRange, ProcessingResult, TimingMetadata
+    from application.config.system_config import SystemConfig
+    from application.container.service_container import ServiceContainer
+    from domain.models import TimingMetadata
 
 from application.services.error_formatting import clean_text_for_display, get_processing_stage_error
-from application.services.progress_store import cancel_operation, is_operation_cancelled, update_progress
-from domain.errors import ApplicationError, ErrorCode, Result
-from domain.models import ProcessingRequest, TextSegment, TimedAudioResult
+from application.services.progress_store import is_operation_cancelled, update_progress
+from domain.models import ProcessingRequest
 from utils import parse_page_range_from_form, parse_plain_english_from_form
 
 logger = logging.getLogger(__name__)
 
+
 class DocumentProcessingService:
     """Service for orchestrating document-to-audio conversion pipeline."""
 
-    def __init__(self, service_container: 'ServiceContainer', config: 'SystemConfig'):
+    def __init__(self, service_container: "ServiceContainer", config: "SystemConfig"):
         self.container = service_container
         self.config = config
 
@@ -47,7 +48,7 @@ class DocumentProcessingService:
 
             # 1. Validate and prepare file info (10%)
             update_progress(operation_id, "validating", 10, "Validating uploaded file...")
-            
+
             # Simplified file info extraction
             base_filename = Path(original_filename).stem
             page_range = parse_page_range_from_form(request_form)
@@ -80,20 +81,12 @@ class DocumentProcessingService:
                 logger.info("Created custom TextPipeline with plain English conversion enabled")
 
             update_progress(operation_id, "processing", 20, "Starting document processing...")
-            
-            request_obj = ProcessingRequest(
-                pdf_path=saved_file_path, 
-                output_name=base_filename, 
-                page_range=page_range
-            )
+
+            request_obj = ProcessingRequest(pdf_path=saved_file_path, output_name=base_filename, page_range=page_range)
 
             # Core processing
             processing_result = document_engine.process_document(
-                request_obj, 
-                audio_engine, 
-                text_pipeline, 
-                enable_timing, 
-                self.config.text_processing.llm_chunk_size
+                request_obj, audio_engine, text_pipeline, enable_timing, self.config.text_processing.llm_chunk_size
             )
 
             if is_operation_cancelled(operation_id):
@@ -102,7 +95,14 @@ class DocumentProcessingService:
             if processing_result.is_failure:
                 error_msg = str(processing_result.error)
                 enhanced_error = get_processing_stage_error("audio_generation", Exception(error_msg), original_filename)
-                update_progress(operation_id, "error", 0, "Processing failed", is_error=True, error_message=enhanced_error)
+                update_progress(
+                    operation_id,
+                    "error",
+                    0,
+                    "Processing failed",
+                    is_error=True,
+                    error_message=enhanced_error,
+                )
                 return
 
             # 3. Finalize result (100%)
@@ -115,6 +115,7 @@ class DocumentProcessingService:
 
             # Prepare legacy ProcessingResult for backward compatibility with route handlers
             from domain.models import ProcessingResult
+
             final_result = ProcessingResult(
                 audio_files=audio_result.audio_files or {},
                 combined_mp3_file=audio_result.combined_mp3,
@@ -139,9 +140,16 @@ class DocumentProcessingService:
         except Exception as e:
             logger.exception(f"Unexpected error in background processing: {e}")
             enhanced_error = get_processing_stage_error("processing", e, original_filename)
-            update_progress(operation_id, "error", 0, "Processing failed unexpectedly", is_error=True, error_message=enhanced_error)
+            update_progress(
+                operation_id,
+                "error",
+                0,
+                "Processing failed unexpectedly",
+                is_error=True,
+                error_message=enhanced_error,
+            )
 
-    def _save_timing_data(self, base_filename: str, timing_metadata: 'TimingMetadata') -> None:
+    def _save_timing_data(self, base_filename: str, timing_metadata: "TimingMetadata") -> None:
         """Save timing metadata as JSON file."""
         timing_json = {
             "total_duration": timing_metadata.total_duration,
@@ -170,6 +178,7 @@ class DocumentProcessingService:
 
             # Register with file manager for cleanup if needed
             from infrastructure.file.file_manager import FileManager
+
             with contextlib.suppress(Exception):
                 file_manager = self.container.get(FileManager)
                 if hasattr(file_manager, "schedule_cleanup"):

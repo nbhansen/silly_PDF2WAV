@@ -1,5 +1,5 @@
 # domain/text/chunking_strategy.py - Text Chunking Strategies with Result[T] pattern
-"""Text chunking strategies using Result[T] pattern for error handling.
+r"""Text chunking strategies using Result[T] pattern for error handling.
 
 No exceptions thrown - all errors returned as Result[T].
 

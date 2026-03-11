@@ -163,9 +163,7 @@ class DocumentEngine(IDocumentEngine):
             # Step 2: Process through LLM cleaning
             cleaned_chunks = []
             for i, combined_chunk in enumerate(combined_chunks, 1):
-                logger.debug(
-                    "Processing LLM chunk %d/%d (%d chars)", i, len(combined_chunks), len(combined_chunk)
-                )
+                logger.debug("Processing LLM chunk %d/%d (%d chars)", i, len(combined_chunks), len(combined_chunk))
                 logger.debug("Combined text preview: '%s...'", combined_chunk[:100])
 
                 logger.debug("Calling text_pipeline.clean_text()...")
@@ -200,7 +198,9 @@ class DocumentEngine(IDocumentEngine):
 
             logger.info(
                 "Processed through optimized pipeline: %d -> %d -> %d chunks",
-                len(text_chunks), len(combined_chunks), len(processed_chunks)
+                len(text_chunks),
+                len(combined_chunks),
+                len(processed_chunks),
             )
 
             return Result.success(processed_chunks)

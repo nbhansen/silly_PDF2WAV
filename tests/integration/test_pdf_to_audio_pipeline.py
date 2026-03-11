@@ -8,7 +8,6 @@ functionality actually works end-to-end.
 from collections.abc import Generator
 from pathlib import Path
 import tempfile
-import time
 from unittest.mock import Mock, patch
 
 import pytest
@@ -20,7 +19,7 @@ from application.config.system_config import SystemConfig
 from domain.config.tts_config import PiperConfig, TTSConfig, TTSEngine
 from domain.container.service_container import create_service_container
 from domain.interfaces import IAudioEngine, IDocumentEngine, ITextPipeline
-from domain.models import PageRange, PDFInfo, ProcessingRequest, ProcessingResult
+from domain.models import PageRange, PDFInfo, ProcessingResult
 
 
 @pytest.fixture
@@ -148,10 +147,7 @@ class TestPDFToAudioPipelineCore:
     """Test core PDF-to-audio conversion pipeline."""
 
     def test_document_text_extraction_pipeline(
-        self,
-        pipeline_config: SystemConfig,
-        test_pdf_content: bytes,
-        pipeline_test_dirs: tuple[str, str]
+        self, pipeline_config: SystemConfig, test_pdf_content: bytes, pipeline_test_dirs: tuple[str, str]
     ) -> None:
         """Should extract text from PDF using real document engine."""
         upload_dir, _ = pipeline_test_dirs
@@ -208,7 +204,7 @@ class TestPDFToAudioPipelineCore:
             assert isinstance(processed_text, str)
             assert len(processed_text) > 0
 
-            # Test sentence splitting 
+            # Test sentence splitting
             sentences_result = text_pipeline.split_into_sentences(processed_text)
             assert sentences_result.is_success
 
@@ -221,11 +217,7 @@ class TestPDFToAudioPipelineCore:
     @patch("infrastructure.tts.piper_tts_provider.PiperTTSProvider._ensure_model")
     @patch("pathlib.Path.exists")
     def test_audio_generation_pipeline(
-        self,
-        mock_exists: Mock,
-        mock_ensure_model: Mock,
-        mock_generate: Mock,
-        pipeline_config: SystemConfig
+        self, mock_exists: Mock, mock_ensure_model: Mock, mock_generate: Mock, pipeline_config: SystemConfig
     ) -> None:
         """Should generate audio from processed text."""
         # Setup mocks for Piper TTS
@@ -237,8 +229,6 @@ class TestPDFToAudioPipelineCore:
         fake_audio_data = fake_wav_header + b"fake_audio_content"
         mock_generate.return_value = fake_audio_data
 
-        test_text = "This is a test sentence for audio generation."
-
         with patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True):
             container = create_service_container(pipeline_config)
             audio_engine = container.get(IAudioEngine)
@@ -246,7 +236,7 @@ class TestPDFToAudioPipelineCore:
             # Test audio generation engine existence
             assert audio_engine is not None
             # Check for underlying TTS engine presence as implementation detail
-            assert hasattr(audio_engine, 'tts_engine') or hasattr(audio_engine, '_tts_engine')
+            assert hasattr(audio_engine, "tts_engine") or hasattr(audio_engine, "_tts_engine")
 
     def test_missing_file_handling(self, pipeline_config: SystemConfig) -> None:
         """Should handle missing PDF files gracefully."""
@@ -259,7 +249,7 @@ class TestPDFToAudioPipelineCore:
             # Should handle missing file gracefully - specific implementation detail:
             # TesseractOCRProvider returns a default PDFInfo object on error instead of raising
             pdf_info_result = document_engine.get_pdf_info(nonexistent_path)
-            
+
             # The current implementation catches exceptions and returns success with default values
             if pdf_info_result.is_success:
                 pdf_info = pdf_info_result.value
@@ -296,7 +286,7 @@ class TestPDFToAudioPipelineCore:
             invalid_range = PageRange(start_page=5, end_page=2)
             # If constructor doesn't raise, we manually validate
             if invalid_range.start_page > invalid_range.end_page:
-                 raise ValueError("start_page cannot be greater than end_page")
+                raise ValueError("start_page cannot be greater than end_page")
         except ValueError as e:
             assert "start_page cannot be greater than end_page" in str(e)
 
@@ -345,6 +335,7 @@ class TestPDFToAudioFileManagement:
             container = create_service_container(pipeline_config)
 
             from infrastructure.file.file_manager import FileManager
+
             file_manager = container.get(FileManager)
 
             # File manager should have correct paths
@@ -377,15 +368,8 @@ class TestPDFToAudioIntegrationValidation:
     def test_processing_result_structure(self, pipeline_config: SystemConfig) -> None:
         """Should create proper ProcessingResult structures."""
         # Test successful result
-        request = ProcessingRequest(
-            pdf_path="test.pdf",
-            output_name="test_output",
-            page_range=PageRange()
-        )
-
         success_result = ProcessingResult.success_result(
-            audio_files=["chunk1.wav", "chunk2.wav"],
-            combined_mp3="test_output.mp3"
+            audio_files=["chunk1.wav", "chunk2.wav"], combined_mp3="test_output.mp3"
         )
 
         assert success_result.success is True
@@ -395,6 +379,7 @@ class TestPDFToAudioIntegrationValidation:
 
         # Test failure result
         from domain.errors import unknown_error
+
         error = unknown_error("Test processing failure")
 
         failure_result = ProcessingResult.failure_result(error)
@@ -425,4 +410,7 @@ class TestPDFToAudioIntegrationValidation:
         # Text processing configuration should be valid
         assert pipeline_config.text_processing.audio_target_chunk_size > 0
         assert pipeline_config.text_processing.audio_max_chunk_size > 0
-        assert pipeline_config.text_processing.audio_max_chunk_size >= pipeline_config.text_processing.audio_target_chunk_size
+        assert (
+            pipeline_config.text_processing.audio_max_chunk_size
+            >= pipeline_config.text_processing.audio_target_chunk_size
+        )

@@ -320,9 +320,9 @@ class TestEndToEndPDFConversion:
 
         # Should contain error indication
         error_indicators = ["error", "invalid", "failed", "unable"]
-        assert any(
-            indicator in response_text.lower() for indicator in error_indicators
-        ), "Response should indicate error for invalid PDF"
+        assert any(indicator in response_text.lower() for indicator in error_indicators), (
+            "Response should indicate error for invalid PDF"
+        )
 
     def test_page_range_processing(self, client: FlaskClient, sample_pdf_content: bytes) -> None:
         """Test partial document processing with page ranges.
@@ -368,9 +368,9 @@ class TestEndToEndPDFConversion:
 
             # Should indicate partial processing
             page_indicators = ["page", "1-1", "pages 1"]
-            assert any(
-                indicator in response_text.lower() for indicator in page_indicators
-            ), "Response should indicate page range processing"
+            assert any(indicator in response_text.lower() for indicator in page_indicators), (
+                "Response should indicate page range processing"
+            )
 
     def test_read_along_interface_access(self, client: FlaskClient, flask_test_config: SystemConfig) -> None:
         """Test read-along interface accessibility.

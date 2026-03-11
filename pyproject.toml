@@ -93,15 +93,35 @@ ignore = [
 
     # Complexity - allow some complexity in domain logic
     "C901",   # Complex function (we'll monitor separately)
+
+    # Style preferences - if/elif chains more readable than dicts for multiline strings
+    "SIM116", # Use dict instead of consecutive if statements
+
+    # Async - pathlib in async is fine for our use case (not using trio/anyio)
+    "ASYNC240", # Async functions should not use pathlib
 ]
 
 [tool.ruff.lint.per-file-ignores]
 # Test files can have additional flexibility
 "tests/**/*.py" = [
     "S101",   # Assert statements are expected in tests
+    "S108",   # Probable insecure usage of temp files (test paths are fine)
     "D103",   # Missing docstring in public function (test functions)
     "ANN001", # Missing type annotation for function argument
     "ANN201", # Missing return type annotation for public function
+    "PT017",  # Assertion on exception in except block (acceptable in tests)
+    "PT018",  # Assertion should be broken down (acceptable in tests)
+    "S110",   # try-except-pass (acceptable in tests)
+    "SIM117", # Nested with statements (acceptable in tests)
+    "PTH123", # open() vs Path.open() (acceptable in tests)
+    "RUF059", # Unused unpacked variable (acceptable in tests)
+    "F841",   # Local variable assigned but never used (acceptable in tests)
+    "RUF043", # Pattern metacharacters in match= (acceptable in tests)
+]
+
+# PDF pipeline test has trailing spaces in PDF binary content literals
+"tests/integration/test_pdf_to_audio_pipeline.py" = [
+    "W291",   # Trailing whitespace in PDF xref table content
 ]
 
 # Infrastructure files - allow secure URL operations

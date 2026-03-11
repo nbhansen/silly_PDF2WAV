@@ -305,6 +305,7 @@ def cleanup_test_files(temp_dir):
 def _check_command_available(command: str) -> bool:
     """Check if a command is available on the system."""
     import shutil
+
     return shutil.which(command) is not None
 
 
@@ -316,6 +317,7 @@ def _check_piper_available() -> bool:
     # Check Python library
     try:
         from piper.voice import PiperVoice  # noqa: F401
+
         return True
     except ImportError:
         pass

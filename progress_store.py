@@ -4,7 +4,7 @@ This module exists for backward compatibility. New code should import from
 application.services.progress_store directly.
 """
 
-from application.services.progress_store import (  # noqa: F401
+from application.services.progress_store import (
     ProgressStatus,
     ThreadSafeProgressStore,
     cancel_operation,

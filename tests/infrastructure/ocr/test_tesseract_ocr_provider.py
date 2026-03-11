@@ -6,8 +6,6 @@ Tests image processing pipeline, PDF info extraction and page range validation.
 
 from unittest.mock import MagicMock, Mock, patch
 
-import pytest
-
 from domain.errors import ErrorCode
 from domain.models import PageRange
 from infrastructure.ocr.tesseract_ocr_provider import TesseractOCRProvider

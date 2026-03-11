@@ -79,9 +79,7 @@ class TestPiperTTSProviderInitialization:
 
     @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
     @patch("subprocess.run")
-    def test_init_with_missing_model_files_defers_error(
-        self, mock_run: Mock, temp_models_dir: str
-    ) -> None:
+    def test_init_with_missing_model_files_defers_error(self, mock_run: Mock, temp_models_dir: str) -> None:
         """Should defer error for missing model files to generate_audio_data call."""
         # Make Piper command line available so it proceeds to model check
         mock_run.return_value = Mock(returncode=0)
@@ -214,9 +212,7 @@ class TestPiperTTSProviderTextValidation:
 
     @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
     @patch("subprocess.run")
-    def test_generate_audio_data_rejects_empty_text(
-        self, mock_run: Mock, basic_piper_config: PiperConfig
-    ) -> None:
+    def test_generate_audio_data_rejects_empty_text(self, mock_run: Mock, basic_piper_config: PiperConfig) -> None:
         """Should reject empty text input."""
         mock_run.return_value = Mock(returncode=0)
         provider = PiperTTSProvider(basic_piper_config)
@@ -229,9 +225,7 @@ class TestPiperTTSProviderTextValidation:
 
     @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
     @patch("subprocess.run")
-    def test_generate_audio_data_rejects_whitespace_only(
-        self, mock_run: Mock, basic_piper_config: PiperConfig
-    ) -> None:
+    def test_generate_audio_data_rejects_whitespace_only(self, mock_run: Mock, basic_piper_config: PiperConfig) -> None:
         """Should reject whitespace-only text."""
         mock_run.return_value = Mock(returncode=0)
         provider = PiperTTSProvider(basic_piper_config)
@@ -244,9 +238,7 @@ class TestPiperTTSProviderTextValidation:
 
     @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
     @patch("subprocess.run")
-    def test_generate_audio_data_rejects_error_messages(
-        self, mock_run: Mock, basic_piper_config: PiperConfig
-    ) -> None:
+    def test_generate_audio_data_rejects_error_messages(self, mock_run: Mock, basic_piper_config: PiperConfig) -> None:
         """Should reject error message text."""
         mock_run.return_value = Mock(returncode=0)
         provider = PiperTTSProvider(basic_piper_config)
@@ -286,9 +278,7 @@ class TestPiperTTSProviderAvailabilityChecking:
 
     @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
     @patch("subprocess.run")
-    def test_generate_audio_data_fails_when_unavailable(
-        self, mock_run: Mock, basic_piper_config: PiperConfig
-    ) -> None:
+    def test_generate_audio_data_fails_when_unavailable(self, mock_run: Mock, basic_piper_config: PiperConfig) -> None:
         """Should fail gracefully when Piper is not available."""
         # Mock command line check to fail
         mock_run.side_effect = FileNotFoundError("piper command not found")
@@ -330,7 +320,7 @@ class TestPiperTTSProviderCommandLineGeneration:
 
         mock_run.return_value = Mock(returncode=0, stderr="", stdout="")
         mock_exists.return_value = True
-        
+
         # FIX: Path.stat() needs to return object with integer st_mode
         stat_result = Mock()
         stat_result.st_size = 44100
@@ -370,9 +360,7 @@ class TestPiperTTSProviderCommandLineGeneration:
 
     @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
     @patch("subprocess.run")
-    def test_generate_with_command_line_handles_timeout(
-        self, mock_run: Mock, custom_piper_config: PiperConfig
-    ) -> None:
+    def test_generate_with_command_line_handles_timeout(self, mock_run: Mock, custom_piper_config: PiperConfig) -> None:
         """Should handle command timeout gracefully."""
         # Mock successful piper check
         mock_run.return_value = Mock(returncode=0)
@@ -380,6 +368,7 @@ class TestPiperTTSProviderCommandLineGeneration:
 
         # Mock timeout on actual generation
         from subprocess import TimeoutExpired
+
         mock_run.side_effect = TimeoutExpired("piper", 30)
 
         result = provider.generate_audio_data("Test text")
@@ -400,9 +389,7 @@ class TestPiperTTSProviderCommandLineGeneration:
         provider = PiperTTSProvider(custom_piper_config)
 
         # Mock command failure
-        mock_run.return_value = Mock(
-            returncode=1, stderr="Model not found", stdout="", args=["piper"]
-        )
+        mock_run.return_value = Mock(returncode=1, stderr="Model not found", stdout="", args=["piper"])
 
         result = provider.generate_audio_data("Test text")
 
@@ -482,9 +469,7 @@ class TestPiperTTSProviderSecureDownload:
         assert call_args.kwargs["timeout"] == 30
 
     @patch("urllib.request.urlopen")
-    def test_secure_download_handles_http_errors(
-        self, mock_urlopen: Mock, basic_piper_config: PiperConfig
-    ) -> None:
+    def test_secure_download_handles_http_errors(self, mock_urlopen: Mock, basic_piper_config: PiperConfig) -> None:
         """Should handle HTTP error responses."""
         provider = PiperTTSProvider(basic_piper_config)
 
@@ -501,9 +486,7 @@ class TestPiperTTSProviderModelManagement:
     """Test model downloading and management."""
 
     @patch.object(PiperTTSProvider, "_secure_download")
-    def test_ensure_model_downloads_when_missing(
-        self, mock_download: Mock, temp_models_dir: str
-    ) -> None:
+    def test_ensure_model_downloads_when_missing(self, mock_download: Mock, temp_models_dir: str) -> None:
         """Should download model files when they don't exist."""
         config = PiperConfig(
             model_name="en_US-ryan-medium",
@@ -545,9 +528,7 @@ class TestPiperTTSProviderModelManagement:
             assert config_path == str(config_file)
 
     @patch.object(PiperTTSProvider, "_secure_download")
-    def test_ensure_model_handles_download_failure(
-        self, mock_download: Mock, temp_models_dir: str
-    ) -> None:
+    def test_ensure_model_handles_download_failure(self, mock_download: Mock, temp_models_dir: str) -> None:
         """Should handle model download failures gracefully."""
         config = PiperConfig(
             model_name="en_US-lessac-medium",

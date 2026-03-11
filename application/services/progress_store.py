@@ -117,9 +117,7 @@ class ThreadSafeProgressStore:
 
         current_time = time.time()
         stale_ids = [
-            op_id
-            for op_id, timestamp in self._timestamps.items()
-            if current_time - timestamp > self._max_age_seconds
+            op_id for op_id, timestamp in self._timestamps.items() if current_time - timestamp > self._max_age_seconds
         ]
 
         for op_id in stale_ids:

@@ -66,10 +66,7 @@ class ServiceContainer(IServiceContainer):
         # Build all factories in a single immutable dict
         factories: dict[ServiceKey, ServiceFactory] = {
             # Application Services
-            DocumentProcessingService: lambda: DocumentProcessingService(
-                service_container=self,
-                config=self.config
-            ),
+            DocumentProcessingService: lambda: DocumentProcessingService(service_container=self, config=self.config),
             # File Manager
             FileManager: lambda: FileManager(
                 upload_folder=self.config.files.upload_folder, output_folder=self.config.files.audio_folder
@@ -120,9 +117,7 @@ class ServiceContainer(IServiceContainer):
                 # Use LLM config for model name, falling back to gemini config if not set
                 # But prefer llm.model_name for text tasks
                 model_name = self.config.llm.model_name or self.config.gemini.model_name
-                factories[GeminiLLMProvider] = lambda: GeminiLLMProvider(
-                    model_name=model_name, api_key=api_key
-                )
+                factories[GeminiLLMProvider] = lambda: GeminiLLMProvider(model_name=model_name, api_key=api_key)
 
         return factories
 

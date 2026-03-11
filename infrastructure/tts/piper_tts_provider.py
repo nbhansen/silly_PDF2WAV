@@ -348,8 +348,8 @@ class PiperTTSProvider(ITTSEngine):
                 (":" + env.get("LD_LIBRARY_PATH", "")) if env.get("LD_LIBRARY_PATH") else ""
             )
 
-            logger.debug("PIPER COMMAND: %s", ' '.join(cmd))
-            logger.debug("PIPER ENV LD_LIBRARY_PATH: %s", env.get('LD_LIBRARY_PATH'))
+            logger.debug("PIPER COMMAND: %s", " ".join(cmd))
+            logger.debug("PIPER ENV LD_LIBRARY_PATH: %s", env.get("LD_LIBRARY_PATH"))
             logger.debug("PIPER INPUT LENGTH: %d chars", len(text))
             process = subprocess.run(cmd, input=text, capture_output=True, text=True, timeout=timeout, env=env)
 
