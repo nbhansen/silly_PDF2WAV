@@ -32,6 +32,7 @@ class GeminiLLMProvider(ILLMProvider):
     ):
         self.api_key = api_key
         self.model_name = model_name
+        self._initialization_error: Optional[str] = None  # Deferred error handling
         self.client = self._init_client()
 
         # Rate limiting configuration
@@ -43,11 +44,14 @@ class GeminiLLMProvider(ILLMProvider):
     def _init_client(self) -> Optional[genai.Client]:
         """Initialize the Gemini client with API key validation."""
         if not self.api_key or self.api_key == "YOUR_GOOGLE_AI_API_KEY":
+            self._initialization_error = "Gemini API key not configured"
             return None
 
         try:
             return genai.Client(api_key=self.api_key)
-        except Exception:
+        except Exception as e:
+            self._initialization_error = f"Failed to initialize Gemini LLM client: {e}"
+            logger.error(self._initialization_error)
             return None
 
     def process_text(self, text: str) -> Result[str]:
@@ -56,6 +60,11 @@ class GeminiLLMProvider(ILLMProvider):
 
     def generate_content(self, prompt: str) -> Result[str]:
         """Generate content based on a prompt."""
+        # Check for deferred initialization errors
+        if self._initialization_error:
+            logger.error("Gemini LLM initialization failed: %s", self._initialization_error)
+            return Result.failure(llm_provider_error(self._initialization_error))
+
         if not self.client:
             return Result.failure(llm_provider_error("Client not available"))
 
@@ -120,6 +129,11 @@ class GeminiLLMProvider(ILLMProvider):
 
     async def generate_content_async(self, prompt: str) -> Result[str]:
         """Generate content asynchronously with rate limiting."""
+        # Check for deferred initialization errors
+        if self._initialization_error:
+            logger.error("Gemini LLM initialization failed: %s", self._initialization_error)
+            return Result.failure(llm_provider_error(self._initialization_error))
+
         if not self.client:
             return Result.failure(llm_provider_error("Client not available"))
 

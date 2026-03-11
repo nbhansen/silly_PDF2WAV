@@ -41,16 +41,23 @@ class GeminiTTSProvider(ITTSEngine):
         self.max_concurrent_requests = max_concurrent_requests
         self.requests_per_minute = requests_per_minute
         self.output_format = "mp3"  # Gemini audio is typically MP3
+        self._initialization_error: Optional[str] = None  # Deferred error handling
 
         try:
             self.client = genai.Client(api_key=self.api_key)
             logger.info(f"Gemini TTS initialized with model={model_name}, voice={voice_name}")
         except Exception as e:
-            logger.error(f"Failed to initialize Gemini Client: {e}")
+            self._initialization_error = f"Failed to initialize Gemini Client: {e}"
+            logger.error(self._initialization_error)
             self.client = None
 
     def generate_audio_data(self, text: str) -> Result[bytes]:
         """Generate audio data from text using Gemini."""
+        # Check for deferred initialization errors
+        if self._initialization_error:
+            logger.error("Gemini TTS initialization failed: %s", self._initialization_error)
+            return Result.failure(tts_engine_error(self._initialization_error))
+
         if not self.client:
             return Result.failure(tts_engine_error("Gemini Client not initialized"))
 
@@ -87,6 +94,11 @@ class GeminiTTSProvider(ITTSEngine):
 
     async def generate_audio_data_async(self, text: str) -> Result[bytes]:
         """Generate audio data asynchronously."""
+        # Check for deferred initialization errors
+        if self._initialization_error:
+            logger.error("Gemini TTS initialization failed: %s", self._initialization_error)
+            return Result.failure(tts_engine_error(self._initialization_error))
+
         if not self.client:
             return Result.failure(tts_engine_error("Gemini Client not initialized"))
 
