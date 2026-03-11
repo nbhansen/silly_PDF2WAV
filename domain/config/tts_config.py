@@ -41,7 +41,7 @@ class PiperConfig:
     noise_w: float = 0.8  # Pronunciation variability
     sentence_silence: float = 0.2  # Seconds of silence between sentences
     download_dir: str = "piper_models"
-    use_gpu: bool = True  # Piper is CPU-optimized, but keeping for compatibility
+    use_gpu: bool = True  # Not yet implemented: Piper currently runs CPU-only. Kept for future use.
 
 
 @dataclass(frozen=True)

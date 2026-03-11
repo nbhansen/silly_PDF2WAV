@@ -61,10 +61,17 @@ class DocumentEngine(IDocumentEngine):
     Pure functions with no exceptions - all errors returned as Result[T].
     """
 
-    def __init__(self, ocr_provider: IOCRProvider, file_manager: IFileManager, min_text_threshold: int = 100):
+    def __init__(
+        self,
+        ocr_provider: IOCRProvider,
+        file_manager: IFileManager,
+        min_text_threshold: int = 100,
+        audio_target_chunk_size: int = 4000,
+    ):
         self.ocr_provider = ocr_provider
         self.file_manager = file_manager
         self.min_text_threshold = min_text_threshold
+        self.audio_target_chunk_size = audio_target_chunk_size
         logger.debug("DocumentEngine initialized with Result[T] pattern")
 
     def get_pdf_info(self, pdf_path: str) -> Result[PDFInfo]:
@@ -220,7 +227,7 @@ class DocumentEngine(IDocumentEngine):
             logger.debug("Enhanced text (%d chars): '%s...'", len(enhanced_text), enhanced_text[:100])
 
             # Step 4: Split enhanced text back into optimal chunks for TTS
-            processed_chunks = self._split_for_tts(enhanced_text)
+            processed_chunks = self._split_for_tts(enhanced_text, self.audio_target_chunk_size)
             logger.debug("Split enhanced text into %d TTS-optimized chunks", len(processed_chunks))
 
             logger.info(

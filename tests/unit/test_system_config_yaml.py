@@ -44,7 +44,7 @@ class TestSystemConfigYAMLLoading:
                 "piper": {"model_name": "en_US-test-high", "models_dir": "test_models", "length_scale": 1.2},
             },
             "secrets": {"google_ai_api_key": "test-api-key-123"},
-            "text_processing": {"enable_text_cleaning": False, "enable_natural_formatting": False, "chunk_size": 5000},
+            "text_processing": {"enable_text_cleaning": False, "enable_natural_formatting": False},
             "files": {
                 "upload_folder": "test_uploads",
                 "audio_folder": "test_audio",
@@ -69,7 +69,6 @@ class TestSystemConfigYAMLLoading:
         # Text processing
         assert config.text_processing.enable_cleaning is False
         assert config.text_processing.enable_natural_formatting is False
-        assert config.text_processing.chunk_size == 5000
 
         # File settings
         assert config.files.upload_folder == "test_uploads"
@@ -100,7 +99,6 @@ class TestSystemConfigYAMLLoading:
             "text_processing": {
                 "enable_text_cleaning": "true",  # String boolean
                 "enable_natural_formatting": 1,  # Integer boolean
-                "chunk_size": "6000",  # String integer
                 "audio_target_chunk_size": 2500,
             },
             "files": {
@@ -122,8 +120,8 @@ class TestSystemConfigYAMLLoading:
         assert config.cleanup.enabled is True
 
         # Integer conversions
-        assert config.text_processing.chunk_size == 6000
-        assert isinstance(config.text_processing.chunk_size, int)
+        assert config.text_processing.audio_target_chunk_size == 2500
+        assert isinstance(config.text_processing.audio_target_chunk_size, int)
         assert config.files.max_file_size_mb == 30
         assert isinstance(config.files.max_file_size_mb, int)
 
@@ -244,14 +242,13 @@ class TestSystemConfigYAMLLoading:
             "tts": {"engine": "piper"},
             "text_processing": {
                 "enable_text_cleaning": None,  # Should use default
-                "chunk_size": None,  # Should use default
             },
         }
 
         config_file = _write_yaml_config(tmp_path, config_data)
         config = SystemConfig.from_yaml(config_file)
         assert config.text_processing.enable_cleaning is True  # Default value
-        assert config.text_processing.chunk_size == 20000  # Default value
+        assert config.text_processing.llm_chunk_size == 50000  # Default value
 
     def test_from_yaml_case_insensitive_tts_engine(self, tmp_path: Path):
         """Test that TTS engine is case-insensitive."""

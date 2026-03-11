@@ -12,7 +12,6 @@ class TextProcessingConfig:
     enable_cleaning: bool = True
     enable_natural_formatting: bool = True
     enable_plain_english: bool = False
-    chunk_size: int = 20000  # Legacy setting
     llm_chunk_size: int = 50000  # Large chunks for LLM text cleaning
     audio_target_chunk_size: int = 3000
     audio_max_chunk_size: int = 5000

@@ -135,6 +135,7 @@ class ServiceContainer(IServiceContainer):
             IDocumentEngine: lambda: DocumentEngine(
                 ocr_provider=self.get(TesseractOCRProvider),
                 file_manager=self.get(FileManager),
+                audio_target_chunk_size=self.config.text_processing.audio_target_chunk_size,
             ),
             # OCR Provider
             TesseractOCRProvider: lambda: TesseractOCRProvider(config=self.config),
@@ -167,7 +168,9 @@ class ServiceContainer(IServiceContainer):
                 voice_name=self.config.gemini.voice_name,
                 min_request_interval=self.config.tts.request_delay_seconds,
                 max_concurrent_requests=self.config.tts.concurrent_requests,
-                requests_per_minute=30,  # Default rate limit for Flash TTS
+                # Gemini Flash TTS API hard limit is 30 RPM; no config field needed
+                # since this is an API constraint, not a user-tunable setting.
+                requests_per_minute=30,
             )
         else:
             piper_config = self.config.piper
