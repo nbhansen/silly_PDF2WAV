@@ -40,7 +40,7 @@ from utils import (
 
 def background_process_document(
     operation_id: str,
-    request_form: dict,
+    request_form: dict[str, str],
     saved_file_path: str,
     original_filename: str,
     enable_timing: bool,
@@ -376,7 +376,7 @@ def register_routes(app: Flask) -> None:
                 original_filename,
                 enable_timing,
                 get_app_context(),
-                current_app._get_current_object(),
+                current_app._get_current_object(),  # type: ignore[attr-defined]
             ),
             daemon=True,
         )
@@ -420,7 +420,7 @@ def register_routes(app: Flask) -> None:
                 "total_files": len(files),
                 "total_size_mb": total_size / (1024 * 1024),
                 "directory": str(audio_dir),
-                "cleanup_enabled": get_app_config().enable_file_cleanup,
+                "cleanup_enabled": get_app_config().cleanup.enabled,
             }
             return jsonify(stats)
 
@@ -507,7 +507,7 @@ def register_routes(app: Flask) -> None:
                 "service_exists": True,
                 "has_file_manager": has_file_manager,
                 "service_type": service.__class__.__name__,
-                "file_cleanup_enabled": get_app_config().enable_file_cleanup,
+                "file_cleanup_enabled": get_app_config().cleanup.enabled,
                 "is_reloader_process": is_flask_reloader(),
             }
 

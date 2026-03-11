@@ -55,10 +55,11 @@ class ServiceContainer(IServiceContainer):
     def _build_core_services(self) -> dict[ServiceKey, ServiceFactory]:
         """Build all core service factories upfront (immutable pattern)."""
         from application.services.document_service import DocumentProcessingService
-        from domain.audio.audio_engine import AudioEngine, IAudioEngine
+        from domain.audio.audio_engine import AudioEngine
         from domain.audio.timing_engine import ITimingEngine, TimingEngine, TimingMode
-        from domain.document.document_engine import DocumentEngine, IDocumentEngine
-        from domain.text.text_pipeline import ITextPipeline, TextPipeline
+        from domain.document.document_engine import DocumentEngine
+        from domain.interfaces import IAudioEngine, IDocumentEngine, ITextPipeline
+        from domain.text.text_pipeline import TextPipeline
         from infrastructure.file.file_manager import FileManager
         from infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
         from infrastructure.ocr.tesseract_ocr_provider import TesseractOCRProvider

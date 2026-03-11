@@ -46,13 +46,13 @@ class GeminiTTSProvider(ITTSEngine):
         self.output_format = "mp3"  # Gemini audio is typically MP3
         self._initialization_error: Optional[str] = None  # Deferred error handling
 
+        self.client: Optional[genai.Client] = None
         try:
             self.client = genai.Client(api_key=self.api_key)
             logger.info(f"Gemini TTS initialized with model={model_name}, voice={voice_name}")
         except Exception as e:
             self._initialization_error = f"Failed to initialize Gemini Client: {e}"
             logger.error(self._initialization_error)
-            self.client = None
 
     def generate_audio_data(self, text: str) -> Result[bytes]:
         """Generate audio data from text using Gemini."""

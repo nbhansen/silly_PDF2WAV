@@ -16,8 +16,8 @@ from application.config.app_configs import FlaskConfig
 from application.config.file_configs import FileCleanupConfig, FileConfig
 from application.config.processing_configs import LLMConfig, OCRConfig, PerformanceConfig, TextProcessingConfig
 from application.config.system_config import SystemConfig
+from application.container.service_container import create_service_container
 from domain.config.tts_config import PiperConfig, TTSConfig, TTSEngine
-from domain.container.service_container import create_service_container
 from domain.interfaces import IAudioEngine, IDocumentEngine, ITextPipeline
 from domain.models import PageRange, PDFInfo, ProcessingResult
 
@@ -285,7 +285,11 @@ class TestPDFToAudioPipelineCore:
             # This should raise ValueError due to domain model validation
             invalid_range = PageRange(start_page=5, end_page=2)
             # If constructor doesn't raise, we manually validate
-            if invalid_range.start_page > invalid_range.end_page:
+            if (
+                invalid_range.start_page is not None
+                and invalid_range.end_page is not None
+                and invalid_range.start_page > invalid_range.end_page
+            ):
                 raise ValueError("start_page cannot be greater than end_page")
         except ValueError as e:
             assert "start_page cannot be greater than end_page" in str(e)

@@ -33,7 +33,7 @@ class DocumentProcessingService:
     def process_document_background(
         self,
         operation_id: str,
-        request_form: dict,
+        request_form: dict[str, str],
         saved_file_path: str,
         original_filename: str,
         enable_timing: bool,
@@ -71,7 +71,9 @@ class DocumentProcessingService:
 
             # Create custom text pipeline if plain English is requested
             if enable_plain_english:
-                llm_provider = self.container.get(GeminiLLMProvider) if self.config.gemini.api_key else None
+                llm_provider = (
+                    self.container.get(GeminiLLMProvider) if self.config.gemini and self.config.gemini.api_key else None
+                )
                 text_pipeline = TextPipeline(
                     llm_provider=llm_provider,
                     enable_cleaning=self.config.text_processing.enable_cleaning,
@@ -117,7 +119,7 @@ class DocumentProcessingService:
             from domain.models import ProcessingResult
 
             final_result = ProcessingResult(
-                audio_files=audio_result.audio_files or {},
+                audio_files=audio_result.audio_files or [],
                 combined_mp3_file=audio_result.combined_mp3,
                 timing_data=audio_result.timing_data,
                 error=None,
