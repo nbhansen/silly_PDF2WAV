@@ -44,7 +44,6 @@ This is a **hexagonal architecture** PDF-to-audio converter Flask application:
 - **`ServiceContainer`** (`domain/container/service_container.py`) - Immutable DI container with lazy initialization
 - **`ApplicationContext`** (`application/context/`) - Holds config + services, passed through Flask's `app.config["APP_CONTEXT"]`
 - **`ThreadSafeProgressStore`** (`progress_store.py`) - Thread-safe job progress tracking with locking
-- Factories in `domain/factories/` create specialized services
 
 ### Key Interfaces (`domain/interfaces.py`)
 - `ITTSEngine` / `IEnhancedTTSEngine` - Text-to-speech abstraction
