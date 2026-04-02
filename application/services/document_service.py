@@ -17,7 +17,8 @@ if TYPE_CHECKING:
 
 from application.services.error_formatting import clean_text_for_display, get_processing_stage_error
 from application.services.progress_store import is_operation_cancelled, update_progress
-from domain.models import ProcessingRequest
+from domain.interfaces import IAudioEngine, IDocumentEngine, IFileManager, ITextPipeline
+from domain.models import ProcessingRequest, ProcessingResult
 from utils import parse_page_range_from_form, parse_plain_english_from_form
 
 logger = logging.getLogger(__name__)
@@ -58,10 +59,6 @@ class DocumentProcessingService:
                 return
 
             # 2. Execute processing (20-95%)
-            from domain.interfaces import IAudioEngine, IDocumentEngine, ITextPipeline
-            from domain.text.text_pipeline import TextPipeline
-            from infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
-
             document_engine = self.container.get(IDocumentEngine)
             audio_engine = self.container.get(IAudioEngine)
             text_pipeline = self.container.get(ITextPipeline)
@@ -71,16 +68,8 @@ class DocumentProcessingService:
 
             # Create custom text pipeline if plain English is requested
             if enable_plain_english:
-                llm_provider = (
-                    self.container.get(GeminiLLMProvider) if self.config.gemini and self.config.gemini.api_key else None
-                )
-                text_pipeline = TextPipeline(
-                    llm_provider=llm_provider,
-                    enable_cleaning=self.config.text_processing.enable_cleaning,
-                    enable_natural_formatting=self.config.text_processing.enable_natural_formatting,
-                    enable_plain_english=True,
-                )
-                logger.info("Created custom TextPipeline with plain English conversion enabled")
+                text_pipeline = self.container.get("plain_english_text_pipeline")
+                logger.info("Using TextPipeline with plain English conversion enabled")
 
             update_progress(operation_id, "processing", 20, "Starting document processing...")
 
@@ -116,8 +105,6 @@ class DocumentProcessingService:
                 self._save_timing_data(base_filename, audio_result.timing_data)
 
             # Prepare legacy ProcessingResult for backward compatibility with route handlers
-            from domain.models import ProcessingResult
-
             final_result = ProcessingResult(
                 audio_files=audio_result.audio_files or [],
                 combined_mp3_file=audio_result.combined_mp3,
@@ -179,10 +166,8 @@ class DocumentProcessingService:
             logger.info(f"Saved timing data: {timing_filename}")
 
             # Register with file manager for cleanup if needed
-            from infrastructure.file.file_manager import FileManager
-
             with contextlib.suppress(Exception):
-                file_manager = self.container.get(FileManager)
+                file_manager = self.container.get(IFileManager)
                 if hasattr(file_manager, "schedule_cleanup"):
                     file_manager.schedule_cleanup(timing_filename, 2.0)
         except Exception as e:
