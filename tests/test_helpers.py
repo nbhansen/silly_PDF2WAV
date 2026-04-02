@@ -116,7 +116,7 @@ class FakeFileManager:
 class FakeTimingEngine(ITimingEngine):
     """Fake timing engine for testing."""
 
-    def generate_with_timing(self, text_chunks: list[str], output_filename: str) -> TimedAudioResult:
+    def generate_with_timing(self, text_chunks: list[str], output_filename: str) -> Result[TimedAudioResult]:
         """Generate fake timed audio result for testing."""
         from domain.models import TextSegment
 
@@ -141,8 +141,12 @@ class FakeTimingEngine(ITimingEngine):
             total_duration=current_time, text_segments=segments, audio_files=[f"{output_filename}.wav"]
         )
 
-        return TimedAudioResult(
-            audio_files=[f"{output_filename}.wav"], combined_mp3=f"{output_filename}.mp3", timing_data=timing_metadata
+        return Result.success(
+            TimedAudioResult(
+                audio_files=[f"{output_filename}.wav"],
+                combined_mp3=f"{output_filename}.mp3",
+                timing_data=timing_metadata,
+            )
         )
 
 

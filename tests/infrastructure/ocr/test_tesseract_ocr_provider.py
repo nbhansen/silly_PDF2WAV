@@ -116,7 +116,9 @@ class TestTesseractOCRProviderPerformOCR:
         result = provider.perform_ocr("empty_image.png")
 
         assert result.is_failure
+        assert result.error is not None
         assert result.error.code == ErrorCode.TEXT_EXTRACTION_FAILED
+        assert result.error.details is not None
         assert "OCR process yielded no text" in result.error.details
 
     @patch("pytesseract.image_to_string")
@@ -128,7 +130,9 @@ class TestTesseractOCRProviderPerformOCR:
         result = provider.perform_ocr("bad_image.png")
 
         assert result.is_failure
+        assert result.error is not None
         assert result.error.code == ErrorCode.TEXT_EXTRACTION_FAILED
+        assert result.error.details is not None
         assert "OCR failed on bad_image.png: Tesseract not found" in result.error.details
 
     @patch("pytesseract.image_to_string")
@@ -140,6 +144,8 @@ class TestTesseractOCRProviderPerformOCR:
         result = provider.perform_ocr("nonexistent.png")
 
         assert result.is_failure
+        assert result.error is not None
+        assert result.error.details is not None
         assert "Image file not found" in result.error.details
 
     @patch("pytesseract.image_to_string")

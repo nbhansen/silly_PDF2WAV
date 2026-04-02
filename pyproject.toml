@@ -209,6 +209,7 @@ strict_equality = true
 
 # Allow some flexibility for external dependencies
 ignore_missing_imports = true
+exclude = ["venv/"]
 
 # Module-specific overrides
 [[tool.mypy.overrides]]
@@ -216,20 +217,6 @@ module = "tests.*"
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 
-# Temporarily exclude problematic test files until Result[T] migration is complete
-[[tool.mypy.overrides]]
-module = [
-    "tests.unit.test_text_pipeline_tdd",
-    "tests.unit.test_new_architecture",
-    "tests.benchmarks.test_immutable_performance",
-    "tests.infrastructure.llm.test_gemini_llm_provider",
-    "tests.infrastructure.ocr.test_tesseract_ocr_provider",
-    "tests.infrastructure.file.test_file_manager",
-    "tests.conftest",
-    "tests.test_helpers",
-    "app_factory",
-]
-ignore_errors = true
 
 [tool.bandit]
 # Security vulnerability scanning

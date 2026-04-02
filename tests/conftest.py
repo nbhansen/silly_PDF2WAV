@@ -102,7 +102,7 @@ def mock_tts_engine():
     """Professional mock TTS engine with realistic behavior."""
     mock = MagicMock()
 
-    def generate_audio_side_effect(text: str) -> Result[bytes, Exception]:
+    def generate_audio_side_effect(text: str) -> Result[bytes]:
         # Simulate realistic audio generation
         audio_size = len(text) * 10  # 10 bytes per character
         return Result.success(b"fake_audio_" + b"x" * audio_size)
@@ -120,7 +120,7 @@ def mock_llm_provider():
     """Professional mock LLM provider."""
     mock = MagicMock()
 
-    def clean_text_side_effect(text: str) -> Result[str, Exception]:
+    def clean_text_side_effect(text: str) -> Result[str]:
         # Simulate realistic text cleaning
         cleaned = text.replace("\n", " ").strip()
         cleaned += "... *pause*"  # Add realistic LLM enhancements

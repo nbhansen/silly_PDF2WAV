@@ -51,7 +51,7 @@ class TestGeminiLLMProviderInitialization:
             )
 
             assert provider.api_key is None
-            assert provider.client is None
+            assert provider.client is None  # type: ignore[unreachable]
 
     def test_init_with_client_exception_returns_none_client(self) -> None:
         """Should return None client when genai.Client raises exception."""
@@ -404,20 +404,19 @@ class TestGeminiLLMProviderSyncContentGeneration:
 
             # Mock response type and attributes for debugging
             type(mock_response).__name__ = "GenerateContentResponse"
-            mock_response.__dir__ = Mock(
-                return_value=[
-                    "candidates",
-                    "text",
-                    "prompt_feedback",
-                    "usage_metadata",
-                    "model",
-                    "finish_reason",
-                    "safety_ratings",
-                    "citation_metadata",
-                    "content_filter_results",
-                    "blocked",
-                ]
-            )
+            _dir_attrs_407 = [
+                "candidates",
+                "text",
+                "prompt_feedback",
+                "usage_metadata",
+                "model",
+                "finish_reason",
+                "safety_ratings",
+                "citation_metadata",
+                "content_filter_results",
+                "blocked",
+            ]
+            type(mock_response).__dir__ = lambda self: _dir_attrs_407  # type: ignore[method-assign]
 
             mock_client = Mock()
             mock_client.models.generate_content.return_value = mock_response
@@ -733,20 +732,19 @@ class TestGeminiLLMProviderResponseParsing:
             mock_response.__class__.__name__ = "GenerateContentResponse"
 
             # Mock dir() to return specific attributes
-            mock_response.__dir__ = Mock(
-                return_value=[
-                    "candidates",
-                    "text",
-                    "finish_reason",
-                    "usage_metadata",
-                    "prompt_feedback",
-                    "safety_ratings",
-                    "citation_metadata",
-                    "model_name",
-                    "generation_config",
-                    "safety_settings",
-                ]
-            )
+            _dir_attrs_736 = [
+                "candidates",
+                "text",
+                "finish_reason",
+                "usage_metadata",
+                "prompt_feedback",
+                "safety_ratings",
+                "citation_metadata",
+                "model_name",
+                "generation_config",
+                "safety_settings",
+            ]
+            type(mock_response).__dir__ = lambda self: _dir_attrs_736  # type: ignore[method-assign]
 
             mock_client = Mock()
             mock_client.models.generate_content.return_value = mock_response

@@ -113,6 +113,7 @@ class TestChunkingStrategyPerformance:
         def chunk_large_text() -> list[str]:
             chunk_result = chunker.chunk_text(large_text_chunks, max_chunk_size=2000)
             assert chunk_result.is_success
+            assert chunk_result.value is not None
             return chunk_result.value
 
         result = benchmark(chunk_large_text)
@@ -125,6 +126,7 @@ class TestChunkingStrategyPerformance:
         def chunk_large_text() -> list[str]:
             chunk_result = chunker.chunk_text(large_text_chunks, max_chunk_size=1500)
             assert chunk_result.is_success
+            assert chunk_result.value is not None
             return chunk_result.value
 
         result = benchmark(chunk_large_text)
@@ -136,7 +138,7 @@ class TestChunkingStrategyPerformance:
 
         def process_chunks() -> list[str]:
             result = chunker.chunk_text(large_text_chunks, max_chunk_size=2000)
-            return result.value if result.is_success else []
+            return result.value or []
 
         result = benchmark(process_chunks)
         assert len(result) > 0
