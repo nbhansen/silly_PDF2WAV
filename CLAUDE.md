@@ -4,24 +4,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build & Development Commands
 
+Uses **uv** for dependency management. All commands should be run via `uv run`.
+
 ```bash
+# Setup
+uv sync --extra dev                    # Install all dependencies
+uv run pre-commit install              # Set up pre-commit hooks
+
 # Run application
-python app.py                          # Starts Flask server at localhost:5000
+uv run python app.py                   # Starts Flask server at localhost:5000
 
 # Testing
-python -m pytest                       # All tests
-python -m pytest tests/unit/           # Unit tests only
-python -m pytest tests/integration/    # Integration tests only
-python -m pytest tests/benchmarks/     # Performance benchmarks
-python -m pytest -k "test_name"        # Run specific test by name
-python -m pytest -m unit               # Run tests by marker
+uv run python -m pytest               # All tests
+uv run python -m pytest tests/unit/    # Unit tests only
+uv run python -m pytest tests/integration/  # Integration tests only
+uv run python -m pytest tests/benchmarks/   # Performance benchmarks
+uv run python -m pytest -k "test_name"      # Run specific test by name
 
 # Linting & Formatting (pre-commit runs all automatically)
-pre-commit run --all-files             # Run all checks
-ruff check . --fix                     # Lint with auto-fix
-ruff format .                          # Format code
-mypy .                                 # Type checking
-bandit -c pyproject.toml -r .          # Security scanning
+uv run pre-commit run --all-files      # Run all checks
+uv run ruff check . --fix              # Lint with auto-fix
+uv run ruff format .                   # Format code
+uv run mypy .                          # Type checking
+uv run bandit -c pyproject.toml -r .   # Security scanning
 ```
 
 ## Architecture Overview

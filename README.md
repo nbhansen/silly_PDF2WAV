@@ -66,12 +66,11 @@ sudo pacman -S tesseract ffmpeg espeak-ng python
 git clone <repository-url>
 cd silly_PDF2WAV
 
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
+# Install uv (if not already installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Install dependencies (includes Piper TTS)
-pip install -r requirements.txt
+uv sync --extra dev
 
 # Copy and edit configuration
 cp config.example.yaml config.yaml
@@ -81,8 +80,7 @@ cp config.example.yaml config.yaml
 ### 3. Run the Application
 
 ```bash
-source venv/bin/activate
-python app.py
+uv run python app.py
 ```
 
 Open http://localhost:5000 in your browser, upload a PDF, and get an MP3 back!
@@ -151,11 +149,11 @@ silly_PDF2WAV/
 ## Testing
 
 ```bash
-python -m pytest                       # All tests
-python -m pytest tests/unit/           # Unit tests only
-python -m pytest tests/integration/    # Integration tests
-python -m pytest -k "test_name"        # Specific test
-pre-commit run --all-files             # Linting + formatting + type checks
+uv run python -m pytest                       # All tests
+uv run python -m pytest tests/unit/           # Unit tests only
+uv run python -m pytest tests/integration/    # Integration tests
+uv run python -m pytest -k "test_name"        # Specific test
+uv run pre-commit run --all-files             # Linting + formatting + type checks
 ```
 
 ## Troubleshooting
@@ -166,7 +164,7 @@ pre-commit run --all-files             # Linting + formatting + type checks
 
 **"Text cleaning failed"**: Verify your Google AI API key is set correctly, or disable text cleaning in config.yaml.
 
-**Import errors**: Always use `source venv/bin/activate` before running any commands.
+**Import errors**: Use `uv run` to run commands, which ensures the correct virtual environment is active.
 
 ## License
 
