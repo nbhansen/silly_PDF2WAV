@@ -54,13 +54,6 @@ class ApplicationContext:
             logger.debug("Audio service check failed: %s", e)
             return False
 
-    @property
-    def pdf_service(self) -> object:
-        """Get PDF processing service (audio engine)."""
-        from domain.interfaces import IAudioEngine
-
-        return self.service_container.get(IAudioEngine)
-
     def get_logger(self, name: str) -> logging.Logger:
         """Get a logger instance for the given module."""
         return self.logger_factory.get_logger(name)
