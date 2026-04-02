@@ -98,7 +98,16 @@ class DocumentProcessingService:
 
             # 3. Finalize result (100%)
             audio_result = processing_result.value
-            assert audio_result is not None
+            if audio_result is None:
+                update_progress(
+                    operation_id,
+                    "error",
+                    0,
+                    "Processing failed",
+                    is_error=True,
+                    error_message="Processing succeeded but returned no audio result",
+                )
+                return
 
             # Save timing data if needed
             if enable_timing and audio_result.timing_data:
