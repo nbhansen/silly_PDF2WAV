@@ -6,6 +6,7 @@ which would violate hexagonal architecture if placed in domain/.
 The domain layer only contains the IServiceContainer interface.
 """
 
+import threading
 import types
 from typing import Callable, TypeVar, Union
 
@@ -31,22 +32,26 @@ class ServiceContainer(IServiceContainer):
         self._factories: types.MappingProxyType[ServiceKey, ServiceFactory] = types.MappingProxyType(factories)
 
         # Mutable singleton cache (internal implementation detail)
-        # Note: This is the only mutable part, but it's thread-safe lazy loading
         self._singletons: dict[ServiceKey, object] = {}
+        self._lock = threading.Lock()
 
     def get(self, interface: Union[type[T], str]) -> T:
-        """Get service instance (singleton pattern)."""
+        """Get service instance (singleton pattern, thread-safe)."""
         if interface in self._singletons:
             return self._singletons[interface]  # type: ignore[return-value]
 
-        if interface not in self._factories:
-            interface_name = getattr(interface, "__name__", str(interface))
-            raise ValueError(f"Service {interface_name} not registered")
+        with self._lock:
+            # Double-check after acquiring lock
+            if interface in self._singletons:
+                return self._singletons[interface]  # type: ignore[return-value]
 
-        # Create instance using factory
-        instance = self._factories[interface]()
-        self._singletons[interface] = instance
-        return instance  # type: ignore[return-value]
+            if interface not in self._factories:
+                interface_name = getattr(interface, "__name__", str(interface))
+                raise ValueError(f"Service {interface_name} not registered")
+
+            instance = self._factories[interface]()
+            self._singletons[interface] = instance
+            return instance  # type: ignore[return-value]
 
     def has(self, interface: Union[type[T], str]) -> bool:
         """Check if service is registered."""
