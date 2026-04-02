@@ -20,7 +20,7 @@ from application.container.service_container import create_service_container
 from domain.config.tts_config import PiperConfig, TTSConfig, TTSEngine
 from domain.errors import Result
 from domain.interfaces import IAudioEngine, IDocumentEngine, ITextPipeline
-from domain.models import PageRange, ProcessingRequest
+from domain.models import PageRange, ProcessingRequest, TimedAudioResult
 from infrastructure.file.file_manager import FileManager
 
 
@@ -210,7 +210,6 @@ class TestDomainModelIntegration:
     def test_result_pattern_integration(self, integration_config: SystemConfig) -> None:
         """Should properly use Result pattern throughout service layer."""
         from domain.errors import unknown_error
-        from domain.models import ProcessingResult
 
         # Test Result pattern works
         success_result = Result.success("test data")
@@ -222,13 +221,12 @@ class TestDomainModelIntegration:
         assert failure_result.error is not None
         assert "test error" in str(failure_result.error.details)
 
-        # Test ProcessingResult integration
-        processing_result = ProcessingResult.success_result(audio_files=["test.mp3"], combined_mp3="combined.mp3")
+        # Test TimedAudioResult integration
+        timed_result = TimedAudioResult(audio_files=["test.mp3"], combined_mp3="combined.mp3")
 
-        assert processing_result.success is True
-        assert processing_result.audio_files is not None
-        assert "test.mp3" in processing_result.audio_files
-        assert processing_result.combined_mp3_file == "combined.mp3"
+        assert timed_result.audio_files is not None
+        assert "test.mp3" in timed_result.audio_files
+        assert timed_result.combined_mp3 == "combined.mp3"
 
 
 class TestErrorHandlingIntegration:

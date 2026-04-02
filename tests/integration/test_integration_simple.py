@@ -76,16 +76,16 @@ def test_basic_workflow_structure():
 
 def test_error_handling_structure():
     """Test that error handling works in the service structure."""
-    from domain.errors import ApplicationError, configuration_error
-    from domain.models import ProcessingResult
+    from domain.errors import ApplicationError, Result, configuration_error
 
     # Test error creation
     error = configuration_error("Test error")
     assert isinstance(error, ApplicationError)
     assert "Configuration error" in str(error)
 
-    # Test result creation with error
-    result = ProcessingResult.failure_result(error)
-    assert result.success is False
+    # Test result creation with error using Result pattern
+    result: Result[str] = Result.failure(error)
+    assert result.is_failure
     assert result.error == error
-    assert "Configuration error" in result.get_error_message()
+    assert result.error is not None
+    assert "Configuration error" in str(result.error)

@@ -19,7 +19,7 @@ from application.config.system_config import SystemConfig
 from application.container.service_container import create_service_container
 from domain.config.tts_config import PiperConfig, TTSConfig, TTSEngine
 from domain.interfaces import IAudioEngine, IDocumentEngine, ITextPipeline
-from domain.models import PageRange, PDFInfo, ProcessingResult
+from domain.models import PageRange, PDFInfo, TimedAudioResult
 
 
 @pytest.fixture
@@ -371,27 +371,23 @@ class TestPDFToAudioIntegrationValidation:
     """Validate the integration works as expected."""
 
     def test_processing_result_structure(self, pipeline_config: SystemConfig) -> None:
-        """Should create proper ProcessingResult structures."""
+        """Should create proper TimedAudioResult structures."""
+        from domain.errors import Result, unknown_error
+
         # Test successful result
-        success_result = ProcessingResult.success_result(
+        success_result = TimedAudioResult(
             audio_files=["chunk1.wav", "chunk2.wav"], combined_mp3="test_output.mp3"
         )
 
-        assert success_result.success is True
         assert success_result.audio_files == ["chunk1.wav", "chunk2.wav"]
-        assert success_result.combined_mp3_file == "test_output.mp3"
-        assert success_result.error is None
+        assert success_result.combined_mp3 == "test_output.mp3"
+        assert success_result.timing_data is None
 
-        # Test failure result
-        from domain.errors import unknown_error
-
+        # Test failure result using Result pattern
         error = unknown_error("Test processing failure")
-
-        failure_result = ProcessingResult.failure_result(error)
-        assert failure_result.success is False
+        failure_result: Result[TimedAudioResult] = Result.failure(error)
+        assert failure_result.is_failure
         assert failure_result.error == error
-        assert failure_result.audio_files is None
-        assert failure_result.combined_mp3_file is None
 
     def test_pipeline_configuration_validation(self, pipeline_config: SystemConfig) -> None:
         """Should validate pipeline configuration is complete."""

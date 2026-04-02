@@ -7,7 +7,6 @@ Tests written first to drive implementation and ensure all edge cases are covere
 from domain.models import (
     CleanupResult,
     PDFInfo,
-    ProcessingResult,
     TextSegment,
     TimedAudioResult,
     TimingMetadata,
@@ -45,91 +44,6 @@ class TestPDFInfo:
 
         assert pdf_info.title == "Título en Español: José María"
         assert pdf_info.author == "李小明"
-
-
-class TestProcessingResult:
-    """TDD tests for ProcessingResult model - comprehensive error handling tests."""
-
-    def test_successful_processing_result_creation(self):
-        """Should create successful result with audio files."""
-        audio_files = ["file1.wav", "file2.wav"]
-        result = ProcessingResult.success_result(audio_files=audio_files, combined_mp3="combined.mp3")
-
-        assert result.success is True
-        assert result.is_retryable is False
-        assert result.audio_files == audio_files
-        assert result.combined_mp3_file == "combined.mp3"
-        assert result.error is None
-        assert result.get_error_message() == "No error"
-        assert result.get_error_code() is None
-
-    def test_successful_result_with_timing_data(self):
-        """Should create successful result with timing information."""
-        from domain.models import TextSegment, TimingMetadata
-
-        segments = [TextSegment("Hello world", 0.0, 1.0, "sentence", 0, 0)]
-        timing_data = TimingMetadata(1.0, segments, ["audio.wav"])
-
-        result = ProcessingResult.success_result(audio_files=["audio.wav"], timing_data=timing_data)
-
-        assert result.success is True
-        assert result.timing_data is not None
-        assert result.timing_data.total_duration == 1.0
-
-    def test_successful_result_with_debug_info(self):
-        """Should create successful result with debug information."""
-        debug_info = {"chunks_processed": 5, "total_duration": 120.5}
-        result = ProcessingResult.success_result(audio_files=["output.wav"], debug_info=debug_info)
-
-        assert result.success is True
-        assert result.debug_info == debug_info
-
-    def test_failed_processing_result_creation(self):
-        """Should create failed result with error information."""
-        from domain.errors import text_extraction_error
-
-        error = text_extraction_error("Failed to extract text from PDF")
-        result = ProcessingResult.failure_result(error)
-
-        assert result.success is False
-        assert result.is_retryable is True  # text extraction errors are typically retryable
-        assert result.audio_files is None
-        assert result.combined_mp3_file is None
-        assert result.timing_data is None
-        assert result.error == error
-        assert "Failed to extract text from PDF" in result.get_error_message()
-        assert result.get_error_code() is not None
-
-    def test_processing_result_retryable_logic(self):
-        """Should correctly determine if errors are retryable."""
-        from domain.errors import audio_generation_error, configuration_error
-
-        # Non-retryable error
-        config_error = configuration_error("Invalid API key")
-        non_retryable_result = ProcessingResult.failure_result(config_error)
-        assert non_retryable_result.is_retryable is False
-
-        # Retryable error
-        audio_error = audio_generation_error("TTS service temporarily unavailable")
-        retryable_result = ProcessingResult.failure_result(audio_error)
-        assert retryable_result.is_retryable is True
-
-    def test_processing_result_with_empty_audio_files(self):
-        """Should handle empty audio files list."""
-        result = ProcessingResult.success_result(audio_files=[])
-
-        assert result.success is True
-        assert result.audio_files == []
-
-    def test_processing_result_immutability(self):
-        """Should be immutable after creation."""
-        audio_files = ["file1.wav"]
-        result = ProcessingResult.success_result(audio_files=audio_files)
-
-        # Modifying original list shouldn't affect result
-        audio_files.append("file2.wav")
-        assert result.audio_files is not None
-        assert len(result.audio_files) == 1
 
 
 class TestCleanupResult:
