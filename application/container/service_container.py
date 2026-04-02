@@ -58,7 +58,7 @@ class ServiceContainer(IServiceContainer):
         from domain.audio.audio_engine import AudioEngine
         from domain.audio.timing_engine import ITimingEngine, TimingEngine, TimingMode
         from domain.document.document_engine import DocumentEngine
-        from domain.interfaces import IAudioEngine, IDocumentEngine, ITextPipeline
+        from domain.interfaces import IAudioEngine, IDocumentEngine, IFileManager, ILLMProvider, ITextPipeline
         from domain.text.text_pipeline import TextPipeline
         from infrastructure.file.file_manager import FileManager
         from infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
@@ -69,9 +69,10 @@ class ServiceContainer(IServiceContainer):
             # Application Services
             DocumentProcessingService: lambda: DocumentProcessingService(service_container=self, config=self.config),
             # File Manager
-            FileManager: lambda: FileManager(
+            IFileManager: lambda: FileManager(
                 upload_folder=self.config.files.upload_folder, output_folder=self.config.files.audio_folder
             ),
+            FileManager: lambda: self.get(IFileManager),
             # TTS Engine (factory method)
             "tts_engine": lambda: self._create_tts_engine(),
             # Text Pipeline
@@ -119,6 +120,7 @@ class ServiceContainer(IServiceContainer):
                 # But prefer llm.model_name for text tasks
                 model_name = self.config.llm.model_name or self.config.gemini.model_name
                 factories[GeminiLLMProvider] = lambda: GeminiLLMProvider(model_name=model_name, api_key=api_key)
+                factories[ILLMProvider] = lambda: self.get(GeminiLLMProvider)
 
         return factories
 
