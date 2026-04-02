@@ -33,7 +33,7 @@ class ServiceContainer(IServiceContainer):
 
         # Mutable singleton cache (internal implementation detail)
         self._singletons: dict[ServiceKey, object] = {}
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
     def get(self, interface: Union[type[T], str]) -> T:
         """Get service instance (singleton pattern, thread-safe)."""
