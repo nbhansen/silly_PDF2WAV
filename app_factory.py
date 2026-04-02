@@ -17,17 +17,6 @@ from application.context.application_context import ApplicationContext
 from infrastructure.file.cleanup_scheduler import FileCleanupScheduler
 
 
-def create_service_container(config: SystemConfig, logger_factory: ThreadSafeLoggerFactory) -> ServiceContainer:
-    """Create service container with all dependencies."""
-    logger = logger_factory.get_logger("service_factory")
-
-    # Create container - it builds all services automatically
-    container = ServiceContainer(config)
-
-    logger.info("Service container initialized successfully")
-    return container
-
-
 def create_app(config_path: Optional[Path] = None) -> Flask:
     """Create and configure Flask application with proper dependency injection.
 
@@ -57,7 +46,7 @@ def create_app(config_path: Optional[Path] = None) -> Flask:
 
     # Create service container
     logger.info("Initializing services...")
-    service_container = create_service_container(app_config, logger_factory)
+    service_container = ServiceContainer(app_config)
 
     # Create cleanup scheduler if enabled
     cleanup_scheduler = None

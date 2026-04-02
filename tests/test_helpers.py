@@ -15,9 +15,8 @@ from domain.models import PageRange, ProcessingRequest, TimedAudioResult, Timing
 class FakeTTSEngine(ITTSEngine):
     """Fake TTS engine for testing purposes."""
 
-    def __init__(self, should_fail: bool = False, output_format: str = "wav"):
+    def __init__(self, should_fail: bool = False):
         self.should_fail = should_fail
-        self.output_format = output_format
         self.generated_texts: list[str] = []
 
     def generate_audio_data(self, text_to_speak: str) -> Result[bytes]:
@@ -26,10 +25,6 @@ class FakeTTSEngine(ITTSEngine):
         if self.should_fail:
             return Result.failure(tts_engine_error("TTS generation failed"))
         return Result.success(f"audio_data_for_{len(text_to_speak)}_chars".encode())
-
-    def get_output_format(self) -> str:
-        """Return the configured output format."""
-        return self.output_format
 
     async def generate_audio_data_async(self, text_to_speak: str) -> Result[bytes]:
         """Async version for interface compliance."""

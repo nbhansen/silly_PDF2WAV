@@ -170,14 +170,6 @@ class GeminiTTSProvider(ITTSEngine):
                 wav_file.writeframes(pcm_data)
             return wav_io.getvalue()
 
-    def get_output_format(self) -> str:
-        """Get the output format for generated audio."""
-        return self.output_format
-
-    def prefers_sync_processing(self) -> bool:
-        """Whether this engine prefers synchronous processing."""
-        return False  # Gemini is API-based, async preferred
-
     def supports_ssml(self) -> bool:
         """Whether this engine supports SSML."""
         return False  # Gemini Audio model takes text prompt, not SSML (prompt engineering used instead)

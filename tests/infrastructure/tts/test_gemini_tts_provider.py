@@ -79,18 +79,6 @@ class TestGeminiTTSProviderInitialization:
 class TestGeminiTTSProviderInterfaces:
     """Test ITTSEngine interface implementation."""
 
-    def test_get_output_format(self, basic_gemini_provider: GeminiTTSProvider) -> None:
-        """Should return MP3 format."""
-        provider = basic_gemini_provider
-
-        assert provider.get_output_format() == "mp3"
-
-    def test_prefers_sync_processing(self, basic_gemini_provider: GeminiTTSProvider) -> None:
-        """Should prefer asynchronous processing for API-based service."""
-        provider = basic_gemini_provider
-
-        assert provider.prefers_sync_processing() is False
-
     def test_supports_ssml(self, basic_gemini_provider: GeminiTTSProvider) -> None:
         """Should support SSML markup."""
         provider = basic_gemini_provider

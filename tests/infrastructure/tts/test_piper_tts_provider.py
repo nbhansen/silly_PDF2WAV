@@ -188,18 +188,6 @@ class TestPiperTTSProviderSSMLProcessing:
 class TestPiperTTSProviderInterfaces:
     """Test ITTSEngine interface implementation."""
 
-    def test_get_output_format(self, basic_piper_config: PiperConfig) -> None:
-        """Should return WAV format."""
-        provider = PiperTTSProvider(basic_piper_config)
-
-        assert provider.get_output_format() == "wav"
-
-    def test_prefers_sync_processing(self, basic_piper_config: PiperConfig) -> None:
-        """Should prefer synchronous processing for local engine."""
-        provider = PiperTTSProvider(basic_piper_config)
-
-        assert provider.prefers_sync_processing() is True
-
     def test_supports_ssml(self, basic_piper_config: PiperConfig) -> None:
         """Should return False since Piper doesn't support SSML."""
         provider = PiperTTSProvider(basic_piper_config)

@@ -169,14 +169,6 @@ class PiperTTSProvider(ITTSEngine):
             result = await loop.run_in_executor(executor, self.generate_audio_data, text_to_speak)
         return result
 
-    def get_output_format(self) -> str:
-        """Return the output audio format."""
-        return self.output_format
-
-    def prefers_sync_processing(self) -> bool:
-        """Return True if this engine prefers synchronous processing."""
-        return True  # Local engine, works well with sync processing
-
     def supports_ssml(self) -> bool:
         """Return True if this engine supports SSML markup."""
         return False  # Piper does NOT support SSML - all tags must be stripped

@@ -251,8 +251,6 @@ def register_routes(app: Flask) -> None:
             return "No processing result available", 500
 
         # We need to reconstruct the page range - for now use default
-        from domain.models import PageRange
-
         page_range = PageRange(start_page=None, end_page=None)  # Default to all pages
 
         # Check if this was a timing-enabled operation

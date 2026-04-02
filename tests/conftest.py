@@ -108,8 +108,6 @@ def mock_tts_engine():
         return Result.success(b"fake_audio_" + b"x" * audio_size)
 
     mock.generate_audio_data.side_effect = generate_audio_side_effect
-    mock.get_output_format.return_value = "wav"
-    mock.prefers_sync_processing.return_value = True
     mock.supports_ssml.return_value = True
 
     return mock
