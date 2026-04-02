@@ -314,6 +314,7 @@ class PiperTTSProvider(ITTSEngine):
     def _generate_with_command_line(self, text: str) -> bytes:
         """Generate using command line."""
         temp_path = None
+        timeout = max(30, len(text) // 50)  # ~1 second per 50 chars
         try:
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
                 temp_path = temp_file.name
@@ -337,10 +338,6 @@ class PiperTTSProvider(ITTSEngine):
 
             if self.config.speaker_id is not None:
                 cmd.extend(["--speaker", str(self.config.speaker_id)])
-
-            # Piper command line can handle basic SSML
-            # Use dynamic timeout based on text length (minimum 30 seconds)
-            timeout = max(30, len(text) // 50)  # ~1 second per 50 chars
 
             # Set up environment for local piper binary with libraries
             env = os.environ.copy()
