@@ -406,17 +406,17 @@ class PiperTTSProvider(ITTSEngine):
         # Download if needed
         base_url = self.repository_url
 
-        # Simple model mapping
-        model_paths = {
-            # US Male voices
-            "en_US-ryan-high": "en/en_US/ryan/high",
-            "en_US-ryan-medium": "en/en_US/ryan/medium",
-            # GB voices
-            "en_GB-cori-high": "en/en_GB/cori/high",
-            "en_GB-alba-medium": "en/en_GB/alba/medium",
-        }
-
-        model_path_segment = model_paths.get(model_name, "en/en_US/lessac/medium")  # fallback
+        # Derive URL path from model name convention: {lang}_{region}-{voice}-{quality}
+        # e.g. "en_US-ryan-high" -> "en/en_US/ryan/high"
+        parts = model_name.split("-")
+        if len(parts) != 3:
+            raise ValueError(
+                f"Unrecognized Piper model name format: '{model_name}'. "
+                f"Expected format: {{lang}}_{{region}}-{{voice}}-{{quality}} (e.g. en_US-ryan-high)"
+            )
+        lang_region, voice, quality = parts
+        lang = lang_region.split("_")[0]
+        model_path_segment = f"{lang}/{lang_region}/{voice}/{quality}"
 
         try:
             # Download model and config securely
