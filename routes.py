@@ -32,7 +32,7 @@ from application.services.progress_store import (
     update_progress,
 )
 from domain.models import PageRange, ProcessingResult
-from infrastructure.file.file_manager import FileManager
+from domain.interfaces import IFileManager
 from utils import (
     allowed_file,
 )
@@ -406,7 +406,7 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "Service not available"}), 500
 
         try:
-            if not service.has(FileManager):
+            if not service.has(IFileManager):
                 return jsonify({"error": "File management not available"}), 404
 
             audio_dir = Path(app.config["AUDIO_FOLDER"])
@@ -436,7 +436,7 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "Service not available"}), 500
 
         try:
-            if not service.has(FileManager):
+            if not service.has(IFileManager):
                 return jsonify({"error": "File management not available"}), 404
 
             max_age_hours = float(request.form.get("max_age_hours", 24.0))
@@ -500,7 +500,7 @@ def register_routes(app: Flask) -> None:
             def is_flask_reloader() -> bool:
                 return os.environ.get("WERKZEUG_RUN_MAIN") != "true"
 
-            has_file_manager = service.has(FileManager)
+            has_file_manager = service.has(IFileManager)
 
             info: dict[str, Any] = {
                 "processor_available": is_processor_available(),
@@ -512,7 +512,7 @@ def register_routes(app: Flask) -> None:
             }
 
             if has_file_manager:
-                file_manager = service.get(FileManager)
+                file_manager = service.get(IFileManager)
                 info["file_manager_type"] = file_manager.__class__.__name__
 
             return jsonify(info)

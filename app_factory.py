@@ -62,9 +62,9 @@ def create_app(config_path: Optional[Path] = None) -> Flask:
     # Create cleanup scheduler if enabled
     cleanup_scheduler = None
     if app_config.cleanup.enabled:
-        from infrastructure.file.file_manager import FileManager
+        from domain.interfaces import IFileManager
 
-        file_manager = service_container.get(FileManager)
+        file_manager = service_container.get(IFileManager)
         cleanup_scheduler = FileCleanupScheduler(
             file_manager=file_manager,
             max_file_age_seconds=int(app_config.cleanup.max_file_age_hours * 3600),
