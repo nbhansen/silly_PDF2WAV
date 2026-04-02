@@ -81,6 +81,13 @@ class ServiceContainer(IServiceContainer):
                 enable_cleaning=self.config.text_processing.enable_cleaning,
                 enable_natural_formatting=self.config.text_processing.enable_natural_formatting,
             ),
+            # Plain English variant of TextPipeline
+            "plain_english_text_pipeline": lambda: TextPipeline(
+                llm_provider=self.get(GeminiLLMProvider) if self.config.gemini and self.config.gemini.api_key else None,
+                enable_cleaning=self.config.text_processing.enable_cleaning,
+                enable_natural_formatting=self.config.text_processing.enable_natural_formatting,
+                enable_plain_english=True,
+            ),
             # Timing Engine
             ITimingEngine: lambda: TimingEngine(
                 tts_engine=self.get("tts_engine"),
