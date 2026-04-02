@@ -31,8 +31,8 @@ from application.services.progress_store import (
     get_progress,
     update_progress,
 )
-from domain.models import PageRange, ProcessingResult
 from domain.interfaces import IFileManager
+from domain.models import PageRange, ProcessingResult
 from utils import (
     allowed_file,
 )

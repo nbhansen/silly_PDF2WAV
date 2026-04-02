@@ -20,7 +20,7 @@ class TestLayerBoundaries:
             if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("infrastructure"):
                 violations.append(f"line {node.lineno}: from {node.module} import ...")
 
-        assert violations == [], f"Infrastructure imports found in document_service.py:\n" + "\n".join(violations)
+        assert violations == [], "Infrastructure imports found in document_service.py:\n" + "\n".join(violations)
 
     def test_document_service_does_not_construct_domain_objects(self) -> None:
         """DocumentProcessingService must not directly construct TextPipeline."""
