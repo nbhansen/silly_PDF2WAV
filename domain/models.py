@@ -3,9 +3,9 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional
+from typing import Optional
 
-from .errors import ApplicationError, Result, invalid_page_range_error
+from .errors import Result, invalid_page_range_error
 
 # --- Core Domain Models with Result[T] Pattern ---
 
@@ -55,61 +55,6 @@ class PDFInfo:
     total_pages: int
     title: str
     author: str
-
-
-@dataclass(frozen=True)
-class ProcessingResult:
-    """Result of PDF processing operation with structured error handling."""
-
-    audio_files: Optional[list[str]] = None
-    combined_mp3_file: Optional[str] = None
-    timing_data: Optional["TimingMetadata"] = None
-    debug_info: Optional[dict[str, Any]] = None
-    error: Optional[ApplicationError] = None
-
-    @property
-    def success(self) -> bool:
-        """Check if processing was successful."""
-        return self.error is None
-
-    @property
-    def is_retryable(self) -> bool:
-        """Check if the error (if any) is retryable."""
-        return self.error is not None and self.error.retryable
-
-    @classmethod
-    def success_result(
-        cls,
-        audio_files: list[str],
-        combined_mp3: Optional[str] = None,
-        timing_data: Optional["TimingMetadata"] = None,
-        debug_info: Optional[dict[str, Any]] = None,
-    ) -> "ProcessingResult":
-        """Create a successful processing result."""
-        return cls(
-            audio_files=audio_files.copy() if audio_files is not None else None,  # Create defensive copy
-            combined_mp3_file=combined_mp3,
-            timing_data=timing_data,
-            debug_info=debug_info.copy() if debug_info is not None else None,  # Create defensive copy
-            error=None,
-        )
-
-    @classmethod
-    def failure_result(cls, error: ApplicationError) -> "ProcessingResult":
-        """Create a failed processing result."""
-        return cls(audio_files=None, combined_mp3_file=None, timing_data=None, debug_info=None, error=error)
-
-    def get_error_message(self) -> str:
-        """Get a user-friendly error message."""
-        if self.error:
-            return str(self.error)
-        return "No error"
-
-    def get_error_code(self) -> Optional[str]:
-        """Get the error code for logging/debugging."""
-        if self.error:
-            return self.error.code.value
-        return None
 
 
 @dataclass(frozen=True)
