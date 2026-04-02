@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 from application.services.error_formatting import clean_text_for_display, get_processing_stage_error
 from application.services.progress_store import is_operation_cancelled, update_progress
 from domain.interfaces import IAudioEngine, IDocumentEngine, IFileManager, ITextPipeline
-from domain.models import ProcessingRequest, ProcessingResult
+from domain.models import ProcessingRequest
 from utils import parse_page_range_from_form, parse_plain_english_from_form
 
 logger = logging.getLogger(__name__)
@@ -113,15 +113,6 @@ class DocumentProcessingService:
             if enable_timing and audio_result.timing_data:
                 self._save_timing_data(base_filename, audio_result.timing_data)
 
-            # Prepare legacy ProcessingResult for backward compatibility with route handlers
-            final_result = ProcessingResult(
-                audio_files=audio_result.audio_files or [],
-                combined_mp3_file=audio_result.combined_mp3,
-                timing_data=audio_result.timing_data,
-                error=None,
-                debug_info={"audio_generation": "success"},
-            )
-
             update_progress(
                 operation_id,
                 "complete",
@@ -131,7 +122,7 @@ class DocumentProcessingService:
                 result_data={
                     "base_filename": base_filename,
                     "original_filename": original_filename,
-                    "processing_result": final_result,
+                    "audio_result": audio_result,
                 },
             )
 
