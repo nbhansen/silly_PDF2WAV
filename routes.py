@@ -23,7 +23,6 @@ from application.container.service_container import ServiceContainer
 from application.context.application_context import ApplicationContext
 from application.services.document_service import DocumentProcessingService
 from application.services.error_formatting import (
-    get_contextual_error_message,
     get_processing_stage_error,
 )
 from application.services.progress_store import (
@@ -32,7 +31,7 @@ from application.services.progress_store import (
     update_progress,
 )
 from domain.interfaces import IFileManager
-from domain.models import PageRange, ProcessingResult
+from domain.models import PageRange, TimedAudioResult
 from utils import (
     allowed_file,
 )
@@ -245,19 +244,19 @@ def register_routes(app: Flask) -> None:
         result_data = progress.result_data
         base_filename = result_data.get("base_filename", "unknown")
         original_filename = result_data.get("original_filename", "unknown")
-        processing_result = result_data.get("processing_result")
+        audio_result = result_data.get("audio_result")
 
-        if not processing_result:
+        if not audio_result:
             return "No processing result available", 500
 
         # We need to reconstruct the page range - for now use default
         page_range = PageRange(start_page=None, end_page=None)  # Default to all pages
 
         # Check if this was a timing-enabled operation
-        enable_timing = progress.stage in ["complete"] and processing_result.timing_data is not None
+        enable_timing = progress.stage in ["complete"] and audio_result.timing_data is not None
 
         # Render the result using the existing function
-        return render_upload_result(processing_result, original_filename, base_filename, page_range, enable_timing)
+        return render_upload_result(audio_result, original_filename, base_filename, page_range, enable_timing)
 
     @app.route("/get_pdf_info", methods=["POST"])
     def get_pdf_info() -> Union[Response, tuple[Response, int]]:
@@ -520,7 +519,7 @@ def register_routes(app: Flask) -> None:
 
 
 def render_upload_result(
-    result: Optional[ProcessingResult],
+    result: Optional[TimedAudioResult],
     original_filename: str,
     base_filename_no_ext: str,
     page_range: PageRange,
@@ -530,38 +529,26 @@ def render_upload_result(
     if result is None:
         return render_template("error.html", error_message="Processing failed - no result returned")
 
-    get_logger("routes").debug("DEBUG: result.success=%s, result.error=%s", result.success, result.error)
-    if result.success:
-        display_filename = original_filename
-        if not page_range.is_full_document():
-            display_filename += f" (pages {page_range.start_page or 1}-{page_range.end_page or 'end'})"
+    display_filename = original_filename
+    if not page_range.is_full_document():
+        display_filename += f" (pages {page_range.start_page or 1}-{page_range.end_page or 'end'})"
 
-        # CRITICAL: Different template parameters based on timing
-        template_params = {
-            "audio_files": result.audio_files or [],
-            "combined_mp3_file": result.combined_mp3_file,
-            "original_filename": display_filename,
-            "tts_engine": get_app_config().tts.engine.value,
-            "file_count": len(result.audio_files) if result.audio_files else 0,
-            "debug_info": result.debug_info,
-        }
+    template_params: dict[str, Any] = {
+        "audio_files": result.audio_files,
+        "combined_mp3_file": result.combined_mp3,
+        "original_filename": display_filename,
+        "tts_engine": get_app_config().tts.engine.value,
+        "file_count": len(result.audio_files),
+    }
 
-        # Add timing-specific parameters for read-along functionality
-        if enable_timing:
-            template_params.update(
-                {
-                    "has_timing_data": True,  # Enables read-along button
-                    "base_filename": base_filename_no_ext,  # For read-along URL
-                }
-            )
-            get_logger("routes").info("Timing data enabled - read-along button will be available")
-        else:
-            template_params.update({"has_timing_data": False})  # No read-along button
-            get_logger("routes").info("Standard processing - no read-along functionality")
-
-        return render_template("result.html", **template_params)
+    if enable_timing:
+        template_params.update(
+            {
+                "has_timing_data": True,
+                "base_filename": base_filename_no_ext,
+            }
+        )
     else:
-        # Handle errors (common for both routes) with enhanced messaging
-        assert result.error is not None, "Error result should have error details"
-        enhanced_error_message = get_contextual_error_message(result.error, get_app_config(), original_filename)
-        return enhanced_error_message
+        template_params.update({"has_timing_data": False})
+
+    return render_template("result.html", **template_params)
