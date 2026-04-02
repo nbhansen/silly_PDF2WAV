@@ -6,14 +6,23 @@ Tests thread safety, error handling, and edge cases for progress tracking.
 from concurrent.futures import ThreadPoolExecutor
 import time
 
+import pytest
+
 from application.services.progress_store import (
     ProgressStatus,
     ThreadSafeProgressStore,
     cancel_operation,
     get_progress,
     is_operation_cancelled,
+    set_progress_store,
     update_progress,
 )
+
+
+@pytest.fixture(autouse=True)
+def _init_progress_store() -> None:
+    """Ensure a progress store is initialized for tests using module-level functions."""
+    set_progress_store(ThreadSafeProgressStore())
 
 
 class TestProgressStatus:

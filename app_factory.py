@@ -71,11 +71,18 @@ def create_app(config_path: Optional[Path] = None) -> Flask:
             check_interval_seconds=300,
         )
 
+    # Create and install progress store (eliminates module-level global)
+    from application.services.progress_store import ThreadSafeProgressStore, set_progress_store
+
+    progress_store = ThreadSafeProgressStore()
+    set_progress_store(progress_store)
+
     # Create application context
     app_context = ApplicationContext(
         config=app_config,
         service_container=service_container,
         logger_factory=logger_factory,
+        progress_store=progress_store,
         cleanup_scheduler=cleanup_scheduler,
     )
 

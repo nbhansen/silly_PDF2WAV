@@ -10,6 +10,7 @@ from typing import Optional, Protocol
 
 from application.config.system_config import SystemConfig
 from application.container.service_container import ServiceContainer
+from application.services.progress_store import ThreadSafeProgressStore
 from infrastructure.file.cleanup_scheduler import FileCleanupScheduler
 
 
@@ -36,6 +37,7 @@ class ApplicationContext:
     config: SystemConfig
     service_container: ServiceContainer
     logger_factory: LoggerFactory
+    progress_store: ThreadSafeProgressStore
     cleanup_scheduler: Optional[FileCleanupScheduler] = None
 
     @property

@@ -127,18 +127,15 @@ class ThreadSafeProgressStore:
             logger.debug("Cleaned up stale progress entry: %s", op_id)
 
 
-# Default global instance for backwards compatibility
-_progress_store = ThreadSafeProgressStore()
+# Module-level instance, set by app_factory.py during startup via set_progress_store().
+# No default — forces explicit initialization.
+_progress_store: Optional[ThreadSafeProgressStore] = None
 
 
 def set_progress_store(store: ThreadSafeProgressStore) -> None:
     """Set the global progress store instance.
 
-    This allows the ApplicationContext to inject a specific instance,
-    making the progress store testable and configurable.
-
-    Args:
-        store: The ThreadSafeProgressStore instance to use globally.
+    Called by app_factory.py during application startup.
     """
     global _progress_store
     _progress_store = store
@@ -146,10 +143,12 @@ def set_progress_store(store: ThreadSafeProgressStore) -> None:
 
 def get_progress_store() -> ThreadSafeProgressStore:
     """Get the current global progress store instance."""
+    if _progress_store is None:
+        raise RuntimeError("ProgressStore not initialized. Call set_progress_store() during app startup.")
     return _progress_store
 
 
-# Backwards-compatible module-level functions that delegate to the global store
+# Convenience functions that delegate to the managed store instance.
 def update_progress(
     operation_id: str,
     stage: str,
@@ -161,7 +160,7 @@ def update_progress(
     result_data: Optional[dict[str, Any]] = None,
 ) -> None:
     """Update progress for an operation."""
-    _progress_store.update(
+    get_progress_store().update(
         operation_id=operation_id,
         stage=stage,
         percentage=percentage,
@@ -175,14 +174,14 @@ def update_progress(
 
 def get_progress(operation_id: str) -> Optional[ProgressStatus]:
     """Get current progress for an operation."""
-    return _progress_store.get(operation_id)
+    return get_progress_store().get(operation_id)
 
 
 def cancel_operation(operation_id: str) -> None:
     """Mark an operation as cancelled."""
-    _progress_store.cancel(operation_id)
+    get_progress_store().cancel(operation_id)
 
 
 def is_operation_cancelled(operation_id: str) -> bool:
     """Check if an operation has been cancelled."""
-    return _progress_store.is_cancelled(operation_id)
+    return get_progress_store().is_cancelled(operation_id)
