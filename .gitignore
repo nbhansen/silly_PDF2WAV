@@ -190,7 +190,7 @@ config.prod.yaml
 # --------------------------------------
 # Version Management
 # --------------------------------------
-.python-version
+# .python-version is tracked for uv
 
 # --------------------------------------
 # Celery
