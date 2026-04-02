@@ -92,68 +92,7 @@
             <span class="info-label">Audio Format:</span>
             <span>MP3 (Compressed)</span>
         </div>
-        {% if debug_info and debug_info.text_chunks_count %}
-        <div class="info-item">
-            <span class="info-label">Content Sections:</span>
-            <span>{{ debug_info.text_chunks_count }} parts combined</span>
-        </div>
-        {% endif %}
-        {% if debug_info and debug_info.timing_segments %}
-        <div class="info-item">
-            <span class="info-label">Read-Along Segments:</span>
-            <span>{{ debug_info.timing_segments }} synchronized sections</span>
-        </div>
-        {% endif %}
     </div>
-
-    <!-- Processing Information -->
-    {% if debug_info %}
-    <div class="info-card processing-info">
-        <h3><i class="fas fa-cogs"></i> Processing Details</h3>
-        {% if debug_info.raw_text_length %}
-        <div class="info-item">
-            <span class="info-label">Text Extracted:</span>
-            <span>{{ "{:,}".format(debug_info.raw_text_length) }} characters</span>
-        </div>
-        {% endif %}
-        {% if debug_info.page_range and debug_info.page_range != "full_document" %}
-        <div class="info-item">
-            <span class="info-label">Page Range:</span>
-            <span>{{ debug_info.page_range.range_description if debug_info.page_range.range_description else debug_info.page_range }}</span>
-        </div>
-        {% endif %}
-        {% if debug_info.ffmpeg_available is defined %}
-        <div class="info-item">
-            <span class="info-label">MP3 Compression:</span>
-            <span>
-                {% if debug_info.ffmpeg_available %}
-                    <i class="fas fa-check" style="color: var(--success-border);"></i> Available
-                {% else %}
-                    <i class="fas fa-times" style="color: var(--error-border);"></i> Not Available
-                {% endif %}
-            </span>
-        </div>
-        {% endif %}
-        {% if debug_info.ssml_enhancement %}
-        <div class="info-item">
-            <span class="info-label">SSML Enhancement:</span>
-            <span>{{ debug_info.ssml_enhancement.title() }}</span>
-        </div>
-        {% endif %}
-        {% if debug_info.timing_data_created %}
-        <div class="info-item">
-            <span class="info-label">Read-Along Data:</span>
-            <span>
-                {% if debug_info.timing_data_created %}
-                    <i class="fas fa-check" style="color: var(--success-border);"></i> Generated
-                {% else %}
-                    <i class="fas fa-times" style="color: var(--error-border);"></i> Not Generated
-                {% endif %}
-            </span>
-        </div>
-        {% endif %}
-    </div>
-    {% endif %}
 
     <!-- Usage Instructions -->
     <div class="info-card instructions">
