@@ -1,33 +1,33 @@
 .PHONY: test test-unit test-integration lint format typecheck check dev-setup run clean
 
 test:
-	python -m pytest
+	uv run python -m pytest
 
 test-unit:
-	python -m pytest tests/unit/
+	uv run python -m pytest tests/unit/
 
 test-integration:
-	python -m pytest tests/integration/
+	uv run python -m pytest tests/integration/
 
 lint:
-	ruff check . --fix
+	uv run ruff check . --fix
 
 format:
-	ruff format .
+	uv run ruff format .
 
 typecheck:
-	mypy .
+	uv run mypy .
 
 check:  ## Run all checks (lint, format, typecheck, tests)
-	pre-commit run --all-files
-	python -m pytest tests/unit/
+	uv run pre-commit run --all-files
+	uv run python -m pytest tests/unit/
 
 dev-setup:  ## Set up development environment
-	pip install -r requirements.txt
-	pre-commit install
+	uv sync --extra dev
+	uv run pre-commit install
 
 run:
-	python app.py
+	uv run python app.py
 
 clean:  ## Clean generated files
 	find . -type d -name __pycache__ -exec rm -rf {} +
