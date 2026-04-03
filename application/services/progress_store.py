@@ -61,9 +61,18 @@ class ThreadSafeProgressStore:
         error_message: Optional[str] = None,
         result_data: Optional[dict[str, Any]] = None,
     ) -> None:
-        """Update progress for an operation (thread-safe)."""
+        """Update progress for an operation (thread-safe).
+
+        If the operation has been cancelled, the update is ignored to prevent
+        a racing background thread from overwriting the cancellation status.
+        """
         logger.debug("Progress [%s]: stage=%s, pct=%d%%, msg=%s", operation_id[:8], stage, percentage, message)
         with self._lock:
+            # Don't overwrite cancellation status with a regular update
+            if self._cancellation_flags.get(operation_id, False) and not is_complete and not is_error:
+                logger.debug("Progress [%s]: update ignored, operation is cancelled", operation_id[:8])
+                return
+
             self._progress[operation_id] = ProgressStatus(
                 operation_id=operation_id,
                 stage=stage,

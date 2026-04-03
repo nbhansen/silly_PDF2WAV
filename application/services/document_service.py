@@ -152,6 +152,9 @@ class DocumentProcessingService:
                 is_error=True,
                 error_message=enhanced_error,
             )
+        finally:
+            # Always clean up the uploaded file when processing finishes
+            self._cleanup_upload(saved_file_path)
 
     def _save_timing_data(self, base_filename: str, timing_metadata: "TimingMetadata") -> None:
         """Save timing metadata as JSON file."""
@@ -187,3 +190,14 @@ class DocumentProcessingService:
                     file_manager.schedule_cleanup(timing_filename, 2.0)
         except Exception as e:
             logger.error(f"Failed to save timing data: {e}")
+
+    @staticmethod
+    def _cleanup_upload(saved_file_path: str) -> None:
+        """Remove the uploaded file after processing completes or is cancelled."""
+        try:
+            path = Path(saved_file_path)
+            if path.exists():
+                path.unlink()
+                logger.debug("Cleaned up upload file: %s", saved_file_path)
+        except Exception:
+            logger.warning("Failed to clean up upload file: %s", saved_file_path, exc_info=True)

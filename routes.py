@@ -59,9 +59,6 @@ def background_process_document(
     """
     # Use the Flask app context for this thread
     with app.app_context():
-        # Store context in Flask app for access in helper functions if needed
-        app.config["APP_CONTEXT"] = app_context
-
         bg_logger = app_context.get_logger("routes.background")
         bg_logger.debug("Background thread started for operation %s, file: %s", operation_id[:8], original_filename)
         try:
