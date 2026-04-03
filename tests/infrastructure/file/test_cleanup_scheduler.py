@@ -60,11 +60,10 @@ class TestFileCleanupSchedulerInitialization:
         assert scheduler.file_manager is mock_file_manager
         assert scheduler.max_file_age_seconds == 120
         assert scheduler.check_interval_seconds == 30
-        assert isinstance(scheduler._lock, threading.Lock)
-        assert isinstance(scheduler._stop_event, threading.Event)
-        assert isinstance(scheduler._thread, threading.Thread)
+        assert isinstance(scheduler._lock, type(threading.Lock()))
+        assert isinstance(scheduler._stop_event, type(threading.Event()))
+        assert scheduler._thread is None  # Thread created on start(), not init
         assert scheduler._scheduled_files == {}
-        assert scheduler._thread.daemon is True
 
     def test_init_with_zero_age_seconds(self, mock_file_manager):
         """Should accept zero max_file_age_seconds for immediate cleanup."""
@@ -156,84 +155,85 @@ class TestFileScheduling:
 class TestThreadManagement:
     """Test background thread lifecycle management."""
 
-    def test_start_background_thread_successfully(self, scheduler):
-        """Should start background thread when not already running."""
-        with (
-            patch.object(scheduler._thread, "is_alive") as mock_is_alive,
-            patch.object(scheduler._thread, "start") as mock_start,
-            patch.object(scheduler._stop_event, "clear") as mock_clear,
-        ):
-            mock_is_alive.return_value = False
+    def test_start_creates_and_starts_thread(self, scheduler):
+        """Should create and start a new daemon thread."""
+        assert scheduler._thread is None
+
+        with patch("threading.Thread") as mock_thread_cls:
+            mock_thread = MagicMock()
+            mock_thread.is_alive.return_value = False
+            mock_thread_cls.return_value = mock_thread
 
             scheduler.start()
 
-            mock_clear.assert_called_once()
-            mock_start.assert_called_once()
+            mock_thread_cls.assert_called_once_with(target=scheduler._cleanup_job, daemon=True)
+            mock_thread.start.assert_called_once()
 
     def test_start_does_not_restart_running_thread(self, scheduler):
         """Should not start new thread if one is already running."""
-        with (
-            patch.object(scheduler._thread, "is_alive") as mock_is_alive,
-            patch.object(scheduler._thread, "start") as mock_start,
-        ):
-            mock_is_alive.return_value = True
+        mock_thread = MagicMock()
+        mock_thread.is_alive.return_value = True
+        scheduler._thread = mock_thread
 
-            scheduler.start()
+        scheduler.start()
 
-            mock_start.assert_not_called()
+        # No new thread should be created — existing one is alive
+        mock_thread.start.assert_not_called()
 
     def test_stop_background_thread_with_proper_cleanup(self, scheduler):
         """Should stop background thread and wait for completion."""
-        with (
-            patch.object(scheduler._thread, "is_alive") as mock_is_alive,
-            patch.object(scheduler._thread, "join") as mock_join,
-            patch.object(scheduler._stop_event, "set") as mock_set,
-        ):
-            mock_is_alive.return_value = True
+        mock_thread = MagicMock()
+        mock_thread.is_alive.return_value = True
+        scheduler._thread = mock_thread
 
-            scheduler.stop()
+        scheduler.stop()
 
-            mock_set.assert_called_once()
-            mock_join.assert_called_once_with(timeout=5)
+        assert scheduler._stop_event.is_set()
+        mock_thread.join.assert_called_once_with(timeout=5)
+
+    def test_stop_does_nothing_when_thread_is_none(self, scheduler):
+        """Should handle stop gracefully when thread was never started."""
+        assert scheduler._thread is None
+
+        # Should not raise
+        scheduler.stop()
 
     def test_stop_does_nothing_when_thread_not_running(self, scheduler):
         """Should handle stop gracefully when thread is not running."""
-        with (
-            patch.object(scheduler._thread, "is_alive") as mock_is_alive,
-            patch.object(scheduler._thread, "join") as mock_join,
-            patch.object(scheduler._stop_event, "set") as mock_set,
-        ):
-            mock_is_alive.return_value = False
+        mock_thread = MagicMock()
+        mock_thread.is_alive.return_value = False
+        scheduler._thread = mock_thread
 
-            scheduler.stop()
+        scheduler.stop()
 
-            mock_set.assert_not_called()
-            mock_join.assert_not_called()
+        mock_thread.join.assert_not_called()
 
     def test_multiple_start_stop_cycles(self, scheduler):
-        """Should handle multiple start/stop cycles correctly."""
-        with (
-            patch.object(scheduler._thread, "is_alive") as mock_is_alive,
-            patch.object(scheduler._thread, "start") as mock_start,
-            patch.object(scheduler._thread, "join") as mock_join,
-        ):
-            # First cycle
-            mock_is_alive.return_value = False
+        """Should create a new thread for each start cycle (threads can't be restarted)."""
+        threads_created = []
+
+        with patch("threading.Thread") as mock_thread_cls:
+            mock_thread = MagicMock()
+            mock_thread.is_alive.return_value = False
+            mock_thread_cls.return_value = mock_thread
+            threads_created.append(mock_thread)
+
+            # First start
             scheduler.start()
-            mock_start.assert_called_once()
+            assert mock_thread_cls.call_count == 1
 
-            mock_is_alive.return_value = True
+            # Simulate thread finished
+            mock_thread.is_alive.return_value = True
             scheduler.stop()
-            mock_join.assert_called_once_with(timeout=5)
+            mock_thread.is_alive.return_value = False
 
-            # Second cycle
-            mock_is_alive.return_value = False
+            # Second start — should create a NEW thread
+            mock_thread2 = MagicMock()
+            mock_thread2.is_alive.return_value = False
+            mock_thread_cls.return_value = mock_thread2
+
             scheduler.start()
-            assert mock_start.call_count == 2
-
-            mock_is_alive.return_value = True
-            scheduler.stop()
-            assert mock_join.call_count == 2
+            assert mock_thread_cls.call_count == 2
 
 
 # === Cleanup Logic Tests ===
@@ -314,22 +314,19 @@ class TestCleanupLogic:
         }
         assert scheduler._scheduled_files == expected_remaining
 
-    def test_process_expired_files_propagates_delete_exceptions(self, scheduler, mock_file_manager, mock_time):
-        """Should propagate file deletion exceptions from file manager."""
+    def test_process_expired_files_retains_failed_deletions(self, scheduler, mock_file_manager, mock_time):
+        """Should keep files in tracking when deletion fails (for retry next cycle)."""
         current_time = 2000.0
         mock_time.return_value = current_time
 
-        # File that should be deleted
         scheduler._scheduled_files = {"/expired/file.txt": 1900.0}
 
-        # Mock delete_file to raise exception
         mock_file_manager.delete_file.side_effect = OSError("File not found")
 
-        # Should raise exception since _process_expired_files doesn't catch it
-        with pytest.raises(OSError, match="File not found"):
-            scheduler._process_expired_files()
+        # Should NOT raise — errors are caught and logged
+        scheduler._process_expired_files()
 
-        # File should not be removed from schedule due to exception
+        # File should remain in schedule for retry next cycle
         assert "/expired/file.txt" in scheduler._scheduled_files
         mock_file_manager.delete_file.assert_called_once_with("/expired/file.txt")
 
@@ -356,7 +353,7 @@ class TestCleanupLogic:
 
         # Test that the method can be called safely - the lock usage is internal
         # We'll verify the lock exists and the operation completes successfully
-        assert isinstance(scheduler._lock, threading.Lock)
+        assert isinstance(scheduler._lock, type(threading.Lock()))
 
         scheduler._process_expired_files()
 
@@ -449,7 +446,7 @@ class TestThreadSafety:
         assert len(scheduler._scheduled_files) == 5
 
         # Test that lock is accessible and working
-        assert isinstance(scheduler._lock, threading.Lock)
+        assert isinstance(scheduler._lock, type(threading.Lock()))
 
 
 # === Error Handling Tests ===
@@ -458,8 +455,8 @@ class TestThreadSafety:
 class TestErrorHandling:
     """Test error handling scenarios and exception recovery."""
 
-    def test_file_manager_delete_failures_stop_processing(self, scheduler, mock_file_manager, mock_time):
-        """Should stop processing when file deletion fails."""
+    def test_file_manager_delete_failures_continue_processing(self, scheduler, mock_file_manager, mock_time):
+        """Should continue processing remaining files when one deletion fails."""
         current_time = 2000.0
         mock_time.return_value = current_time
 
@@ -468,17 +465,16 @@ class TestErrorHandling:
             "/fail/file2.txt": 1880.0,
         }
 
-        # First delete fails
-        mock_file_manager.delete_file.side_effect = OSError("Permission denied")
+        # First delete fails, second succeeds
+        mock_file_manager.delete_file.side_effect = [OSError("Permission denied"), None]
 
-        # Should raise exception and stop processing
-        with pytest.raises(OSError, match="Permission denied"):
-            scheduler._process_expired_files()
+        scheduler._process_expired_files()
 
-        # Only one delete attempt should be made before exception
-        assert mock_file_manager.delete_file.call_count == 1
-        # Files should remain in schedule due to exception
-        assert len(scheduler._scheduled_files) == 2
+        # Both deletes should be attempted
+        assert mock_file_manager.delete_file.call_count == 2
+        # Failed file stays tracked for retry, successful one is removed
+        assert "/fail/file1.txt" in scheduler._scheduled_files
+        assert "/fail/file2.txt" not in scheduler._scheduled_files
 
     def test_cleanup_job_continues_after_exceptions(self, scheduler):
         """Should continue cleanup job after exceptions in processing."""
@@ -534,21 +530,16 @@ class TestErrorHandling:
 
     def test_thread_join_timeout_handling(self, scheduler):
         """Should handle thread join timeouts gracefully."""
-        with (
-            patch.object(scheduler._thread, "is_alive") as mock_is_alive,
-            patch.object(scheduler._thread, "join") as mock_join,
-        ):
-            # Thread is running
-            mock_is_alive.return_value = True
+        mock_thread = MagicMock()
+        mock_thread.is_alive.return_value = True
+        mock_thread.join.return_value = None  # Simulate timeout
+        scheduler._thread = mock_thread
 
-            # Mock join to simulate timeout (returns None)
-            mock_join.return_value = None
+        # Stop should complete even if join times out
+        scheduler.stop()
 
-            # Stop should complete even if join times out
-            scheduler.stop()
-
-            # Should have attempted to join with timeout
-            mock_join.assert_called_once_with(timeout=5)
+        # Should have attempted to join with timeout
+        mock_thread.join.assert_called_once_with(timeout=5)
 
 
 # === Integration Tests ===

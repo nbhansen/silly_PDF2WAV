@@ -35,7 +35,7 @@ class FileCleanupScheduler:
         self._scheduled_files: dict[str, float] = {}  # {filepath: creation_timestamp}
 
         self._stop_event = threading.Event()
-        self._thread = threading.Thread(target=self._cleanup_job, daemon=True)
+        self._thread: threading.Thread | None = None
 
     def schedule(self, filepath: str) -> None:
         """Schedule a file for cleanup monitoring."""
@@ -45,18 +45,21 @@ class FileCleanupScheduler:
 
     def start(self) -> None:
         """Start the background cleanup thread."""
-        if not self._thread.is_alive():
-            self._stop_event.clear()
-            self._thread.start()
-            logger.info(
-                "File cleanup scheduler started (interval=%ds, max_age=%ds)",
-                self.check_interval_seconds,
-                self.max_file_age_seconds,
-            )
+        if self._thread is not None and self._thread.is_alive():
+            return
+
+        self._stop_event.clear()
+        self._thread = threading.Thread(target=self._cleanup_job, daemon=True)
+        self._thread.start()
+        logger.info(
+            "File cleanup scheduler started (interval=%ds, max_age=%ds)",
+            self.check_interval_seconds,
+            self.max_file_age_seconds,
+        )
 
     def stop(self) -> None:
         """Stop the background cleanup thread."""
-        if self._thread.is_alive():
+        if self._thread is not None and self._thread.is_alive():
             logger.info("Stopping file cleanup scheduler")
             self._stop_event.set()
             self._thread.join(timeout=5)
@@ -76,25 +79,32 @@ class FileCleanupScheduler:
     def _process_expired_files(self) -> None:
         """Process and remove expired files."""
         current_time = time.time()
-        files_to_delete = []
 
+        # Collect expired files under lock (fast), then delete outside lock (slow I/O)
         with self._lock:
             logger.debug("Checking %d tracked files for expiration", len(self._scheduled_files))
+            expired = {
+                filepath: creation_time
+                for filepath, creation_time in self._scheduled_files.items()
+                if (current_time - creation_time) > self.max_file_age_seconds
+            }
 
-            # Find expired files
-            for filepath, creation_time in list(self._scheduled_files.items()):
-                if (current_time - creation_time) > self.max_file_age_seconds:
-                    files_to_delete.append(filepath)
+        if not expired:
+            return
 
-            # Remove expired files
-            for filepath in files_to_delete:
-                try:
-                    self.file_manager.delete_file(filepath)
-                    age = current_time - self._scheduled_files[filepath]
-                    logger.info("Deleted expired file: %s (age=%.0fs)", filepath, age)
-                except Exception:
-                    logger.error("Failed to delete expired file: %s", filepath, exc_info=True)
-                del self._scheduled_files[filepath]
+        # Delete files outside lock so schedule() isn't blocked by I/O
+        successfully_deleted = []
+        for filepath, creation_time in expired.items():
+            try:
+                self.file_manager.delete_file(filepath)
+                logger.info("Deleted expired file: %s (age=%.0fs)", filepath, current_time - creation_time)
+                successfully_deleted.append(filepath)
+            except Exception:
+                logger.error("Failed to delete expired file: %s (will retry next cycle)", filepath, exc_info=True)
 
-        if files_to_delete:
-            logger.debug("Cleanup cycle complete: %d files deleted", len(files_to_delete))
+        # Remove only successfully deleted files from tracking
+        if successfully_deleted:
+            with self._lock:
+                for filepath in successfully_deleted:
+                    self._scheduled_files.pop(filepath, None)
+            logger.debug("Cleanup cycle complete: %d files deleted", len(successfully_deleted))
