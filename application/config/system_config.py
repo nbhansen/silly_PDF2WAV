@@ -65,7 +65,8 @@ Environment Variables
 - FLASK_DEBUG: Override flask.debug setting
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+import logging
 import os
 from pathlib import Path
 from typing import Callable, Optional, Union, cast
@@ -76,7 +77,10 @@ from domain.config.tts_config import GeminiConfig, PiperConfig, TTSConfig, TTSEn
 
 from .app_configs import FlaskConfig
 from .file_configs import FileCleanupConfig, FileConfig
+from .logging_config import LoggingConfig
 from .processing_configs import LLMConfig, OCRConfig, PerformanceConfig, TextProcessingConfig
+
+logger = logging.getLogger(__name__)
 
 # Type for YAML configuration values
 YAMLValue = Union[str, int, float, bool, list[str], dict[str, object], None]
@@ -101,6 +105,9 @@ class SystemConfig:
     # Engine-specific configs (only one should be set based on tts.engine)
     gemini: Optional[GeminiConfig] = None
     piper: Optional[PiperConfig] = None
+
+    # Logging configuration (default INFO, auto-derived from flask.debug in from_yaml)
+    logging_config: LoggingConfig = field(default_factory=LoggingConfig)
 
     # System-level settings
     project_root: str = ""
@@ -136,6 +143,7 @@ class SystemConfig:
         flask_config = cls._parse_flask_config(get_config)
         ocr_config = cls._parse_ocr_config(get_config)
         llm_config = cls._parse_llm_config(get_config)
+        logging_config = cls._parse_logging_config(get_config, flask_config)
 
         # Get project root
         project_root = str(get_config("system.project_root", ""))
@@ -152,6 +160,7 @@ class SystemConfig:
             llm=llm_config,
             gemini=gemini_config,
             piper=piper_config,
+            logging_config=logging_config,
             project_root=project_root,
         )
 
@@ -343,6 +352,24 @@ class SystemConfig:
         )
 
     @classmethod
+    def _parse_logging_config(cls, get_config: ConfigAccessor, flask_config: FlaskConfig) -> LoggingConfig:
+        """Parse logging configuration.
+
+        If logging.level is not set, derives from flask.debug:
+        debug=true -> DEBUG, debug=false -> INFO.
+        """
+        explicit_level = get_config("logging.level", None)
+        level = ("DEBUG" if flask_config.debug else "INFO") if explicit_level is None else str(explicit_level).upper()
+
+        fmt = cls._parse_string_value(
+            get_config("logging.format", "%(asctime)s - %(name)s - %(levelname)s - %(message)s"),
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        )
+        json_format = cls._parse_bool_value(get_config("logging.json_format", False), False)
+
+        return LoggingConfig(level=level, format=fmt, json_format=json_format, console_output=True)
+
+    @classmethod
     def _parse_ocr_config(cls, get_config: ConfigAccessor) -> OCRConfig:
         """Parse OCR configuration."""
         return OCRConfig(
@@ -515,35 +542,51 @@ class SystemConfig:
 
         return parsed
 
-    def print_summary(self) -> None:
-        """Print configuration summary for debugging."""
-        print("=" * 50)
-        print("PDF to Audio Converter - Configuration")
-        print("=" * 50)
-        print(f"TTS Engine: {self.tts.engine.value}")
-        print(f"Text Cleaning: {'Enabled' if self.text_processing.enable_cleaning else 'Disabled'}")
-        print(f"Natural Formatting: {'Enabled' if self.text_processing.enable_natural_formatting else 'Disabled'}")
-        print(f"Plain English Conversion: {'Enabled' if self.text_processing.enable_plain_english else 'Disabled'}")
-        print(f"Async Audio: {'Enabled' if self.performance.enable_async_audio else 'Disabled'}")
-        print(f"Audio Concurrent Chunks: {self.performance.audio_concurrent_chunks}")
-        print(f"TTS Concurrent Requests: {self.tts.concurrent_requests}")
-        print(f"LLM Concurrent Requests: {self.llm.concurrent_requests}")
-        print(f"Upload Folder: {self.files.upload_folder}")
-        print(f"Audio Folder: {self.files.audio_folder}")
+    def log_summary(self, log: Optional[logging.Logger] = None) -> None:
+        """Log configuration summary."""
+        log = log or logger
+        lines = [
+            "=" * 50,
+            "PDF to Audio Converter - Configuration",
+            "=" * 50,
+            f"Log Level: {self.logging_config.level}",
+            f"TTS Engine: {self.tts.engine.value}",
+            f"Text Cleaning: {'Enabled' if self.text_processing.enable_cleaning else 'Disabled'}",
+            f"Natural Formatting: {'Enabled' if self.text_processing.enable_natural_formatting else 'Disabled'}",
+            f"Plain English Conversion: {'Enabled' if self.text_processing.enable_plain_english else 'Disabled'}",
+            f"Async Audio: {'Enabled' if self.performance.enable_async_audio else 'Disabled'}",
+            f"Audio Concurrent Chunks: {self.performance.audio_concurrent_chunks}",
+            f"TTS Concurrent Requests: {self.tts.concurrent_requests}",
+            f"LLM Concurrent Requests: {self.llm.concurrent_requests}",
+            f"Upload Folder: {self.files.upload_folder}",
+            f"Audio Folder: {self.files.audio_folder}",
+            f"File Cleanup: {'Enabled' if self.cleanup.enabled else 'Disabled'}",
+        ]
 
-        # File management
-        print(f"File Cleanup: {'Enabled' if self.cleanup.enabled else 'Disabled'}")
         if self.cleanup.enabled:
-            print(f"Max File Age: {self.cleanup.max_file_age_hours} hours")
-            print(f"Cleanup Interval: {self.cleanup.auto_cleanup_interval_hours} hours")
-            print(f"Max Disk Usage: {self.cleanup.max_disk_usage_mb} MB")
+            lines.extend(
+                [
+                    f"Max File Age: {self.cleanup.max_file_age_hours} hours",
+                    f"Cleanup Interval: {self.cleanup.auto_cleanup_interval_hours} hours",
+                    f"Max Disk Usage: {self.cleanup.max_disk_usage_mb} MB",
+                ]
+            )
 
         if self.tts.engine == TTSEngine.GEMINI and self.gemini:
             api_key_status = "Set" if self.gemini.api_key else "Missing"
-            print(f"Gemini API Key: {api_key_status}")
-            print(f"Gemini Voice: {self.gemini.voice_name}")
+            lines.extend(
+                [
+                    f"Gemini API Key: {api_key_status}",
+                    f"Gemini Voice: {self.gemini.voice_name}",
+                ]
+            )
         elif self.tts.engine == TTSEngine.PIPER and self.piper:
-            print(f"Piper Model: {self.piper.model_name}")
-            print(f"Piper Models Dir: {self.piper.models_dir}")
+            lines.extend(
+                [
+                    f"Piper Model: {self.piper.model_name}",
+                    f"Piper Models Dir: {self.piper.models_dir}",
+                ]
+            )
 
-        print("=" * 50)
+        lines.append("=" * 50)
+        log.info("\n".join(lines))

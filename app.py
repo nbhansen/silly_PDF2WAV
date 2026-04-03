@@ -65,17 +65,14 @@ if __name__ == "__main__":
     context = app.config["APP_CONTEXT"]
     logger = context.get_logger(__name__)
 
-    # Suppress noisy Flask HTTP request logs (keeps our app logs clean)
     import logging
 
-    logging.getLogger("werkzeug").setLevel(logging.ERROR)
+    logging.getLogger("werkzeug").setLevel(logging.INFO)
 
     # Only log startup info once
     if not is_flask_reloader():
         logger.info("Starting Flask development server...")
-        logger.info("TTS Engine: %s", context.config.tts.engine.value)
-        logger.info("Text Cleaning: %s", "Enabled" if context.config.text_processing.enable_cleaning else "Disabled")
-        logger.info("File Cleanup: %s", "Enabled" if context.config.cleanup.enabled else "Disabled")
+        context.config.log_summary(logger)
 
     # Run Flask app
     app.run(debug=context.config.flask.debug, host=context.config.flask.host, port=context.config.flask.port)

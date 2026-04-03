@@ -56,6 +56,7 @@ from abc import ABC, abstractmethod
 from contextlib import suppress
 import dataclasses
 from enum import Enum
+import logging
 from pathlib import Path
 import time
 from typing import TYPE_CHECKING, Optional
@@ -66,6 +67,8 @@ from ..models import TextSegment, TimedAudioResult, TimingMetadata
 
 if TYPE_CHECKING:
     from ..interfaces import ITextPipeline
+
+logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -124,7 +127,7 @@ class TimingEngine(ITimingEngine):
 
         # Optimize timing mode for engine capabilities
         if mode == TimingMode.ESTIMATION and not hasattr(tts_engine, "generate_audio_with_timestamps"):
-            print(f"✅ {tts_engine.__class__.__name__}: Using measurement mode for precise timestamps")
+            logger.debug("%s: No native timestamps, switching to measurement mode", tts_engine.__class__.__name__)
             self.mode = TimingMode.MEASUREMENT
 
     def generate_with_timing(self, text_chunks: list[str], output_filename: str) -> Result[TimedAudioResult]:
@@ -149,7 +152,7 @@ class TimingEngine(ITimingEngine):
             # Engine doesn't support native timestamps, use measurement mode instead
             return self._generate_with_measurement(text_chunks, output_filename)
 
-        print("TimingEngine: Using estimation mode with native engine timestamps")
+        logger.debug("TimingEngine: Using estimation mode with native engine timestamps")
 
         try:
             # Process chunks individually to respect size limits
@@ -157,14 +160,14 @@ class TimingEngine(ITimingEngine):
             all_text_segments = []
             cumulative_time = 0.0
 
-            print(f"🔍 TimingEngine: Processing {len(text_chunks)} chunks individually")
+            logger.debug("TimingEngine: Processing %d chunks individually", len(text_chunks))
 
             for i, chunk in enumerate(text_chunks):
                 # Enhance text with natural formatting if available
                 if self.text_pipeline:
                     enhance_result = self.text_pipeline.enhance_with_natural_formatting(chunk)
                     if enhance_result.is_failure:
-                        print(f"TimingEngine: Enhancement failed for chunk {i + 1}, using original")
+                        logger.warning("TimingEngine: Enhancement failed for chunk %d, using original", i + 1)
                         enhanced_chunk = chunk
                     elif enhance_result.value is not None:
                         enhanced_chunk = enhance_result.value
@@ -173,13 +176,16 @@ class TimingEngine(ITimingEngine):
                 else:
                     enhanced_chunk = chunk
 
-                print(f"🔍 TimingEngine: Processing chunk {i + 1}/{len(text_chunks)} ({len(enhanced_chunk)} chars)")
+                logger.debug(
+                    "TimingEngine: Processing chunk %d/%d (%d chars)", i + 1, len(text_chunks), len(enhanced_chunk)
+                )
 
                 # Check chunk size
                 if len(enhanced_chunk) > 3000:
-                    print(
-                        f"🚨 TimingEngine: Chunk {i + 1} too large ({len(enhanced_chunk)} chars), "
-                        f"falling back to measurement mode"
+                    logger.warning(
+                        "TimingEngine: Chunk %d too large (%d chars), falling back to measurement mode",
+                        i + 1,
+                        len(enhanced_chunk),
                     )
                     return self._generate_with_measurement(text_chunks, output_filename)
 
@@ -190,7 +196,7 @@ class TimingEngine(ITimingEngine):
                 result = self.tts_engine.generate_audio_with_timestamps(enhanced_chunk)
 
                 if result.is_failure:
-                    print(f"TimingEngine: Engine failed for chunk {i + 1}: {result.error}")
+                    logger.warning("TimingEngine: Engine failed for chunk %d: %s", i + 1, result.error)
                     continue
 
                 audio_data, text_segments = result.value
@@ -250,7 +256,7 @@ class TimingEngine(ITimingEngine):
 
         Returns Result with timing data or error.
         """
-        print("TimingEngine: Using measurement mode for accurate timing extraction")
+        logger.debug("TimingEngine: Using measurement mode for accurate timing extraction")
 
         try:
             all_temp_files = []
@@ -329,7 +335,7 @@ class TimingEngine(ITimingEngine):
                 enhanced_chunk = chunk
                 sentences = [chunk]
 
-            print(f"TimingEngine: Chunk {chunk_index + 1} has {len(sentences)} sentences")
+            logger.debug("TimingEngine: Chunk %d has %d sentences", chunk_index + 1, len(sentences))
 
             # Process in batches for efficiency
             batch_size = 5
@@ -340,7 +346,9 @@ class TimingEngine(ITimingEngine):
                 batch_end = min(batch_start + batch_size, len(sentences))
                 batch = sentences[batch_start:batch_end]
 
-                print(f"  Processing batch {batch_start // batch_size + 1} (sentences {batch_start + 1}-{batch_end})")
+                logger.debug(
+                    "  Processing batch %d (sentences %d-%d)", batch_start // batch_size + 1, batch_start + 1, batch_end
+                )
 
                 batch_result = self._process_sentence_batch(batch, chunk_index, batch_start, cumulative_time)
 
@@ -356,7 +364,7 @@ class TimingEngine(ITimingEngine):
             )
 
         except Exception as e:
-            print(f"TimingEngine: Error processing chunk {chunk_index}: {e}")
+            logger.error("TimingEngine: Error processing chunk %d: %s", chunk_index, e, exc_info=True)
             return None
 
     def _process_sentence_batch(
@@ -375,7 +383,7 @@ class TimingEngine(ITimingEngine):
             # Generate audio for batch
             audio_result = self.tts_engine.generate_audio_data(batch_text)
             if audio_result.is_failure or not audio_result.value:
-                print("    Failed to generate audio for batch")
+                logger.warning("    Failed to generate audio for batch")
                 return None
 
             # Save temporary audio file
@@ -398,7 +406,7 @@ class TimingEngine(ITimingEngine):
             else:
                 duration = duration_result.value
 
-            print(f"    Audio duration: {duration:.2f}s")
+            logger.debug("    Audio duration: %.2fs", duration)
 
             # Create timing segments for each sentence
             text_segments = []
@@ -422,7 +430,7 @@ class TimingEngine(ITimingEngine):
             )
 
         except Exception as e:
-            print(f"    Error processing batch: {e}")
+            logger.error("    Error processing batch: %s", e, exc_info=True)
             return None
 
     def _apply_rate_limiting(self) -> None:
@@ -435,7 +443,7 @@ class TimingEngine(ITimingEngine):
 
         if time_since_last < self.measurement_interval:
             sleep_time = self.measurement_interval - time_since_last
-            print(f"    Rate limiting: sleeping {sleep_time:.2f}s")
+            logger.debug("    Rate limiting: sleeping %.2fs", sleep_time)
             time.sleep(sleep_time)
 
         self.last_api_call = time.time()
@@ -489,9 +497,9 @@ class TimingEngine(ITimingEngine):
             if result.returncode == 0:
                 return output_filename
             else:
-                print(f"ffmpeg combine failed: {result.stderr.decode()}")
+                logger.error("ffmpeg combine failed: %s", result.stderr.decode())
                 return None
 
         except Exception as e:
-            print(f"TimingEngine: Error combining audio files: {e}")
+            logger.error("TimingEngine: Error combining audio files: %s", e, exc_info=True)
             return None

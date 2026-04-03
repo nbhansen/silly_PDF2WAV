@@ -3,11 +3,13 @@
 Runs in a separate thread to periodically remove expired files.
 """
 
-from contextlib import suppress
+import logging
 import threading
 import time
 
 from domain.interfaces import IFileManager
+
+logger = logging.getLogger(__name__)
 
 
 class FileCleanupScheduler:
@@ -37,6 +39,7 @@ class FileCleanupScheduler:
 
     def schedule(self, filepath: str) -> None:
         """Schedule a file for cleanup monitoring."""
+        logger.debug("Scheduling file for cleanup: %s", filepath)
         with self._lock:
             self._scheduled_files[filepath] = time.time()
 
@@ -45,19 +48,27 @@ class FileCleanupScheduler:
         if not self._thread.is_alive():
             self._stop_event.clear()
             self._thread.start()
+            logger.info(
+                "File cleanup scheduler started (interval=%ds, max_age=%ds)",
+                self.check_interval_seconds,
+                self.max_file_age_seconds,
+            )
 
     def stop(self) -> None:
         """Stop the background cleanup thread."""
         if self._thread.is_alive():
+            logger.info("Stopping file cleanup scheduler")
             self._stop_event.set()
             self._thread.join(timeout=5)
 
     def _cleanup_job(self) -> None:
         """Main cleanup loop running in background thread."""
         while not self._stop_event.is_set():
-            # Log error but continue running
-            with suppress(Exception):
+            try:
+                logger.debug("Cleanup cycle: checking for expired files")
                 self._process_expired_files()
+            except Exception:
+                logger.error("Error during cleanup cycle", exc_info=True)
 
             # Wait for next interval, checking stop event
             self._stop_event.wait(self.check_interval_seconds)
@@ -68,6 +79,8 @@ class FileCleanupScheduler:
         files_to_delete = []
 
         with self._lock:
+            logger.debug("Checking %d tracked files for expiration", len(self._scheduled_files))
+
             # Find expired files
             for filepath, creation_time in list(self._scheduled_files.items()):
                 if (current_time - creation_time) > self.max_file_age_seconds:
@@ -75,5 +88,13 @@ class FileCleanupScheduler:
 
             # Remove expired files
             for filepath in files_to_delete:
-                self.file_manager.delete_file(filepath)
+                try:
+                    self.file_manager.delete_file(filepath)
+                    age = current_time - self._scheduled_files[filepath]
+                    logger.info("Deleted expired file: %s (age=%.0fs)", filepath, age)
+                except Exception:
+                    logger.error("Failed to delete expired file: %s", filepath, exc_info=True)
                 del self._scheduled_files[filepath]
+
+        if files_to_delete:
+            logger.debug("Cleanup cycle complete: %d files deleted", len(files_to_delete))

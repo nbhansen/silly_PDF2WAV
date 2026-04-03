@@ -62,6 +62,7 @@ class ThreadSafeProgressStore:
         result_data: Optional[dict[str, Any]] = None,
     ) -> None:
         """Update progress for an operation (thread-safe)."""
+        logger.debug("Progress [%s]: stage=%s, pct=%d%%, msg=%s", operation_id[:8], stage, percentage, message)
         with self._lock:
             self._progress[operation_id] = ProgressStatus(
                 operation_id=operation_id,
@@ -84,6 +85,7 @@ class ThreadSafeProgressStore:
 
     def cancel(self, operation_id: str) -> None:
         """Mark an operation as cancelled (thread-safe)."""
+        logger.info("Operation cancelled: %s", operation_id[:8])
         with self._lock:
             self._cancellation_flags[operation_id] = True
             if operation_id in self._progress:

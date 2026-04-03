@@ -3,11 +3,14 @@
 Handles file I/O, directory management, and temporary file creation.
 """
 
+import logging
 import os
 from pathlib import Path
 import tempfile
 
 from domain.interfaces import IFileManager
+
+logger = logging.getLogger(__name__)
 
 
 class FileManager(IFileManager):
@@ -18,6 +21,7 @@ class FileManager(IFileManager):
         self.output_folder = str(Path(output_folder).resolve())
         Path(self.upload_folder).mkdir(parents=True, exist_ok=True)
         Path(self.output_folder).mkdir(parents=True, exist_ok=True)
+        logger.debug("FileManager initialized: upload=%s, output=%s", self.upload_folder, self.output_folder)
 
     def get_output_dir(self) -> str:
         """Returns the absolute path to the output directory."""
@@ -32,6 +36,7 @@ class FileManager(IFileManager):
         fd, path = tempfile.mkstemp(suffix=suffix, dir=self.output_folder)
         with os.fdopen(fd, "wb") as tmp:
             tmp.write(content)
+        logger.debug("Saved temp file: %s (%d bytes, suffix=%s)", path, len(content), suffix)
         return path
 
     def save_output_file(self, content: bytes, filename: str) -> str:
@@ -44,6 +49,7 @@ class FileManager(IFileManager):
         output_path = Path(self.output_folder) / base_filename
 
         output_path.write_bytes(content)
+        logger.debug("Saved output file: %s (%d bytes)", base_filename, len(content))
 
         return str(output_path)
 
@@ -53,7 +59,11 @@ class FileManager(IFileManager):
         abs_path = Path(filepath).resolve()
         abs_path_str = str(abs_path)
         if not (abs_path_str.startswith((self.output_folder, self.upload_folder))):
+            logger.error("Attempted file deletion outside managed directories: %s", filepath)
             raise ValueError(f"Cannot delete file outside managed directories: {filepath}")
 
         if abs_path.exists():
             abs_path.unlink()
+            logger.debug("Deleted file: %s", filepath)
+        else:
+            logger.warning("File not found for deletion: %s", filepath)

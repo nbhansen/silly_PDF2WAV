@@ -24,9 +24,11 @@ try:
     from piper.voice import PiperVoice
 
     PIPER_VOICE_AVAILABLE = True
+    logger.debug("PiperVoice library available")
 except ImportError:
     PiperVoice = None  # type: ignore[assignment, misc]
     PIPER_VOICE_AVAILABLE = False
+    logger.info("PiperVoice library not available, will use CLI fallback")
 
 
 class PiperTTSProvider(ITTSEngine):
@@ -245,14 +247,17 @@ class PiperTTSProvider(ITTSEngine):
     def _check_piper_availability(self) -> None:
         """Check what Piper options are available."""
         self.piper_method = None
+        logger.debug("Checking Piper availability...")
 
         # Try Python library first
         if PIPER_VOICE_AVAILABLE:
             self.piper_method = "python_library"
+            logger.debug("Piper method: python_library")
             return
 
         # Try command line - use secure project root
         piper_cmd = str(Path(self.project_root) / "piper")
+        logger.debug("Trying Piper CLI at: %s", piper_cmd)
         try:
             env = os.environ.copy()
             env["LD_LIBRARY_PATH"] = self.project_root + (
@@ -262,12 +267,14 @@ class PiperTTSProvider(ITTSEngine):
             if result.returncode == 0:
                 self.piper_command = piper_cmd
                 self.piper_method = "command_line"
+                logger.debug("Piper method: command_line (%s)", piper_cmd)
                 return
-        except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError):
-            pass
+        except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError) as e:
+            logger.debug("Piper CLI not available: %s", e)
 
         # Nothing available
         self.piper_method = None
+        logger.warning("No Piper TTS method available (neither python library nor CLI)")
 
     def _init_python_library(self) -> None:
         """Initialize the Python library version."""

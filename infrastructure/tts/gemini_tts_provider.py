@@ -67,6 +67,7 @@ class GeminiTTSProvider(ITTSEngine):
         if not text.strip():
             return Result.failure(tts_engine_error("Empty text provided"))
 
+        logger.debug("Generating audio for %d chars of text", len(text))
         try:
             # Configure for audio generation
             config = types.GenerateContentConfig(
@@ -82,6 +83,7 @@ class GeminiTTSProvider(ITTSEngine):
             prompt = text
 
             response = self.client.models.generate_content(model=self.model_name, contents=prompt, config=config)
+            logger.debug("Gemini API call successful, extracting audio from response")
 
             return self._extract_audio_from_response(response)
 
@@ -125,6 +127,8 @@ class GeminiTTSProvider(ITTSEngine):
 
     def _extract_audio_from_response(self, response: types.GenerateContentResponse) -> Result[bytes]:
         """Extract audio bytes from Gemini response."""
+        num_candidates = len(response.candidates) if response.candidates else 0
+        logger.debug("Extracting audio from response (candidates=%d)", num_candidates)
         if not response.candidates:
             return Result.failure(tts_engine_error("No candidates returned from Gemini"))
 
@@ -141,6 +145,11 @@ class GeminiTTSProvider(ITTSEngine):
                 and part.inline_data.data
             ):
                 audio_data = part.inline_data.data
+                logger.debug(
+                    "Found audio part: mime_type=%s, size=%d bytes",
+                    part.inline_data.mime_type,
+                    len(audio_data),
+                )
                 # If PCM, add WAV header
                 if "pcm" in part.inline_data.mime_type:
                     # Extract sample rate if possible, otherwise default to 24000
@@ -152,6 +161,7 @@ class GeminiTTSProvider(ITTSEngine):
                         except (IndexError, ValueError):
                             pass
 
+                    logger.debug("PCM audio detected, adding WAV header (sample_rate=%d)", sample_rate)
                     return Result.success(self._add_wav_header(audio_data, sample_rate))
 
                 return Result.success(audio_data)
