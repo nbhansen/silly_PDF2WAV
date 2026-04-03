@@ -150,6 +150,14 @@ class IAudioEngine(ABC):
         """Combine multiple audio files into one."""
 
 
+class IAudioDurationMeasurer(ABC):
+    """Interface for measuring audio file durations."""
+
+    @abstractmethod
+    def get_duration(self, file_path: str) -> Result[float]:
+        """Get audio file duration in seconds."""
+
+
 class ITextPipeline(ABC):
     """Interface for text processing operations using Result[T] pattern."""
 
