@@ -188,7 +188,7 @@ class TestThreadManagement:
 
         scheduler.stop()
 
-        scheduler._stop_event.is_set()  # stop_event was set
+        assert scheduler._stop_event.is_set()
         mock_thread.join.assert_called_once_with(timeout=5)
 
     def test_stop_does_nothing_when_thread_is_none(self, scheduler):
