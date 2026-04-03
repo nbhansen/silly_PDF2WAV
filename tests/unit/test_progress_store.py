@@ -92,6 +92,30 @@ class TestThreadSafeProgressStore:
         store.cancel("op-3")
         assert store.is_cancelled("op-3") is True
 
+    def test_store_update_ignored_after_cancellation(self) -> None:
+        """Regular updates should be ignored after cancellation to prevent TOCTOU race."""
+        store = ThreadSafeProgressStore()
+        store.update("op-cancel", "processing", 50, "Working")
+        store.cancel("op-cancel")
+        # Regular update should be ignored — cancellation status preserved
+        store.update("op-cancel", "processing", 75, "Still working")
+        progress = store.get("op-cancel")
+        assert progress is not None
+        assert progress.stage == "cancelled"
+        assert progress.percentage == 50
+
+    def test_store_error_update_allowed_after_cancellation(self) -> None:
+        """Error/complete updates should pass through even after cancellation."""
+        store = ThreadSafeProgressStore()
+        store.update("op-err", "processing", 50, "Working")
+        store.cancel("op-err")
+        # Error update should pass through
+        store.update("op-err", "error", 0, "Failed", is_error=True, error_message="boom")
+        progress = store.get("op-err")
+        assert progress is not None
+        assert progress.is_error is True
+        assert progress.cancelled is True  # cancelled flag preserved
+
     def test_store_remove_operation(self) -> None:
         """Should remove operation from tracking."""
         store = ThreadSafeProgressStore()

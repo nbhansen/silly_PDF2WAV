@@ -194,6 +194,8 @@ class DocumentProcessingService:
     @staticmethod
     def _cleanup_upload(saved_file_path: str) -> None:
         """Remove the uploaded file after processing completes or is cancelled."""
+        if not saved_file_path:
+            return
         try:
             path = Path(saved_file_path)
             if path.exists():
