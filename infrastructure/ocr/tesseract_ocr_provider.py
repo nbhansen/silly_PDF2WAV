@@ -40,30 +40,46 @@ class TesseractOCRProvider(IOCRProvider):
             self.ocr_threshold = 180
             self.ocr_language = "eng"
 
+        logger.debug(
+            "TesseractOCRProvider initialized: dpi=%d, threshold=%d, language=%s",
+            self.ocr_dpi,
+            self.ocr_threshold,
+            self.ocr_language,
+        )
+
     def perform_ocr(self, image_path: str) -> Result[str]:
         """Perform OCR on a single image file."""
+        logger.debug("Performing OCR on: %s", image_path)
         try:
             text = pytesseract.image_to_string(image_path, lang=self.ocr_language)
             if not text.strip():
+                logger.warning("OCR yielded no text for: %s", image_path)
                 return Result.failure(text_extraction_error("OCR process yielded no text"))
+            logger.debug("OCR extracted %d chars from: %s", len(text), image_path)
             return Result.success(text)
         except Exception as e:
+            logger.error("OCR failed on %s: %s", image_path, e)
             return Result.failure(text_extraction_error(f"OCR failed on {image_path}: {e!s}"))
 
     def get_pdf_info(self, pdf_path: str) -> PDFInfo:
         """Get basic PDF information."""
+        logger.debug("Getting PDF info: %s", pdf_path)
         try:
             with pdfplumber.open(pdf_path) as pdf:
-                return PDFInfo(
+                info = PDFInfo(
                     total_pages=len(pdf.pages),
                     title=pdf.metadata.get("Title", "Unknown") if pdf.metadata else "Unknown",
                     author=pdf.metadata.get("Author", "Unknown") if pdf.metadata else "Unknown",
                 )
+                logger.debug("PDF info: pages=%d, title=%s", info.total_pages, info.title)
+                return info
         except Exception:
+            logger.warning("Failed to get PDF info: %s", pdf_path, exc_info=True)
             return PDFInfo(total_pages=0, title="Unknown", author="Unknown")
 
     def validate_range(self, pdf_path: str, page_range: PageRange) -> dict[str, Any]:
         """Validate page range against PDF. Returns validation result."""
+        logger.debug("Validating page range %s-%s for %s", page_range.start_page, page_range.end_page, pdf_path)
         try:
             pdf_info = self.get_pdf_info(pdf_path)
             total_pages = pdf_info.total_pages

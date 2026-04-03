@@ -6,12 +6,15 @@ which would violate hexagonal architecture if placed in domain/.
 The domain layer only contains the IServiceContainer interface.
 """
 
+import logging
 import threading
 import types
 from typing import Callable, TypeVar, Union
 
 from application.config.system_config import SystemConfig
 from domain.container.service_container import IServiceContainer, ServiceFactory, ServiceKey
+
+logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
@@ -30,6 +33,7 @@ class ServiceContainer(IServiceContainer):
         # Build all factories upfront (immutable)
         factories = self._build_core_services()
         self._factories: types.MappingProxyType[ServiceKey, ServiceFactory] = types.MappingProxyType(factories)
+        logger.debug("ServiceContainer initialized with %d factories", len(factories))
 
         # Mutable singleton cache (internal implementation detail)
         self._singletons: dict[ServiceKey, object] = {}
@@ -37,20 +41,24 @@ class ServiceContainer(IServiceContainer):
 
     def get(self, interface: Union[type[T], str]) -> T:
         """Get service instance (singleton pattern, thread-safe)."""
+        interface_name = getattr(interface, "__name__", str(interface))
         if interface in self._singletons:
+            logger.debug("Service resolved (cached): %s", interface_name)
             return self._singletons[interface]  # type: ignore[return-value]
 
         with self._lock:
             # Double-check after acquiring lock
             if interface in self._singletons:
+                logger.debug("Service resolved (cached after lock): %s", interface_name)
                 return self._singletons[interface]  # type: ignore[return-value]
 
             if interface not in self._factories:
-                interface_name = getattr(interface, "__name__", str(interface))
                 raise ValueError(f"Service {interface_name} not registered")
 
+            logger.debug("Creating service: %s", interface_name)
             instance = self._factories[interface]()
             self._singletons[interface] = instance
+            logger.debug("Service created: %s -> %s", interface_name, type(instance).__name__)
             return instance  # type: ignore[return-value]
 
     def has(self, interface: Union[type[T], str]) -> bool:
@@ -124,6 +132,12 @@ class ServiceContainer(IServiceContainer):
             TesseractOCRProvider: lambda: TesseractOCRProvider(config=self.config),
         }
 
+        logger.debug(
+            "Registered %d core service factories (LLM configured: %s)",
+            len(factories),
+            bool(self.config.gemini and self.config.gemini.api_key),
+        )
+
         # Add LLM Provider only if configured
         if self.config.gemini and self.config.gemini.api_key:
             api_key = self.config.gemini.api_key
@@ -141,6 +155,7 @@ class ServiceContainer(IServiceContainer):
         from infrastructure.tts.gemini_tts_provider import GeminiTTSProvider
         from infrastructure.tts.piper_tts_provider import PiperTTSProvider
 
+        logger.info("Creating TTS engine: %s", self.config.tts.engine.value)
         if self.config.tts.engine.value == "gemini":
             if not self.config.gemini or not self.config.gemini.api_key:
                 raise ValueError("Gemini API key is required for Gemini TTS engine")

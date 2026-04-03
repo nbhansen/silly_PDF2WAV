@@ -62,6 +62,8 @@ def background_process_document(
         # Store context in Flask app for access in helper functions if needed
         app.config["APP_CONTEXT"] = app_context
 
+        bg_logger = app_context.get_logger("routes.background")
+        bg_logger.debug("Background thread started for operation %s, file: %s", operation_id[:8], original_filename)
         try:
             # Get service from container
             service = app_context.service_container.get(DocumentProcessingService)
@@ -219,6 +221,7 @@ def register_routes(app: Flask) -> None:
             return jsonify({"message": "Operation already completed", "cancelled": False}), 200
 
         cancel_operation(operation_id)
+        get_logger("routes").info("Cancellation requested for operation: %s", operation_id[:8])
         return jsonify({"message": "Cancellation requested", "cancelled": True})
 
     @app.route("/result/<operation_id>")
@@ -260,6 +263,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/get_pdf_info", methods=["POST"])
     def get_pdf_info() -> Union[Response, tuple[Response, int]]:
+        get_logger("routes").debug("PDF info request received")
         service = get_pdf_service()
         if not is_processor_available() or service is None:
             return (
@@ -314,6 +318,7 @@ def register_routes(app: Flask) -> None:
         Returns:
             (file, error_message) - file if valid, error message if invalid
         """
+        get_logger("routes").debug("Validating upload request")
         service = get_pdf_service()
         if not is_processor_available() or service is None:
             return (
@@ -343,6 +348,8 @@ def register_routes(app: Flask) -> None:
         if error or file is None:
             return error or "No file provided"
 
+        route_logger = get_logger("routes")
+
         # Generate unique operation ID
         operation_id = str(uuid.uuid4())
 
@@ -357,6 +364,8 @@ def register_routes(app: Flask) -> None:
         original_filename = secure_filename(file.filename)
         saved_path = Path(config.files.upload_folder) / f"{operation_id}_{original_filename}"
         file.save(str(saved_path))
+        route_logger.info("Upload received: %s (timing=%s, op=%s)", original_filename, enable_timing, operation_id[:8])
+        route_logger.debug("Saved upload to: %s", saved_path)
 
         # Convert form data to dict (Flask objects don't work in threads)
         form_data = dict(request.form)
@@ -378,6 +387,7 @@ def register_routes(app: Flask) -> None:
             daemon=True,
         )
         thread.start()
+        route_logger.info("Background processing started: op=%s", operation_id[:8])
 
         # Return processing page immediately
         return render_template("processing.html", operation_id=operation_id, enable_timing=enable_timing)

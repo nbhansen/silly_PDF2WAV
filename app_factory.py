@@ -4,12 +4,12 @@ This module provides the Flask application factory that creates and configures
 the Flask app with all dependencies properly injected, eliminating global state.
 """
 
+from dataclasses import replace
 from pathlib import Path
 from typing import Optional
 
 from flask import Flask
 
-from application.config.logging_config import LoggingConfig
 from application.config.logging_factory import ThreadSafeLoggerFactory
 from application.config.system_config import SystemConfig
 from application.container.service_container import ServiceContainer
@@ -35,14 +35,16 @@ def create_app(config_path: Optional[Path] = None) -> Flask:
     else:
         app_config = SystemConfig.from_yaml()
 
-    # Create logger factory (no global state) with file logging for home user debugging
-    log_dir = Path.home() / ".pdf_to_audio"
-    log_dir.mkdir(exist_ok=True)
-    log_file = log_dir / "app.log"
+    # Use logging config from system config (respects config.yaml + debug mode)
+    logging_config = app_config.logging_config
+    if logging_config.file_path is None:
+        log_dir = Path.home() / ".pdf_to_audio"
+        log_dir.mkdir(exist_ok=True)
+        logging_config = replace(logging_config, file_path=str(log_dir / "app.log"))
 
-    logging_config = LoggingConfig(level="INFO", console_output=True, file_path=str(log_file))
     logger_factory = ThreadSafeLoggerFactory(logging_config)
     logger = logger_factory.get_logger(__name__)
+    logger.info("Logging configured: level=%s, file=%s", logging_config.level, logging_config.file_path)
 
     # Create service container
     logger.info("Initializing services...")

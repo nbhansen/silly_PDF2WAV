@@ -481,8 +481,8 @@ class TestSystemConfigHelperMethodsTDD:
         assert result.download_dir == "/custom/models"
         assert result.length_scale == 1.2
 
-    def test_print_summary_displays_configuration_info(self):
-        """Should print comprehensive configuration summary."""
+    def test_log_summary_displays_configuration_info(self):
+        """Should log comprehensive configuration summary."""
         config = SystemConfig(
             tts=TTSConfig(engine=TTSEngine.GEMINI),
             files=FileConfig(upload_folder="test_uploads", audio_folder="test_audio"),
@@ -498,26 +498,29 @@ class TestSystemConfigHelperMethodsTDD:
             piper=PiperConfig(),
         )
 
-        # Capture print output
-        with patch("builtins.print") as mock_print:
-            config.print_summary()
+        # Capture log output
+        import logging
 
-            # Verify key information is printed
-            printed_text = " ".join(str(call) for call in mock_print.call_args_list)
+        mock_logger = logging.getLogger("test_log_summary")
+        with patch.object(mock_logger, "info") as mock_info:
+            config.log_summary(mock_logger)
 
-            assert "TTS Engine: gemini" in printed_text
-            assert "Text Cleaning: Enabled" in printed_text
-            assert "Natural Formatting: Disabled" in printed_text
-            assert "Async Audio: Enabled" in printed_text
-            assert "Audio Concurrent Chunks: 8" in printed_text
-            assert "Upload Folder: test_uploads" in printed_text
-            assert "Audio Folder: test_audio" in printed_text
-            assert "File Cleanup: Enabled" in printed_text
-            assert "Max File Age: 48.0 hours" in printed_text
-            assert "Gemini API Key: Set" in printed_text
-            assert "Gemini Voice: Charon" in printed_text
+            # Verify key information is logged
+            logged_text = mock_info.call_args[0][0]
 
-    def test_print_summary_handles_missing_api_key(self):
+            assert "TTS Engine: gemini" in logged_text
+            assert "Text Cleaning: Enabled" in logged_text
+            assert "Natural Formatting: Disabled" in logged_text
+            assert "Async Audio: Enabled" in logged_text
+            assert "Audio Concurrent Chunks: 8" in logged_text
+            assert "Upload Folder: test_uploads" in logged_text
+            assert "Audio Folder: test_audio" in logged_text
+            assert "File Cleanup: Enabled" in logged_text
+            assert "Max File Age: 48.0 hours" in logged_text
+            assert "Gemini API Key: Set" in logged_text
+            assert "Gemini Voice: Charon" in logged_text
+
+    def test_log_summary_handles_missing_api_key(self):
         """Should show 'Missing' for unset API key."""
         config = SystemConfig(
             tts=TTSConfig(engine=TTSEngine.GEMINI),
@@ -532,13 +535,16 @@ class TestSystemConfigHelperMethodsTDD:
             piper=PiperConfig(),
         )
 
-        with patch("builtins.print") as mock_print:
-            config.print_summary()
+        import logging
 
-            printed_text = " ".join(str(call) for call in mock_print.call_args_list)
-            assert "Gemini API Key: Missing" in printed_text
+        mock_logger = logging.getLogger("test_log_summary")
+        with patch.object(mock_logger, "info") as mock_info:
+            config.log_summary(mock_logger)
 
-    def test_print_summary_shows_piper_specific_info(self):
+            logged_text = mock_info.call_args[0][0]
+            assert "Gemini API Key: Missing" in logged_text
+
+    def test_log_summary_shows_piper_specific_info(self):
         """Should show Piper-specific configuration when using Piper."""
         config = SystemConfig(
             tts=TTSConfig(engine=TTSEngine.PIPER),
@@ -556,10 +562,13 @@ class TestSystemConfigHelperMethodsTDD:
             ),
         )
 
-        with patch("builtins.print") as mock_print:
-            config.print_summary()
+        import logging
 
-            printed_text = " ".join(str(call) for call in mock_print.call_args_list)
-            assert "TTS Engine: piper" in printed_text
-            assert "Piper Model: en_US-lessac-high" in printed_text
-            assert "Piper Models Dir: /custom/piper/models" in printed_text
+        mock_logger = logging.getLogger("test_log_summary")
+        with patch.object(mock_logger, "info") as mock_info:
+            config.log_summary(mock_logger)
+
+            logged_text = mock_info.call_args[0][0]
+            assert "TTS Engine: piper" in logged_text
+            assert "Piper Model: en_US-lessac-high" in logged_text
+            assert "Piper Models Dir: /custom/piper/models" in logged_text

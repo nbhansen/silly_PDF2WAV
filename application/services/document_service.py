@@ -62,6 +62,12 @@ class DocumentProcessingService:
             document_engine = self.container.get(IDocumentEngine)
             audio_engine = self.container.get(IAudioEngine)
             text_pipeline = self.container.get(ITextPipeline)
+            logger.debug(
+                "Services resolved: document_engine=%s, audio_engine=%s, text_pipeline=%s",
+                type(document_engine).__name__,
+                type(audio_engine).__name__,
+                type(text_pipeline).__name__,
+            )
 
             # Override timing for Gemini TTS (as per original logic in routes.py)
             enable_timing = enable_timing and self.config.tts.engine.value != "gemini"
@@ -74,6 +80,14 @@ class DocumentProcessingService:
             update_progress(operation_id, "processing", 20, "Starting document processing...")
 
             request_obj = ProcessingRequest(pdf_path=saved_file_path, output_name=base_filename, page_range=page_range)
+            logger.debug(
+                "Processing request: pdf=%s, output=%s, pages=%s-%s, timing=%s",
+                request_obj.pdf_path,
+                request_obj.output_name,
+                page_range.start_page,
+                page_range.end_page,
+                enable_timing,
+            )
 
             # Core processing
             processing_result = document_engine.process_document(
@@ -83,6 +97,7 @@ class DocumentProcessingService:
             if is_operation_cancelled(operation_id):
                 return
 
+            logger.debug("Processing result: success=%s", processing_result.is_success)
             if processing_result.is_failure:
                 error_msg = str(processing_result.error)
                 enhanced_error = get_processing_stage_error("audio_generation", Exception(error_msg), original_filename)
