@@ -523,31 +523,20 @@ class TestGeminiLLMProviderAsyncContentGeneration:
 
             provider = GeminiLLMProvider(api_key="valid_key", model_name="gemini-1.5-flash")
 
-            # Mock the sync generate_content method
+            # Mock the sync generate_content method (asyncio.to_thread will call it)
             provider.generate_content = Mock(return_value=success_result)  # type: ignore[method-assign]
 
-            with (
-                patch("asyncio.sleep") as mock_sleep,
-                patch("concurrent.futures.ThreadPoolExecutor") as mock_executor_class,
-                patch("asyncio.get_event_loop") as mock_get_loop,
-            ):
-                mock_executor = Mock()
-                mock_executor_class.return_value.__enter__.return_value = mock_executor
-
-                mock_loop = Mock()
-                mock_get_loop.return_value = mock_loop
-                mock_loop.run_in_executor = AsyncMock(return_value=success_result)
-
+            with patch("asyncio.sleep") as mock_sleep:
                 result = await provider.generate_content_async("test prompt")
 
             assert result.is_success
             assert result.value == "Async generated content"
 
+            # Verify the sync method was called with the prompt
+            provider.generate_content.assert_called_once_with("test prompt")
+
             # Verify rate limiting delay
             mock_sleep.assert_called_once_with(0.5)
-
-            # Verify executor usage
-            mock_loop.run_in_executor.assert_called_once_with(mock_executor, provider.generate_content, "test prompt")
 
     @pytest.mark.asyncio
     async def test_generate_content_async_with_semaphore_rate_limiting(self) -> None:
@@ -569,18 +558,7 @@ class TestGeminiLLMProviderAsyncContentGeneration:
             # Mock the sync generate_content method
             provider.generate_content = Mock(return_value=success_result)  # type: ignore[method-assign]
 
-            with (
-                patch("asyncio.sleep"),
-                patch("concurrent.futures.ThreadPoolExecutor") as mock_executor_class,
-                patch("asyncio.get_event_loop") as mock_get_loop,
-            ):
-                mock_executor = Mock()
-                mock_executor_class.return_value.__enter__.return_value = mock_executor
-
-                mock_loop = Mock()
-                mock_get_loop.return_value = mock_loop
-                mock_loop.run_in_executor = AsyncMock(return_value=success_result)
-
+            with patch("asyncio.sleep"):
                 await provider.generate_content_async("test prompt")
 
             # Verify semaphore was used
@@ -612,18 +590,16 @@ class TestGeminiLLMProviderAsyncContentGeneration:
 
             provider = GeminiLLMProvider(api_key="valid_key", model_name="gemini-1.5-flash")
 
-            with (
-                patch("asyncio.sleep"),
-                patch("concurrent.futures.ThreadPoolExecutor") as mock_executor_class,
-            ):
-                mock_executor_class.side_effect = Exception("Thread pool creation failed")
+            # Mock sync method to raise an exception
+            provider.generate_content = Mock(side_effect=Exception("Generation failed"))  # type: ignore[method-assign]
 
+            with patch("asyncio.sleep"):
                 result = await provider.generate_content_async("test prompt")
 
             assert result.is_failure
             assert result.error is not None
             assert result.error.code == ErrorCode.LLM_PROVIDER_ERROR
-            assert result.error.details == "Async content generation failed: Thread pool creation failed"
+            assert result.error.details == "Async content generation failed: Generation failed"
 
     @pytest.mark.asyncio
     async def test_generate_content_async_uses_custom_rate_limit_delay(self) -> None:
@@ -642,21 +618,10 @@ class TestGeminiLLMProviderAsyncContentGeneration:
                 min_request_interval=2.0,  # Custom delay
             )
 
-            # Mock the sync generate_content method
+            # Mock the sync generate_content method (asyncio.to_thread will call it)
             provider.generate_content = Mock(return_value=success_result)  # type: ignore[method-assign]
 
-            with (
-                patch("asyncio.sleep") as mock_sleep,
-                patch("concurrent.futures.ThreadPoolExecutor") as mock_executor_class,
-                patch("asyncio.get_event_loop") as mock_get_loop,
-            ):
-                mock_executor = Mock()
-                mock_executor_class.return_value.__enter__.return_value = mock_executor
-
-                mock_loop = Mock()
-                mock_get_loop.return_value = mock_loop
-                mock_loop.run_in_executor = AsyncMock(return_value=success_result)
-
+            with patch("asyncio.sleep") as mock_sleep:
                 result = await provider.generate_content_async("test prompt")
 
             assert result.is_success

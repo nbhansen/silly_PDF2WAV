@@ -5,7 +5,6 @@ Uses the unified Google Gen AI SDK for language model operations.
 """
 
 import asyncio
-import concurrent.futures
 import logging
 import time
 from typing import Optional
@@ -139,10 +138,8 @@ class GeminiLLMProvider(ILLMProvider):
 
         try:
             async with self.request_semaphore:
-                # Execute in thread pool to avoid blocking
-                loop = asyncio.get_event_loop()
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    result = await loop.run_in_executor(executor, self.generate_content, prompt)
+                # Run blocking sync call in thread pool
+                result = await asyncio.to_thread(self.generate_content, prompt)
 
                 # Rate limiting delay
                 await asyncio.sleep(self.min_request_interval)

@@ -163,13 +163,8 @@ class PiperTTSProvider(ITTSEngine):
         Piper is a local engine and doesn't have native async support.
         """
         import asyncio
-        import concurrent.futures
 
-        # Run the sync method in a thread pool to avoid blocking
-        loop = asyncio.get_event_loop()
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            result = await loop.run_in_executor(executor, self.generate_audio_data, text_to_speak)
-        return result
+        return await asyncio.to_thread(self.generate_audio_data, text_to_speak)
 
     def supports_ssml(self) -> bool:
         """Return True if this engine supports SSML markup."""
