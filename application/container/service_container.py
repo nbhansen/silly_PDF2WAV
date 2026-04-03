@@ -69,9 +69,17 @@ class ServiceContainer(IServiceContainer):
         """Build all core service factories upfront (immutable pattern)."""
         from application.services.document_service import DocumentProcessingService
         from domain.audio.audio_engine import AudioEngine
+        from domain.audio.duration_measurer import AudioDurationMeasurer
         from domain.audio.timing_engine import ITimingEngine, TimingEngine, TimingMode
         from domain.document.document_engine import DocumentEngine
-        from domain.interfaces import IAudioEngine, IDocumentEngine, IFileManager, ILLMProvider, ITextPipeline
+        from domain.interfaces import (
+            IAudioDurationMeasurer,
+            IAudioEngine,
+            IDocumentEngine,
+            IFileManager,
+            ILLMProvider,
+            ITextPipeline,
+        )
         from domain.text.text_pipeline import TextPipeline
         from infrastructure.file.file_manager import FileManager
         from infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
@@ -88,6 +96,8 @@ class ServiceContainer(IServiceContainer):
             FileManager: lambda: self.get(IFileManager),
             # TTS Engine (factory method)
             "tts_engine": lambda: self._create_tts_engine(),
+            # Audio Duration Measurer (breaks circular dependency between TimingEngine and AudioEngine)
+            IAudioDurationMeasurer: lambda: AudioDurationMeasurer(),
             # Text Pipeline
             ITextPipeline: lambda: TextPipeline(
                 llm_provider=self.get(GeminiLLMProvider) if self.config.gemini and self.config.gemini.api_key else None,
@@ -105,6 +115,7 @@ class ServiceContainer(IServiceContainer):
             ITimingEngine: lambda: TimingEngine(
                 tts_engine=self.get("tts_engine"),
                 file_manager=self.get(FileManager),
+                duration_measurer=self.get(IAudioDurationMeasurer),
                 text_pipeline=self.get(ITextPipeline),
                 mode=(
                     TimingMode.MEASUREMENT
@@ -118,6 +129,7 @@ class ServiceContainer(IServiceContainer):
                 tts_engine=self.get("tts_engine"),
                 file_manager=self.get(FileManager),
                 timing_engine=self.get(ITimingEngine),
+                duration_measurer=self.get(IAudioDurationMeasurer),
                 max_concurrent=self.config.performance.audio_concurrent_chunks,
                 audio_target_chunk_size=self.config.text_processing.audio_target_chunk_size,
                 audio_max_chunk_size=self.config.text_processing.audio_max_chunk_size,

@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Union
 
 from ..errors import Result, audio_generation_error
-from ..interfaces import IAudioEngine, IFileManager, ITTSEngine
+from ..interfaces import IAudioDurationMeasurer, IAudioEngine, IFileManager, ITTSEngine
 from ..models import TimedAudioResult
 from ..text.chunking_strategy import ChunkingMode, IChunkingStrategy, create_chunking_strategy
 
@@ -34,6 +34,7 @@ class AudioEngine(IAudioEngine):
         tts_engine: ITTSEngine,
         file_manager: IFileManager,
         timing_engine: "ITimingEngine",
+        duration_measurer: Optional[IAudioDurationMeasurer] = None,
         max_concurrent: int = 4,
         audio_target_chunk_size: int = 2000,
         audio_max_chunk_size: int = 3000,
@@ -43,6 +44,7 @@ class AudioEngine(IAudioEngine):
         self.tts_engine = tts_engine
         self.file_manager = file_manager
         self.timing_engine = timing_engine
+        self.duration_measurer = duration_measurer
         self.max_concurrent = max_concurrent
         self.audio_target_chunk_size = audio_target_chunk_size
         self.audio_max_chunk_size = audio_max_chunk_size
@@ -304,34 +306,14 @@ class AudioEngine(IAudioEngine):
             return None
 
     def process_audio_file(self, file_path: str) -> Result[float]:
-        """Get audio file duration using ffprobe or fallback.
+        """Get audio file duration. Delegates to IAudioDurationMeasurer."""
+        if self.duration_measurer:
+            return self.duration_measurer.get_duration(file_path)
 
-        Returns Result with duration or error.
-        """
-        try:
-            import subprocess  # nosec B404
+        # Inline fallback if no measurer injected (backward compatibility)
+        from .duration_measurer import AudioDurationMeasurer
 
-            # Validate file path for security
-            path_obj = Path(file_path)
-            if not path_obj.is_file() or path_obj.is_symlink():
-                return Result.failure(audio_generation_error(f"Invalid or unsafe file path: {file_path}"))
-
-            # Try ffprobe first (most accurate)
-            cmd = ["ffprobe", "-v", "quiet", "-show_entries", "format=duration", "-of", "csv=p=0", file_path]
-
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            if result.returncode == 0 and result.stdout.strip():
-                duration = float(result.stdout.strip())
-                return Result.success(duration)
-
-            # Fallback to file size estimation
-            file_size = Path(file_path).stat().st_size
-            # Rough estimation: 1 second per 44KB for 22kHz audio
-            estimated_duration = file_size / (24000 * 2)  # 24kHz * 2 bytes per sample
-            return Result.success(estimated_duration)
-
-        except Exception as e:
-            return Result.failure(audio_generation_error(f"Failed to get audio duration: {e}"))
+        return AudioDurationMeasurer().get_duration(file_path)
 
     def _combine_wav_chunks(self, audio_chunks: list[bytes]) -> bytes:
         """Combine multiple audio chunks.

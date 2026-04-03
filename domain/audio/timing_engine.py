@@ -62,7 +62,7 @@ import time
 from typing import TYPE_CHECKING, Optional
 
 from ..errors import ErrorCode, Result, audio_generation_error
-from ..interfaces import IFileManager, ITTSEngine
+from ..interfaces import IAudioDurationMeasurer, IFileManager, ITTSEngine
 from ..models import TextSegment, TimedAudioResult, TimingMetadata
 
 if TYPE_CHECKING:
@@ -114,12 +114,14 @@ class TimingEngine(ITimingEngine):
         self,
         tts_engine: ITTSEngine,
         file_manager: IFileManager,
+        duration_measurer: IAudioDurationMeasurer,
         text_pipeline: Optional["ITextPipeline"] = None,
         mode: TimingMode = TimingMode.ESTIMATION,
         measurement_interval: float = 0.8,
     ):
         self.tts_engine = tts_engine
         self.file_manager = file_manager
+        self.duration_measurer = duration_measurer
         self.text_pipeline = text_pipeline
         self.mode = mode
         self.measurement_interval = measurement_interval
@@ -394,11 +396,7 @@ class TimingEngine(ITimingEngine):
                 return None
 
             # Measure audio duration
-            from ..audio.audio_engine import AudioEngine
-
-            # Create a temporary minimal AudioEngine instance for processing
-            temp_audio_engine = AudioEngine(self.tts_engine, self.file_manager, self)
-            duration_result = temp_audio_engine.process_audio_file(temp_path)
+            duration_result = self.duration_measurer.get_duration(temp_path)
 
             if duration_result.is_failure or duration_result.value is None:
                 # Estimate duration fallback
