@@ -6,7 +6,6 @@ No exceptions thrown - all errors returned as Result[T].
 
 import asyncio
 from collections.abc import Awaitable, Coroutine
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 import logging
 from pathlib import Path
@@ -532,11 +531,8 @@ class AudioEngine(IAudioEngine):
                 if self.base_delay > 0:
                     await asyncio.sleep(self.base_delay)
 
-                # Use thread pool for blocking TTS operations
-                loop = asyncio.get_event_loop()
-                with ThreadPoolExecutor() as executor:
-                    future = executor.submit(self._call_tts_engine, text_chunk)
-                    audio_result = await loop.run_in_executor(None, lambda: future.result())
+                # Run blocking TTS in thread pool
+                audio_result = await asyncio.to_thread(self._call_tts_engine, text_chunk)
 
                 if audio_result.is_failure:
                     logger.warning("TTS failed for chunk %d: %s", chunk_number, audio_result.error)
