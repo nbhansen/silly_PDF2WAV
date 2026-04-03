@@ -375,9 +375,7 @@ class TestPDFToAudioIntegrationValidation:
         from domain.errors import Result, unknown_error
 
         # Test successful result
-        success_result = TimedAudioResult(
-            audio_files=["chunk1.wav", "chunk2.wav"], combined_mp3="test_output.mp3"
-        )
+        success_result = TimedAudioResult(audio_files=["chunk1.wav", "chunk2.wav"], combined_mp3="test_output.mp3")
 
         assert success_result.audio_files == ["chunk1.wav", "chunk2.wav"]
         assert success_result.combined_mp3 == "test_output.mp3"
