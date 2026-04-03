@@ -4,8 +4,8 @@ import logging
 from pathlib import Path
 import subprocess  # nosec B404
 
-from domain.errors import Result, audio_generation_error
-from domain.interfaces import IAudioDurationMeasurer
+from ..errors import Result, audio_generation_error
+from ..interfaces import IAudioDurationMeasurer
 
 logger = logging.getLogger(__name__)
 
