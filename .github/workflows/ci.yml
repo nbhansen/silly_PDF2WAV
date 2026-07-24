@@ -23,6 +23,9 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr ffmpeg espeak-ng poppler-utils
+
       - name: Install dependencies
         run: uv sync --extra dev
 
@@ -37,3 +40,12 @@ jobs:
 
       - name: Run unit tests
         run: uv run python -m pytest tests/unit/ -v
+
+      - name: Run infrastructure tests
+        run: uv run python -m pytest tests/infrastructure/ -v
+
+      - name: Run integration tests
+        run: uv run python -m pytest tests/integration/ -v
+
+      - name: Run benchmark tests
+        run: uv run python -m pytest tests/benchmarks/ -v

@@ -19,7 +19,7 @@ from application.config.system_config import SystemConfig
 from application.container.service_container import create_service_container
 from domain.config.tts_config import PiperConfig, TTSConfig, TTSEngine
 from domain.errors import Result
-from domain.interfaces import IAudioEngine, IDocumentEngine, ITextPipeline
+from domain.interfaces import IAudioEngine, IDocumentEngine, ITextPipeline, ITTSEngine
 from domain.models import PageRange, ProcessingRequest, TimedAudioResult
 from infrastructure.file.file_manager import FileManager
 
@@ -300,16 +300,14 @@ class TestRealProviderInteraction:
                     tts_engine = getattr(audio_engine, "_tts_engine", None) or getattr(audio_engine, "tts_engine", None)
 
                     if tts_engine:
-                        # Test interface compliance
+                        # Test interface compliance (ITTSEngine)
+                        assert isinstance(tts_engine, ITTSEngine)
                         assert hasattr(tts_engine, "generate_audio_data")
-                        assert hasattr(tts_engine, "get_output_format")
+                        assert hasattr(tts_engine, "generate_audio_data_async")
                         assert hasattr(tts_engine, "supports_ssml")
-                        assert hasattr(tts_engine, "prefers_sync_processing")
 
                         # Test interface methods work
-                        assert isinstance(tts_engine.get_output_format(), str)
                         assert isinstance(tts_engine.supports_ssml(), bool)
-                        assert isinstance(tts_engine.prefers_sync_processing(), bool)
 
     def test_text_pipeline_real_processing(self, integration_config: SystemConfig) -> None:
         """Should create text pipeline that does real text processing."""

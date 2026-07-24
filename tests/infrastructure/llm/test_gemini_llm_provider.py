@@ -148,7 +148,7 @@ class TestGeminiLLMProviderClientManagement:
         assert result.is_failure
         assert result.error is not None
         assert result.error.code == ErrorCode.LLM_PROVIDER_ERROR
-        assert result.error.details == "Client not available"
+        assert result.error.details == "Gemini API key not configured"
 
 
 class TestGeminiLLMProviderSyncContentGeneration:
@@ -578,7 +578,7 @@ class TestGeminiLLMProviderAsyncContentGeneration:
         assert result.is_failure
         assert result.error is not None
         assert result.error.code == ErrorCode.LLM_PROVIDER_ERROR
-        assert result.error.details == "Client not available"
+        assert result.error.details == "Gemini API key not configured"
 
     @pytest.mark.asyncio
     async def test_generate_content_async_handles_executor_exception(self) -> None:
