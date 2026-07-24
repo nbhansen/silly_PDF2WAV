@@ -598,3 +598,97 @@ class TestFileManagerIntegration:
         for file_path in files_created:
             manager.delete_file(file_path)
             assert not Path(file_path).exists()
+
+
+class TestCleanupOldFiles:
+    """Test age-based cleanup of the output directory."""
+
+    @staticmethod
+    def _age_file(path: Path, hours: float) -> None:
+        """Backdate a file's mtime by the given number of hours."""
+        old_time = path.stat().st_mtime - hours * 3600
+        os.utime(str(path), (old_time, old_time))
+
+    def test_removes_files_older_than_max_age(self, temp_dir):
+        """Should delete old files and spare recent ones."""
+        manager = FileManager(str(temp_dir / "uploads"), str(temp_dir / "outputs"))
+        old_file = Path(manager.output_folder) / "old.wav"
+        old_file.write_bytes(b"x" * 10)
+        self._age_file(old_file, hours=2)
+        new_file = Path(manager.output_folder) / "new.wav"
+        new_file.write_bytes(b"y" * 20)
+
+        result = manager.cleanup_old_files(max_age_hours=1.0)
+
+        assert result.is_success
+        assert result.value is not None
+        assert result.value.files_removed == 1
+        assert result.value.bytes_freed == 10
+        assert result.value.errors == ()
+        assert not old_file.exists()
+        assert new_file.exists()
+
+    def test_ignores_subdirectories(self, temp_dir):
+        """Should never touch directories inside the output folder."""
+        manager = FileManager(str(temp_dir / "uploads"), str(temp_dir / "outputs"))
+        subdir = Path(manager.output_folder) / "nested"
+        subdir.mkdir()
+        self._age_file(subdir, hours=48)
+
+        result = manager.cleanup_old_files(max_age_hours=1.0)
+
+        assert result.is_success
+        assert result.value is not None
+        assert result.value.files_removed == 0
+        assert subdir.exists()
+
+    def test_leaves_upload_folder_untouched(self, temp_dir):
+        """Should only clean the output folder."""
+        manager = FileManager(str(temp_dir / "uploads"), str(temp_dir / "outputs"))
+        upload = Path(manager.upload_folder) / "doc.pdf"
+        upload.write_bytes(b"pdf")
+        self._age_file(upload, hours=48)
+
+        result = manager.cleanup_old_files(max_age_hours=1.0)
+
+        assert result.is_success
+        assert upload.exists()
+
+    @pytest.mark.parametrize("bad_age", [0.0, -1.0, -24.0, float("nan"), float("inf")])
+    def test_rejects_non_positive_or_non_finite_age(self, temp_dir, bad_age):
+        """A negative age would put the cutoff in the future and delete everything."""
+        manager = FileManager(str(temp_dir / "uploads"), str(temp_dir / "outputs"))
+        victim = Path(manager.output_folder) / "current.wav"
+        victim.write_bytes(b"audio")
+
+        result = manager.cleanup_old_files(max_age_hours=bad_age)
+
+        assert result.is_failure
+        assert victim.exists()
+
+    def test_records_error_and_continues_on_delete_failure(self, temp_dir):
+        """A file that fails to delete should be reported, not abort the pass."""
+        manager = FileManager(str(temp_dir / "uploads"), str(temp_dir / "outputs"))
+        stubborn = Path(manager.output_folder) / "stubborn.wav"
+        stubborn.write_bytes(b"x")
+        self._age_file(stubborn, hours=2)
+        removable = Path(manager.output_folder) / "removable.wav"
+        removable.write_bytes(b"y")
+        self._age_file(removable, hours=2)
+
+        original_unlink = Path.unlink
+
+        def failing_unlink(self: Path, *args: object, **kwargs: object) -> None:
+            if self.name == "stubborn.wav":
+                raise OSError("permission denied")
+            original_unlink(self, *args, **kwargs)  # type: ignore[arg-type]
+
+        with patch.object(Path, "unlink", failing_unlink):
+            result = manager.cleanup_old_files(max_age_hours=1.0)
+
+        assert result.is_success
+        assert result.value is not None
+        assert result.value.files_removed == 1
+        assert len(result.value.errors) == 1
+        assert "stubborn.wav" in result.value.errors[0]
+        assert not removable.exists()

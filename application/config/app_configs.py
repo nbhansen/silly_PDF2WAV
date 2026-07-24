@@ -11,3 +11,15 @@ class FlaskConfig:
     debug: bool = True
     host: str = "127.0.0.1"  # Secure default: localhost only
     port: int = 5000
+
+
+@dataclass(frozen=True)
+class AdminConfig:
+    """Gating for the /admin/* endpoints.
+
+    Disabled by default: the endpoints expose filesystem details and can delete
+    generated audio, which is unsafe when the server binds to a non-localhost host.
+    """
+
+    enabled: bool = False
+    token: str | None = None

@@ -4,11 +4,15 @@ Handles file I/O, directory management, and temporary file creation.
 """
 
 import logging
+import math
 import os
 from pathlib import Path
 import tempfile
+import time
 
+from domain.errors import Result, configuration_error
 from domain.interfaces import IFileManager
+from domain.models import CleanupStats
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +56,37 @@ class FileManager(IFileManager):
         logger.debug("Saved output file: %s (%d bytes)", base_filename, len(content))
 
         return str(output_path)
+
+    def cleanup_old_files(self, max_age_hours: float) -> Result[CleanupStats]:
+        """Deletes files in the output directory with mtime older than max_age_hours.
+
+        Rejects non-positive and non-finite ages: a negative age would put the
+        cutoff in the future and delete every file, and NaN comparisons would
+        silently match nothing.
+        """
+        if not math.isfinite(max_age_hours) or max_age_hours <= 0:
+            return Result.failure(
+                configuration_error(f"max_age_hours must be a positive finite number, got {max_age_hours!r}")
+            )
+
+        cutoff_time = time.time() - max_age_hours * 3600
+        files_removed = 0
+        bytes_freed = 0
+        errors: list[str] = []
+
+        for filepath in Path(self.output_folder).iterdir():
+            try:
+                stat = filepath.stat()
+                if not filepath.is_file() or stat.st_mtime >= cutoff_time:
+                    continue
+                filepath.unlink()
+                files_removed += 1
+                bytes_freed += stat.st_size
+                logger.info("Cleaned up old file: %s", filepath.name)
+            except OSError as e:
+                errors.append(f"Failed to remove {filepath.name}: {e!s}")
+
+        return Result.success(CleanupStats(files_removed=files_removed, bytes_freed=bytes_freed, errors=tuple(errors)))
 
     def delete_file(self, filepath: str) -> None:
         """Deletes a file if it exists."""

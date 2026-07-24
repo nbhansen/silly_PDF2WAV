@@ -53,6 +53,10 @@ ocr:                    # OCRConfig - Tesseract settings
 llm:                    # LLMConfig - LLM provider settings
   model_name, max_tokens, temperature
 
+admin:                  # AdminConfig - /admin endpoint gating
+  enabled               # Default false; /admin/* returns 404 when disabled
+                        # Optional token via secrets.admin_token (X-Admin-Token header)
+
 Dependencies
 ------------
 - tts.engine determines which of piper/gemini config is active
@@ -76,7 +80,7 @@ import yaml
 
 from domain.config.tts_config import GeminiConfig, PiperConfig, TTSConfig, TTSEngine
 
-from .app_configs import FlaskConfig
+from .app_configs import AdminConfig, FlaskConfig
 from .file_configs import FileCleanupConfig, FileConfig
 from .logging_config import LoggingConfig
 from .processing_configs import LLMConfig, OCRConfig, PerformanceConfig, TextProcessingConfig
@@ -109,6 +113,9 @@ class SystemConfig:
 
     # Logging configuration (default INFO, auto-derived from flask.debug in from_yaml)
     logging_config: LoggingConfig = field(default_factory=LoggingConfig)
+
+    # Admin endpoint gating (disabled by default)
+    admin: AdminConfig = field(default_factory=AdminConfig)
 
     # System-level settings
     project_root: str = ""
@@ -145,6 +152,7 @@ class SystemConfig:
         ocr_config = cls._parse_ocr_config(get_config)
         llm_config = cls._parse_llm_config(get_config)
         logging_config = cls._parse_logging_config(get_config, flask_config)
+        admin_config = cls._parse_admin_config(get_config)
 
         # Get project root
         project_root = str(get_config("system.project_root", ""))
@@ -162,6 +170,7 @@ class SystemConfig:
             gemini=gemini_config,
             piper=piper_config,
             logging_config=logging_config,
+            admin=admin_config,
             project_root=project_root,
         )
 
@@ -353,6 +362,14 @@ class SystemConfig:
             debug=cls._parse_bool_value(get_config("app.debug", True), True),
             host=cls._parse_string_value(get_config("app.host", "127.0.0.1"), "127.0.0.1"),
             port=cls._parse_int_value(get_config("app.port", 5000), 5000, 1000, 65535),
+        )
+
+    @classmethod
+    def _parse_admin_config(cls, get_config: ConfigAccessor) -> AdminConfig:
+        """Parse admin endpoint gating configuration."""
+        return AdminConfig(
+            enabled=cls._parse_bool_value(get_config("admin.enabled", False), False),
+            token=cls._parse_optional_string_value(get_config("secrets.admin_token", None)),
         )
 
     @classmethod

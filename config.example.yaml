@@ -78,11 +78,20 @@ app:
   host: "127.0.0.1"
   port: 5000
 
+# Admin Endpoints (/admin/*)
+# Disabled by default: they expose filesystem details and can delete generated
+# audio. Only enable on a trusted host; set an admin_token under secrets if the
+# server is reachable by others (send it as the X-Admin-Token header).
+admin:
+  enabled: false
+
 # Secrets and API Keys
 secrets:
   # Required for Text Cleaning and Gemini TTS
   # Get one at: https://aistudio.google.com/app/apikey
   google_ai_api_key: "YOUR_GOOGLE_AI_API_KEY"
+  # Optional: required X-Admin-Token header value for /admin/* when set
+  # admin_token: "choose-a-long-random-string"
 
 # OCR Settings (Tesseract)
 ocr:

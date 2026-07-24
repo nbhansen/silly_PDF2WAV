@@ -64,6 +64,11 @@ class FileCleanupScheduler:
             self._stop_event.set()
             self._thread.join(timeout=5)
 
+    def run_manual_cleanup(self) -> dict[str, int]:
+        """Run one cleanup pass immediately and report how many tracked files were deleted."""
+        logger.info("Manual cleanup triggered")
+        return {"files_deleted": self._process_expired_files()}
+
     def _cleanup_job(self) -> None:
         """Main cleanup loop running in background thread."""
         while not self._stop_event.is_set():
@@ -76,8 +81,8 @@ class FileCleanupScheduler:
             # Wait for next interval, checking stop event
             self._stop_event.wait(self.check_interval_seconds)
 
-    def _process_expired_files(self) -> None:
-        """Process and remove expired files."""
+    def _process_expired_files(self) -> int:
+        """Process and remove expired files, returning the number deleted."""
         current_time = time.time()
 
         # Collect expired files under lock (fast), then delete outside lock (slow I/O)
@@ -90,7 +95,7 @@ class FileCleanupScheduler:
             }
 
         if not expired:
-            return
+            return 0
 
         # Delete files outside lock so schedule() isn't blocked by I/O
         successfully_deleted = []
@@ -108,3 +113,4 @@ class FileCleanupScheduler:
                 for filepath in successfully_deleted:
                     self._scheduled_files.pop(filepath, None)
             logger.debug("Cleanup cycle complete: %d files deleted", len(successfully_deleted))
+        return len(successfully_deleted)

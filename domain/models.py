@@ -65,6 +65,15 @@ class PdfPageText:
 
 
 @dataclass(frozen=True)
+class CleanupStats:
+    """Outcome of an age-based file cleanup pass."""
+
+    files_removed: int
+    bytes_freed: int
+    errors: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class FileInfo:
     """Information about a managed file."""
 

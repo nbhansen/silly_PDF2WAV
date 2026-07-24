@@ -5,9 +5,12 @@ using real Flask test client with dependency injection.
 """
 
 from collections.abc import Generator
+from contextlib import contextmanager
+import dataclasses
 from io import BytesIO
 import json
 from pathlib import Path
+from typing import ClassVar
 from unittest.mock import MagicMock, patch
 
 from flask import Flask
@@ -15,7 +18,7 @@ from flask.testing import FlaskClient
 import pytest
 
 from app_factory import create_app
-from application.config.app_configs import FlaskConfig
+from application.config.app_configs import AdminConfig, FlaskConfig
 from application.config.file_configs import FileCleanupConfig, FileConfig
 from application.config.processing_configs import LLMConfig, OCRConfig, PerformanceConfig, TextProcessingConfig
 from application.config.system_config import SystemConfig
@@ -554,3 +557,100 @@ class TestBackgroundCompletionHandler:
         progress = store.get("op-cancelled")
         assert progress is not None
         assert progress.is_error is False
+
+
+@contextmanager
+def _app_with_admin(base_config: SystemConfig, admin: AdminConfig) -> Generator[FlaskClient, None, None]:
+    """Build a test client whose config has the given admin gating settings."""
+    config = dataclasses.replace(base_config, admin=admin)
+    with (
+        patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True),
+        patch("application.config.system_config.SystemConfig.from_yaml") as mock_config,
+    ):
+        mock_config.return_value = config
+        app = create_app()
+        app.config.update(
+            {
+                "TESTING": True,
+                "UPLOAD_FOLDER": config.files.upload_folder,
+                "AUDIO_FOLDER": config.files.audio_folder,
+            }
+        )
+        register_routes(app)
+        yield app.test_client()
+
+
+class TestAdminEndpointGating:
+    """Admin endpoints must be opt-in and honor the configured token."""
+
+    ADMIN_REQUESTS: ClassVar[list[tuple[str, str]]] = [
+        ("GET", "/admin/file_stats"),
+        ("GET", "/admin/test"),
+        ("POST", "/admin/cleanup"),
+        ("POST", "/admin/cleanup_scheduler"),
+    ]
+
+    def test_admin_disabled_by_default_returns_404(self, client: FlaskClient) -> None:
+        """With the default config every /admin endpoint should look nonexistent."""
+        for method, path in self.ADMIN_REQUESTS:
+            response = client.open(path, method=method)
+            assert response.status_code == 404, f"{method} {path} should 404 when admin is disabled"
+
+    def test_admin_enabled_without_token_allows_access(self, flask_test_config: SystemConfig) -> None:
+        """Enabling admin without a token opens the endpoints (localhost use case)."""
+        with _app_with_admin(flask_test_config, AdminConfig(enabled=True)) as admin_client:
+            response = admin_client.get("/admin/test")
+            assert response.status_code == 200
+
+    def test_admin_token_rejects_missing_or_wrong_header(self, flask_test_config: SystemConfig) -> None:
+        """With a token configured, requests without the right header get 403."""
+        with _app_with_admin(flask_test_config, AdminConfig(enabled=True, token="hunter2")) as admin_client:  # noqa: S106
+            assert admin_client.get("/admin/test").status_code == 403
+            wrong = admin_client.get("/admin/test", headers={"X-Admin-Token": "wrong"})
+            assert wrong.status_code == 403
+
+    def test_admin_token_accepts_correct_header(self, flask_test_config: SystemConfig) -> None:
+        """The configured token in X-Admin-Token unlocks the endpoints."""
+        with _app_with_admin(flask_test_config, AdminConfig(enabled=True, token="hunter2")) as admin_client:  # noqa: S106
+            response = admin_client.get("/admin/test", headers={"X-Admin-Token": "hunter2"})
+            assert response.status_code == 200
+
+
+class TestAdminCleanupEndpoint:
+    """Validation and delegation behavior of POST /admin/cleanup."""
+
+    @pytest.mark.parametrize("bad_age", ["-5", "0", "nan", "inf", "-inf", "not-a-number"])
+    def test_rejects_invalid_max_age_hours(self, flask_test_config: SystemConfig, bad_age: str) -> None:
+        """Invalid ages must 400 before any file is touched."""
+        audio_dir = Path(flask_test_config.files.audio_folder)
+        victim = audio_dir / "current.wav"
+        victim.write_bytes(b"audio")
+
+        with _app_with_admin(flask_test_config, AdminConfig(enabled=True)) as admin_client:
+            response = admin_client.post("/admin/cleanup", data={"max_age_hours": bad_age})
+
+        assert response.status_code == 400
+        assert victim.exists()
+
+    def test_removes_only_files_older_than_cutoff(self, flask_test_config: SystemConfig) -> None:
+        """A valid request should delete old files and report stats."""
+        import os as os_module
+        import time as time_module
+
+        audio_dir = Path(flask_test_config.files.audio_folder)
+        old_file = audio_dir / "old.wav"
+        old_file.write_bytes(b"x" * 10)
+        old_time = time_module.time() - 2 * 3600
+        os_module.utime(old_file, (old_time, old_time))
+        new_file = audio_dir / "new.wav"
+        new_file.write_bytes(b"y")
+
+        with _app_with_admin(flask_test_config, AdminConfig(enabled=True)) as admin_client:
+            response = admin_client.post("/admin/cleanup", data={"max_age_hours": "1"})
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload["files_removed"] == 1
+        assert payload["max_age_hours"] == 1.0
+        assert not old_file.exists()
+        assert new_file.exists()
