@@ -159,7 +159,7 @@ class TestThreadSafeProgressStore:
             assert store.is_cancelled(f"op-{op_id}")
 
     def test_store_cleanup_stale_entries(self) -> None:
-        """Entries older than max_age_seconds should be purged on the next update."""
+        """Finished entries older than max_age_seconds should be purged on the next update."""
         store = ThreadSafeProgressStore(max_age_seconds=60, max_entries=100)
         store.update("op-old", "done", 100, "Complete", is_complete=True)
 
@@ -169,6 +169,38 @@ class TestThreadSafeProgressStore:
 
         assert store.get("op-old") is None
         assert store.get("op-new") is not None
+
+    def test_store_stale_cleanup_spares_in_flight_operations(self) -> None:
+        """In-flight operations must never be age-evicted.
+
+        A long processing phase emits no updates, and eviction would drop the
+        cancellation flag while the background thread still runs.
+        """
+        store = ThreadSafeProgressStore(max_age_seconds=60, max_entries=100)
+        store.update("op-running", "processing", 20, "Working")
+
+        two_minutes_later = time.time() + 120
+        with patch("application.services.progress_store.time.time", return_value=two_minutes_later):
+            store.update("op-new", "starting", 0, "Fresh")
+
+        progress = store.get("op-running")
+        assert progress is not None
+        assert progress.stage == "processing"
+
+    def test_store_cancel_refreshes_entry_lifetime(self) -> None:
+        """Cancelling must refresh the timestamp so the cancellation flag outlives the age window."""
+        store = ThreadSafeProgressStore(max_age_seconds=60, max_entries=100)
+        store.update("op-cancel", "processing", 50, "Working")
+
+        two_minutes_later = time.time() + 120
+        with patch("application.services.progress_store.time.time", return_value=two_minutes_later):
+            store.cancel("op-cancel")
+            store.update("op-other", "starting", 0, "Fresh")
+
+        assert store.is_cancelled("op-cancel") is True
+        progress = store.get("op-cancel")
+        assert progress is not None
+        assert progress.stage == "cancelled"
 
     def test_store_enforces_max_entries_with_fresh_entries(self) -> None:
         """Store must stay bounded even when no entry is stale — oldest evicted first."""
@@ -181,6 +213,22 @@ class TestThreadSafeProgressStore:
         remaining = [f"op-{i}" for i in range(10) if store.get(f"op-{i}") is not None]
         assert len(remaining) == 5
         assert remaining == ["op-5", "op-6", "op-7", "op-8", "op-9"]
+
+    def test_store_overflow_evicts_finished_before_in_flight(self) -> None:
+        """When over the cap, finished entries go first even if an in-flight entry is older."""
+        store = ThreadSafeProgressStore(max_age_seconds=3600, max_entries=3)
+        store.update("op-oldest-running", "processing", 10, "Working")
+        time.sleep(0.001)
+        store.update("op-done", "complete", 100, "Done", is_complete=True)
+        time.sleep(0.001)
+        store.update("op-running-2", "processing", 20, "Working")
+        time.sleep(0.001)
+        store.update("op-running-3", "processing", 30, "Working")
+
+        assert store.get("op-done") is None
+        assert store.get("op-oldest-running") is not None
+        assert store.get("op-running-2") is not None
+        assert store.get("op-running-3") is not None
 
 
 class TestEdgeCases:

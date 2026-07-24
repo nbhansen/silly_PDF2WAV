@@ -73,7 +73,7 @@ def background_process_document(
         except Exception as e:
             get_logger("routes").exception(f"Background process wrapper failed: {e}")
             enhanced_error = get_processing_stage_error("processing", e, original_filename)
-            app_context.progress_store.update(
+            get_progress_store().update(
                 operation_id, "error", 0, "Processing failed unexpectedly", is_error=True, error_message=enhanced_error
             )
 
