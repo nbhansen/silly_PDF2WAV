@@ -116,6 +116,8 @@ Desktop.ini
 # User uploads and outputs
 uploads/
 audio_outputs/
+outputs/
+.benchmarks/
 
 # TTS Models (large files)
 piper_models/

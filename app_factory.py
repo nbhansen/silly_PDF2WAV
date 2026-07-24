@@ -68,7 +68,7 @@ def create_app(config_path: Path | None = None) -> Flask:
     # operations at the configured limit, uploads beyond it queue up.
     background_executor = ThreadPoolExecutor(
         max_workers=app_config.performance.max_concurrent_operations,
-        thread_name_prefix="pdf2wav-worker",
+        thread_name_prefix="verbatimpapers-worker",
     )
     # On process exit: let in-flight conversions finish, but drop queued ones
     # instead of draining the whole queue before shutdown completes.

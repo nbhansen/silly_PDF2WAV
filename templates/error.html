@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Error - VerbatimPapers{% endblock %}
+
+{% block content %}
+    <header class="site-header">
+        <h1 class="site-title">
+            <i class="fas fa-exclamation-triangle"></i>
+            Something Went Wrong
+        </h1>
+        <p class="site-subtitle">The conversion could not be completed</p>
+    </header>
+
+    <div class="error-message">
+        <i class="fas fa-exclamation-circle"></i>
+        {{ error_message }}
+    </div>
+
+    <div class="text-center mt-lg">
+        <a href="{{ url_for('index') }}" class="btn btn-secondary back-btn">
+            <i class="fas fa-arrow-left"></i> Try Another PDF
+        </a>
+    </div>
+{% endblock %}

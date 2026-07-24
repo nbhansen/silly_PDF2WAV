@@ -1,5 +1,5 @@
 # tests/conftest.py
-"""Professional test fixtures for PDF to Audio Converter.
+"""Professional test fixtures for VerbatimPapers.
 
 Simple, reliable fixtures that real development teams use.
 """

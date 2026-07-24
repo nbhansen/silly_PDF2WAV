@@ -1,11 +1,11 @@
-# PDF to Audio Converter - Configuration
+# VerbatimPapers - Configuration
 # Copy this file to config.yaml and customize it
 
 # TTS Configuration
 tts:
   # Engine selection: "piper" (local, recommended) or "gemini" (cloud)
   engine: "piper"
-  
+
   # Rate limiting and concurrency
   concurrent_requests: 4
   request_delay_seconds: 2.0
@@ -15,17 +15,16 @@ tts:
     # Voice model to use
     # Common options: en_US-lessac-medium, en_GB-alba-medium, en_US-ryan-high
     model_name: "en_US-lessac-medium"
-    
-    # Directory to store voice models
-    models_dir: ".local/piper_models"
+
+    # Directory where voice models are downloaded and stored
     download_dir: "piper_models"
-    
+
     # GPU acceleration (not yet implemented, has no effect)
     use_gpu: false
-    
+
     # Speech speed (1.0 = normal, 0.8 = slower, 1.2 = faster)
     length_scale: 1.0
-    
+
     # Advanced audio settings
     noise_scale: 0.667
     noise_w: 0.8
@@ -41,13 +40,13 @@ tts:
 text_processing:
   # Use LLM to clean and fix OCR errors
   enable_text_cleaning: true
-  
+
   # Add natural pauses (...) for better speech rhythm
   enable_natural_formatting: true
-  
+
   # Convert academic text to plain English (optional)
   enable_plain_english_conversion: false
-  
+
   # Chunk sizes for processing
   llm_chunk_size: 50000
   audio_target_chunk_size: 3000
@@ -57,7 +56,7 @@ files:
   upload_folder: "uploads"
   audio_folder: "audio_outputs"
   max_file_size_mb: 100
-  
+
   # Auto-cleanup settings
   cleanup:
     enabled: true

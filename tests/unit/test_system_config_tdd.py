@@ -239,12 +239,12 @@ class TestSystemConfigValidationTDD:
         whitespace_test_cases = [
             ("upload_folder", "   "),  # whitespace only
             ("audio_folder", "\t\n"),  # whitespace only
-            ("models_dir", "  "),  # whitespace only for piper models_dir
+            ("download_dir", "  "),  # whitespace only for piper download_dir
         ]
 
         for folder_attr, invalid_path in whitespace_test_cases:
             # Test creation with invalid path should be allowed but validation should fail
-            if folder_attr == "models_dir":
+            if folder_attr == "download_dir":
                 config = SystemConfig(
                     tts=TTSConfig(engine=TTSEngine.PIPER),
                     files=FileConfig(),
@@ -255,7 +255,7 @@ class TestSystemConfigValidationTDD:
                     ocr=OCRConfig(),
                     llm=LLMConfig(model_name="gemini-1.5-flash"),
                     gemini=GeminiConfig(),
-                    piper=PiperConfig(models_dir=invalid_path),
+                    piper=PiperConfig(download_dir=invalid_path),
                 )
             else:
                 # For file config attributes - create explicit FileConfig based on folder_attr
@@ -287,11 +287,11 @@ class TestSystemConfigValidationTDD:
         empty_test_cases = [
             ("upload_folder", ""),
             ("audio_folder", ""),
-            ("models_dir", ""),  # Test piper models_dir
+            ("download_dir", ""),  # Test piper download_dir
         ]
 
         for folder_attr, empty_path in empty_test_cases:
-            if folder_attr == "models_dir":
+            if folder_attr == "download_dir":
                 config = SystemConfig(
                     tts=TTSConfig(engine=TTSEngine.PIPER),
                     files=FileConfig(),
@@ -302,7 +302,7 @@ class TestSystemConfigValidationTDD:
                     ocr=OCRConfig(),
                     llm=LLMConfig(model_name="gemini-1.5-flash"),
                     gemini=GeminiConfig(),
-                    piper=PiperConfig(models_dir=empty_path),
+                    piper=PiperConfig(download_dir=empty_path),
                 )
             else:
                 # For file config attributes - create explicit FileConfig based on folder_attr
@@ -558,7 +558,7 @@ class TestSystemConfigHelperMethodsTDD:
             gemini=GeminiConfig(),
             piper=PiperConfig(
                 model_name="en_US-lessac-high",
-                models_dir="/custom/piper/models",  # Use models_dir, not download_dir
+                download_dir="/custom/piper/models",
             ),
         )
 

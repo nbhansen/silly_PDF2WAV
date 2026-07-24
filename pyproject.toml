@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 packages = ["application", "domain", "infrastructure"]
 
 [project]
-name = "pdf2wav"
+name = "verbatimpapers"
 version = "0.1.0"
 description = "Convert PDF documents to audio files with TTS engines"
 authors = [{name = "Nicolai Hansen", email = "nbhansen@gmail.com"}]
@@ -44,8 +44,6 @@ dev = [
     "mypy>=1.8.0",
     "bandit>=1.7.5",
     "pre-commit>=3.6.0",
-    "radon>=6.0.1",
-    "vulture>=2.10",
     "types-PyYAML>=6.0.12",
 ]
 
@@ -257,8 +255,3 @@ exclude_lines = [
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
 ]
-
-[tool.radon]
-# Complexity analysis configuration
-cc_min = "B"  # Only show complexity B and above
-mi_min = "B"  # Only show maintainability index B and above
