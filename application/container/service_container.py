@@ -80,12 +80,14 @@ class ServiceContainer(IServiceContainer):
             IDocumentEngine,
             IFileManager,
             ILLMProvider,
+            IPdfTextExtractor,
             ITextPipeline,
         )
         from domain.text.text_pipeline import TextPipeline
         from infrastructure.file.file_manager import FileManager
         from infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
         from infrastructure.ocr.tesseract_ocr_provider import TesseractOCRProvider
+        from infrastructure.pdf.pdfplumber_text_extractor import PdfPlumberTextExtractor
 
         # Build all factories in a single immutable dict
         factories: dict[ServiceKey, ServiceFactory] = {
@@ -144,7 +146,10 @@ class ServiceContainer(IServiceContainer):
             IDocumentEngine: lambda: DocumentEngine(
                 ocr_provider=self.get(TesseractOCRProvider),
                 file_manager=self.get(FileManager),
+                pdf_extractor=self.get(IPdfTextExtractor),
             ),
+            # PDF Text Extractor
+            IPdfTextExtractor: lambda: PdfPlumberTextExtractor(),
             # OCR Provider
             TesseractOCRProvider: lambda: TesseractOCRProvider(config=self.config),
         }

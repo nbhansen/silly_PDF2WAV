@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from .errors import Result
-from .models import PageRange, PDFInfo, ProcessingRequest, TimedAudioResult
+from .models import PageRange, PDFInfo, PdfPageText, ProcessingRequest, TimedAudioResult
 
 # --- Core Service Interfaces ---
 
@@ -66,6 +66,22 @@ class IOCRProvider(ABC):
     @abstractmethod
     def validate_range(self, pdf_path: str, page_range: PageRange) -> dict[str, Any]:
         """Validate page range against PDF document."""
+
+
+class IPdfTextExtractor(ABC):
+    """Interface for extracting text and page images from PDF documents."""
+
+    @abstractmethod
+    def extract_text_by_page(self, pdf_path: str, pages: list[int] | None = None) -> Result[list[PdfPageText]]:
+        """Extract raw text for the requested 0-based page indices (all pages if None).
+
+        Out-of-range indices are skipped; a page whose extraction fails yields
+        empty text so callers can decide on a fallback (e.g. OCR).
+        """
+
+    @abstractmethod
+    def render_page_image(self, pdf_path: str, page_index: int, resolution: int = 300) -> Result[bytes]:
+        """Render a single 0-based page as PNG bytes (for OCR fallback)."""
 
 
 class ITTSEngine(ABC):

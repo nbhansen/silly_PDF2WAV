@@ -57,6 +57,14 @@ class PDFInfo:
 
 
 @dataclass(frozen=True)
+class PdfPageText:
+    """Raw text extracted from a single PDF page."""
+
+    page_index: int  # 0-based
+    text: str
+
+
+@dataclass(frozen=True)
 class FileInfo:
     """Information about a managed file."""
 
