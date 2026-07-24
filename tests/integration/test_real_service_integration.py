@@ -111,6 +111,20 @@ class TestServiceFactoryIntegration:
             assert file_manager.upload_folder == integration_config.files.upload_folder
             assert file_manager.output_folder == integration_config.files.audio_folder
 
+    def test_progress_store_is_container_singleton(self, integration_config: SystemConfig) -> None:
+        """DocumentProcessingService must share the container's single progress store instance."""
+        from application.services.document_service import DocumentProcessingService
+        from application.services.progress_store import ThreadSafeProgressStore
+
+        with patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", True):
+            container = create_service_container(integration_config)
+
+            store = container.get(ThreadSafeProgressStore)
+            assert container.get(ThreadSafeProgressStore) is store
+
+            document_service = container.get(DocumentProcessingService)
+            assert document_service.progress_store is store
+
     def test_tts_engine_selection_and_creation(self, integration_config: SystemConfig) -> None:
         """Should create correct TTS engine based on configuration."""
         # Test Piper engine selection

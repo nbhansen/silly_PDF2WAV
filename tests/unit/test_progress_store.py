@@ -5,24 +5,9 @@ Tests thread safety, error handling, and edge cases for progress tracking.
 
 from concurrent.futures import ThreadPoolExecutor
 import time
+from unittest.mock import patch
 
-import pytest
-
-from application.services.progress_store import (
-    ProgressStatus,
-    ThreadSafeProgressStore,
-    cancel_operation,
-    get_progress,
-    is_operation_cancelled,
-    set_progress_store,
-    update_progress,
-)
-
-
-@pytest.fixture(autouse=True)
-def _init_progress_store() -> None:
-    """Ensure a progress store is initialized for tests using module-level functions."""
-    set_progress_store(ThreadSafeProgressStore())
+from application.services.progress_store import ProgressStatus, ThreadSafeProgressStore
 
 
 class TestProgressStatus:
@@ -174,59 +159,28 @@ class TestThreadSafeProgressStore:
             assert store.is_cancelled(f"op-{op_id}")
 
     def test_store_cleanup_stale_entries(self) -> None:
-        """Should cleanup old entries when max exceeded."""
-        # Create store with low limits for testing
-        store = ThreadSafeProgressStore(max_age_seconds=0, max_entries=5)
+        """Entries older than max_age_seconds should be purged on the next update."""
+        store = ThreadSafeProgressStore(max_age_seconds=60, max_entries=100)
+        store.update("op-old", "done", 100, "Complete", is_complete=True)
 
-        # Add more than max entries
+        two_minutes_later = time.time() + 120
+        with patch("application.services.progress_store.time.time", return_value=two_minutes_later):
+            store.update("op-new", "starting", 0, "Fresh")
+
+        assert store.get("op-old") is None
+        assert store.get("op-new") is not None
+
+    def test_store_enforces_max_entries_with_fresh_entries(self) -> None:
+        """Store must stay bounded even when no entry is stale — oldest evicted first."""
+        store = ThreadSafeProgressStore(max_age_seconds=3600, max_entries=5)
+
         for i in range(10):
-            store.update(f"op-{i}", "done", 100, "Complete", is_complete=True)
-            time.sleep(0.001)  # Ensure different timestamps
+            store.update(f"op-{i}", "processing", 50, "Working")
+            time.sleep(0.001)  # Ensure distinct timestamps for deterministic eviction order
 
-        # Force cleanup by adding one more
-        store.update("op-final", "done", 100, "Final", is_complete=True)
-
-        # Some entries should have been cleaned up
-        active_count = sum(1 for i in range(11) if store.get(f"op-{i}") is not None)
-        # Final entry should always exist
-        assert store.get("op-final") is not None
-        # Most old entries should be cleaned up (within bounds)
-        assert active_count <= 10
-
-
-class TestGlobalFunctions:
-    """Tests for backwards-compatible global functions."""
-
-    def test_update_progress_function(self) -> None:
-        """Should update progress using global function."""
-        update_progress(
-            operation_id="global-op-1",
-            stage="running",
-            percentage=60,
-            message="Progress update",
-        )
-        progress = get_progress("global-op-1")
-        assert progress is not None
-        assert progress.percentage == 60
-
-    def test_get_progress_function(self) -> None:
-        """Should retrieve progress using global function."""
-        update_progress("global-op-2", "running", 30, "Started")
-        progress = get_progress("global-op-2")
-        assert progress is not None
-        assert progress.stage == "running"
-
-    def test_cancel_operation_function(self) -> None:
-        """Should cancel operation using global function."""
-        update_progress("global-op-3", "running", 40, "Working")
-        cancel_operation("global-op-3")
-        assert is_operation_cancelled("global-op-3")
-
-    def test_is_operation_cancelled_function(self) -> None:
-        """Should check cancellation using global function."""
-        assert is_operation_cancelled("never-started") is False
-        cancel_operation("to-cancel")
-        assert is_operation_cancelled("to-cancel") is True
+        remaining = [f"op-{i}" for i in range(10) if store.get(f"op-{i}") is not None]
+        assert len(remaining) == 5
+        assert remaining == ["op-5", "op-6", "op-7", "op-8", "op-9"]
 
 
 class TestEdgeCases:

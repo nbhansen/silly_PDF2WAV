@@ -3,6 +3,10 @@
 This module provides a thread-safe implementation for tracking progress
 of document processing operations. Designed for single-user home app
 but with proper locking to prevent race conditions.
+
+The store is a regular service: it is created by the ServiceContainer and
+reaches consumers via constructor injection (DocumentProcessingService) or
+the ApplicationContext (routes). There is no module-level instance.
 """
 
 from dataclasses import dataclass
@@ -117,82 +121,27 @@ class ThreadSafeProgressStore:
     def remove(self, operation_id: str) -> None:
         """Remove an operation from tracking (thread-safe)."""
         with self._lock:
-            self._progress.pop(operation_id, None)
-            self._cancellation_flags.pop(operation_id, None)
-            self._timestamps.pop(operation_id, None)
+            self._remove_locked(operation_id)
+
+    def _remove_locked(self, operation_id: str) -> None:
+        """Remove all state for an operation (must be called with lock held)."""
+        self._progress.pop(operation_id, None)
+        self._cancellation_flags.pop(operation_id, None)
+        self._timestamps.pop(operation_id, None)
 
     def _cleanup_if_needed(self) -> None:
-        """Remove stale entries if needed (must be called with lock held)."""
-        if len(self._progress) <= self._max_entries:
-            return
-
+        """Evict stale entries, then oldest entries beyond the cap (must be called with lock held)."""
         current_time = time.time()
         stale_ids = [
             op_id for op_id, timestamp in self._timestamps.items() if current_time - timestamp > self._max_age_seconds
         ]
-
         for op_id in stale_ids:
-            self._progress.pop(op_id, None)
-            self._cancellation_flags.pop(op_id, None)
-            self._timestamps.pop(op_id, None)
+            self._remove_locked(op_id)
             logger.debug("Cleaned up stale progress entry: %s", op_id)
 
-
-# Module-level instance, set by app_factory.py during startup via set_progress_store().
-# No default — forces explicit initialization.
-_progress_store: ThreadSafeProgressStore | None = None
-
-
-def set_progress_store(store: ThreadSafeProgressStore) -> None:
-    """Set the global progress store instance.
-
-    Called by app_factory.py during application startup.
-    """
-    global _progress_store
-    _progress_store = store
-
-
-def get_progress_store() -> ThreadSafeProgressStore:
-    """Get the current global progress store instance."""
-    if _progress_store is None:
-        raise RuntimeError("ProgressStore not initialized. Call set_progress_store() during app startup.")
-    return _progress_store
-
-
-# Convenience functions that delegate to the managed store instance.
-def update_progress(
-    operation_id: str,
-    stage: str,
-    percentage: int,
-    message: str,
-    is_complete: bool = False,
-    is_error: bool = False,
-    error_message: str | None = None,
-    result_data: dict[str, Any] | None = None,
-) -> None:
-    """Update progress for an operation."""
-    get_progress_store().update(
-        operation_id=operation_id,
-        stage=stage,
-        percentage=percentage,
-        message=message,
-        is_complete=is_complete,
-        is_error=is_error,
-        error_message=error_message,
-        result_data=result_data,
-    )
-
-
-def get_progress(operation_id: str) -> ProgressStatus | None:
-    """Get current progress for an operation."""
-    return get_progress_store().get(operation_id)
-
-
-def cancel_operation(operation_id: str) -> None:
-    """Mark an operation as cancelled."""
-    get_progress_store().cancel(operation_id)
-
-
-def is_operation_cancelled(operation_id: str) -> bool:
-    """Check if an operation has been cancelled."""
-    return get_progress_store().is_cancelled(operation_id)
+        overflow = len(self._progress) - self._max_entries
+        if overflow > 0:
+            oldest_first = sorted(self._timestamps, key=self._timestamps.__getitem__)
+            for op_id in oldest_first[:overflow]:
+                self._remove_locked(op_id)
+                logger.debug("Evicted oldest progress entry over cap: %s", op_id)

@@ -13,6 +13,7 @@ from application.config.logging_factory import ThreadSafeLoggerFactory
 from application.config.system_config import SystemConfig
 from application.container.service_container import ServiceContainer
 from application.context.application_context import ApplicationContext
+from application.services.progress_store import ThreadSafeProgressStore
 from infrastructure.file.cleanup_scheduler import FileCleanupScheduler
 
 
@@ -61,18 +62,12 @@ def create_app(config_path: Path | None = None) -> Flask:
             check_interval_seconds=300,
         )
 
-    # Create and install progress store (eliminates module-level global)
-    from application.services.progress_store import ThreadSafeProgressStore, set_progress_store
-
-    progress_store = ThreadSafeProgressStore()
-    set_progress_store(progress_store)
-
     # Create application context
     app_context = ApplicationContext(
         config=app_config,
         service_container=service_container,
         logger_factory=logger_factory,
-        progress_store=progress_store,
+        progress_store=service_container.get(ThreadSafeProgressStore),
         cleanup_scheduler=cleanup_scheduler,
     )
 
