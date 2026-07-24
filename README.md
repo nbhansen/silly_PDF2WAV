@@ -110,6 +110,18 @@ When running in a container, override config using environment variables prefixe
 - `PDF2WAV_SECRETS_GOOGLE_AI_API_KEY` — Your Google AI API key
 - `PDF2WAV_APP_PORT` — Port to run on (default 5000)
 
+## Architecture
+
+Hexagonal layering: the domain is pure stdlib logic, external services live behind interfaces in the infrastructure layer, and the application layer wires everything together via dependency injection.
+
+```mermaid
+graph TD
+    Web["Flask entry points (app.py, routes.py)"] --> App["application (config, DI container, orchestration)"]
+    App --> Domain["domain (core logic + interfaces)"]
+    App --> Infra["infrastructure (TTS, LLM, OCR, PDF adapters)"]
+    Infra -->|implements domain interfaces| Domain
+```
+
 ## Project Structure
 
 ```
