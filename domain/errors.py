@@ -1,7 +1,7 @@
 # domain/errors.py
 from dataclasses import dataclass
 from enum import Enum
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 
 class ErrorCode(Enum):
@@ -44,7 +44,7 @@ T = TypeVar("T")
 
 
 @dataclass
-class Result(Generic[T]):
+class Result[T]:
     """Result type that either contains a value or an error."""
 
     value: T | None = None
