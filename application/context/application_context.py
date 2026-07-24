@@ -6,7 +6,7 @@ dependencies and eliminates global state, following hexagonal architecture princ
 
 from dataclasses import dataclass
 import logging
-from typing import Optional, Protocol
+from typing import Protocol
 
 from application.config.system_config import SystemConfig
 from application.container.service_container import ServiceContainer
@@ -38,7 +38,7 @@ class ApplicationContext:
     service_container: ServiceContainer
     logger_factory: LoggerFactory
     progress_store: ThreadSafeProgressStore
-    cleanup_scheduler: Optional[FileCleanupScheduler] = None
+    cleanup_scheduler: FileCleanupScheduler | None = None
 
     @property
     def is_processor_available(self) -> bool:

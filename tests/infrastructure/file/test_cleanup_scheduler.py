@@ -105,12 +105,12 @@ class TestFileScheduling:
         files = ["/test/file1.txt", "/test/file2.txt", "/test/file3.txt"]
         timestamps = [1000.0, 1001.0, 1002.0]
 
-        for file_path, timestamp in zip(files, timestamps):
+        for file_path, timestamp in zip(files, timestamps, strict=True):
             mock_time.return_value = timestamp
             scheduler.schedule(file_path)
 
         assert len(scheduler._scheduled_files) == 3
-        for file_path, expected_timestamp in zip(files, timestamps):
+        for file_path, expected_timestamp in zip(files, timestamps, strict=True):
             assert scheduler._scheduled_files[file_path] == expected_timestamp
 
     def test_schedule_thread_safety_concurrent_operations(self, scheduler, mock_time):

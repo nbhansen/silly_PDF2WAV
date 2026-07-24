@@ -7,7 +7,7 @@ since it depends on infrastructure and application layers.
 """
 
 from abc import ABC, abstractmethod
-from typing import Protocol, TypeVar, Union
+from typing import Protocol, TypeVar
 
 T = TypeVar("T")
 
@@ -22,16 +22,16 @@ class ServiceFactory(Protocol):
 
 
 # Service key type - either a type or string identifier
-ServiceKey = Union[type[object], str]
+ServiceKey = type[object] | str
 
 
 class IServiceContainer(ABC):
     """Simple service container interface."""
 
     @abstractmethod
-    def get(self, interface: Union[type[T], str]) -> T:
+    def get(self, interface: type[T] | str) -> T:
         """Get a service instance."""
 
     @abstractmethod
-    def has(self, interface: Union[type[T], str]) -> bool:
+    def has(self, interface: type[T] | str) -> bool:
         """Check if service is registered."""

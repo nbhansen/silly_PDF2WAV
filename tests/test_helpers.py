@@ -1,7 +1,6 @@
 # tests/test_helpers.py
 from pathlib import Path
 import tempfile
-from typing import Optional
 
 from domain.audio.timing_engine import ITimingEngine
 from domain.errors import Result, llm_provider_error, tts_engine_error
@@ -65,7 +64,7 @@ def create_test_request(pdf_path="test.pdf", output_name="test_output", page_ran
 class FakeFileManager:
     """Fake file manager for testing."""
 
-    def __init__(self, output_dir: Optional[str] = None):
+    def __init__(self, output_dir: str | None = None):
         self.output_dir = output_dir or tempfile.mkdtemp()
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
         self.saved_files: list[str] = []

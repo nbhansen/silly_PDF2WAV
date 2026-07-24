@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 import threading
 import time
-from typing import Any, Optional, Union
+from typing import Any
 import uuid
 
 from flask import Flask, Response, current_app, jsonify, render_template, request, send_from_directory, url_for
@@ -133,7 +133,7 @@ def register_routes(app: Flask) -> None:
         return send_from_directory(app.config["AUDIO_FOLDER"], filename)
 
     @app.route("/read-along/<filename>")
-    def read_along_view(filename: str) -> Union[str, tuple[str, int]]:
+    def read_along_view(filename: str) -> str | tuple[str, int]:
         """Serve read-along interface for audio file."""
         # Extract base filename (remove extension and _combined suffix)
         base_filename = filename.replace("_combined.mp3", "").replace(".mp3", "").replace(".wav", "")
@@ -169,7 +169,7 @@ def register_routes(app: Flask) -> None:
         )
 
     @app.route("/api/timing/<filename>")
-    def get_timing_data(filename: str) -> Union[Response, tuple[Response, int]]:
+    def get_timing_data(filename: str) -> Response | tuple[Response, int]:
         """Serve timing metadata as JSON."""
         timing_filename = f"{filename}_timing.json"
         timing_path = Path(app.config["AUDIO_FOLDER"]) / timing_filename
@@ -187,7 +187,7 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "Failed to load timing data"}), 500
 
     @app.route("/api/progress/<operation_id>")
-    def get_progress_status(operation_id: str) -> Union[Response, tuple[Response, int]]:
+    def get_progress_status(operation_id: str) -> Response | tuple[Response, int]:
         """Get current progress status for an operation."""
         progress = get_progress(operation_id)
         if progress is None:
@@ -208,7 +208,7 @@ def register_routes(app: Flask) -> None:
         )
 
     @app.route("/api/cancel/<operation_id>", methods=["POST"])
-    def cancel_processing_operation(operation_id: str) -> Union[Response, tuple[Response, int]]:
+    def cancel_processing_operation(operation_id: str) -> Response | tuple[Response, int]:
         """Cancel a running operation."""
         progress = get_progress(operation_id)
         if progress is None:
@@ -222,7 +222,7 @@ def register_routes(app: Flask) -> None:
         return jsonify({"message": "Cancellation requested", "cancelled": True})
 
     @app.route("/result/<operation_id>")
-    def show_result(operation_id: str) -> Union[str, tuple[str, int]]:
+    def show_result(operation_id: str) -> str | tuple[str, int]:
         """Show results for a completed operation."""
         progress = get_progress(operation_id)
         if progress is None:
@@ -259,7 +259,7 @@ def register_routes(app: Flask) -> None:
         return render_upload_result(audio_result, original_filename, base_filename, page_range, enable_timing)
 
     @app.route("/get_pdf_info", methods=["POST"])
-    def get_pdf_info() -> Union[Response, tuple[Response, int]]:
+    def get_pdf_info() -> Response | tuple[Response, int]:
         get_logger("routes").debug("PDF info request received")
         service = get_pdf_service()
         if not is_processor_available() or service is None:
@@ -309,7 +309,7 @@ def register_routes(app: Flask) -> None:
         except Exception as e:
             return jsonify({"error": f"Unexpected error while analyzing PDF: {e!s}"}), 500
 
-    def _validate_upload_request() -> tuple[Optional[FileStorage], Optional[str]]:
+    def _validate_upload_request() -> tuple[FileStorage | None, str | None]:
         """Common validation for upload endpoints.
 
         Returns:
@@ -335,7 +335,7 @@ def register_routes(app: Flask) -> None:
 
         return file, None
 
-    def _handle_upload(enable_timing: bool) -> Union[str, tuple[str, int]]:
+    def _handle_upload(enable_timing: bool) -> str | tuple[str, int]:
         """Shared upload handler for both regular and timing-enabled uploads.
 
         Args:
@@ -390,12 +390,12 @@ def register_routes(app: Flask) -> None:
         return render_template("processing.html", operation_id=operation_id, enable_timing=enable_timing)
 
     @app.route("/upload", methods=["POST"])
-    def upload_file() -> Union[str, tuple[str, int]]:
+    def upload_file() -> str | tuple[str, int]:
         """Regular upload WITHOUT timing data."""
         return _handle_upload(enable_timing=False)
 
     @app.route("/upload-with-timing", methods=["POST"])
-    def upload_file_with_timing() -> Union[str, tuple[str, int]]:
+    def upload_file_with_timing() -> str | tuple[str, int]:
         """Upload WITH timing data for read-along functionality."""
         config = get_app_config()
         if config.tts.engine.value == "gemini":
@@ -403,7 +403,7 @@ def register_routes(app: Flask) -> None:
         return _handle_upload(enable_timing=True)
 
     @app.route("/admin/file_stats")
-    def get_file_stats() -> Union[Response, tuple[Response, int]]:
+    def get_file_stats() -> Response | tuple[Response, int]:
         """Get file management statistics (admin endpoint)."""
         service = get_pdf_service()
         if not is_processor_available():
@@ -433,7 +433,7 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": str(e)}), 500
 
     @app.route("/admin/cleanup", methods=["POST"])
-    def manual_cleanup() -> Union[Response, tuple[Response, int]]:
+    def manual_cleanup() -> Response | tuple[Response, int]:
         """Trigger manual file cleanup (admin endpoint)."""
         service = get_pdf_service()
         if not is_processor_available():
@@ -476,7 +476,7 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": str(e)}), 500
 
     @app.route("/admin/cleanup_scheduler", methods=["POST"])
-    def trigger_scheduler_cleanup() -> Union[Response, tuple[Response, int]]:
+    def trigger_scheduler_cleanup() -> Response | tuple[Response, int]:
         """Trigger scheduler's manual cleanup."""
         try:
             context = get_app_context()
@@ -496,7 +496,7 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": str(e)}), 500
 
     @app.route("/admin/test")
-    def test_admin() -> Union[Response, tuple[Response, int]]:
+    def test_admin() -> Response | tuple[Response, int]:
         """Test endpoint to check what's available."""
         try:
             service = get_pdf_service()
@@ -526,7 +526,7 @@ def register_routes(app: Flask) -> None:
 
 
 def render_upload_result(
-    result: Optional[TimedAudioResult],
+    result: TimedAudioResult | None,
     original_filename: str,
     base_filename_no_ext: str,
     page_range: PageRange,

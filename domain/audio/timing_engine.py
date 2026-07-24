@@ -84,7 +84,7 @@ class ChunkProcessingResult:
 class BatchProcessingResult:
     """Result of processing a batch of sentences."""
 
-    temp_file: Optional[str]
+    temp_file: str | None
     text_segments: list[TextSegment]
     final_cumulative_time: float
 
@@ -313,7 +313,7 @@ class TimingEngine(ITimingEngine):
 
     def _process_chunk_with_measurement(
         self, chunk: str, chunk_index: int, cumulative_time: float
-    ) -> Optional[ChunkProcessingResult]:
+    ) -> ChunkProcessingResult | None:
         """Process a single chunk with measurement mode.
 
         Returns ChunkProcessingResult or None on failure.
@@ -371,7 +371,7 @@ class TimingEngine(ITimingEngine):
 
     def _process_sentence_batch(
         self, sentences: list[str], chunk_index: int, batch_start: int, cumulative_time: float
-    ) -> Optional[BatchProcessingResult]:
+    ) -> BatchProcessingResult | None:
         """Process a batch of sentences for timing.
 
         Returns BatchProcessingResult or None on failure.
@@ -446,7 +446,7 @@ class TimingEngine(ITimingEngine):
 
         self.last_api_call = time.time()
 
-    def _combine_audio_chunks(self, audio_files: list[str], output_filename: str) -> Optional[str]:
+    def _combine_audio_chunks(self, audio_files: list[str], output_filename: str) -> str | None:
         """Combine multiple audio files into one.
 
         Returns output path or None on failure.

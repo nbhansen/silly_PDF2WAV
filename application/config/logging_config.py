@@ -6,7 +6,6 @@ import logging
 import logging.handlers
 from pathlib import Path
 import sys
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -15,7 +14,7 @@ class LoggingConfig:
 
     level: str = "INFO"
     format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    file_path: Optional[str] = None
+    file_path: str | None = None
     json_format: bool = False
     max_file_size_mb: int = 10
     backup_count: int = 5
@@ -115,7 +114,7 @@ def get_logger(name: str) -> logging.Logger:
 
 
 # Global logger instance - will be configured by the application
-_app_logger: Optional[logging.Logger] = None
+_app_logger: logging.Logger | None = None
 
 
 def configure_application_logging(config: LoggingConfig) -> None:

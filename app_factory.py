@@ -6,7 +6,6 @@ the Flask app with all dependencies properly injected, eliminating global state.
 
 from dataclasses import replace
 from pathlib import Path
-from typing import Optional
 
 from flask import Flask
 
@@ -17,7 +16,7 @@ from application.context.application_context import ApplicationContext
 from infrastructure.file.cleanup_scheduler import FileCleanupScheduler
 
 
-def create_app(config_path: Optional[Path] = None) -> Flask:
+def create_app(config_path: Path | None = None) -> Flask:
     """Create and configure Flask application with proper dependency injection.
 
     This factory function ensures no global state by creating all dependencies

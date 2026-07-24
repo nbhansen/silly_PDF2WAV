@@ -2,7 +2,6 @@
 """Text processing, OCR, and performance configuration classes."""
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -21,10 +20,10 @@ class TextProcessingConfig:
 class LLMConfig:
     """LLM configuration for text cleaning."""
 
-    model_name: Optional[str] = None
+    model_name: str | None = None
     concurrent_requests: int = 3
     request_delay_seconds: float = 0.5
-    api_key: Optional[str] = None
+    api_key: str | None = None
 
 
 @dataclass(frozen=True)

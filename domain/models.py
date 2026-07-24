@@ -3,7 +3,6 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 from .errors import Result, invalid_page_range_error
 
@@ -14,8 +13,8 @@ from .errors import Result, invalid_page_range_error
 class PageRange:
     """Range specification for document page processing."""
 
-    start_page: Optional[int] = None
-    end_page: Optional[int] = None
+    start_page: int | None = None
+    end_page: int | None = None
 
     def is_full_document(self) -> bool:
         """Return True if this range covers the entire document."""
@@ -65,7 +64,7 @@ class FileInfo:
     full_path: str
     size_bytes: int
     created_at: datetime
-    last_accessed: Optional[datetime] = None
+    last_accessed: datetime | None = None
 
     @property
     def size_mb(self) -> float:
@@ -117,7 +116,7 @@ class TimingMetadata:
     text_segments: list[TextSegment]
     audio_files: list[str]  # just filenames for now
 
-    def get_segment_at_time(self, time_seconds: float) -> Optional[TextSegment]:
+    def get_segment_at_time(self, time_seconds: float) -> TextSegment | None:
         """Find which text segment is active at given time."""
         for segment in self.text_segments:
             if segment.start_time <= time_seconds <= segment.end_time:
@@ -130,8 +129,8 @@ class TimedAudioResult:
     """Audio generation result with optional timing data."""
 
     audio_files: list[str]
-    combined_mp3: Optional[str]
-    timing_data: Optional[TimingMetadata] = None
+    combined_mp3: str | None
+    timing_data: TimingMetadata | None = None
 
     @property
     def has_timing_data(self) -> bool:

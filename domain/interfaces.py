@@ -5,7 +5,7 @@ implementations, facilitating testing and modularity.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any
 
 from .errors import Result
 from .models import PageRange, PDFInfo, ProcessingRequest, TimedAudioResult
@@ -109,7 +109,7 @@ class IDocumentEngine(ABC):
         """Validate requested page range."""
 
     @abstractmethod
-    def extract_text(self, pdf_path: str, pages: Optional[list[int]] = None) -> Result[list[str]]:
+    def extract_text(self, pdf_path: str, pages: list[int] | None = None) -> Result[list[str]]:
         """Extract text from PDF with OCR fallback."""
 
     @abstractmethod
@@ -138,7 +138,7 @@ class IAudioEngine(ABC):
     @abstractmethod
     async def generate_audio_async(
         self, text_chunks: list[str], output_name: str, output_dir: str
-    ) -> tuple[list[str], Optional[str]]:
+    ) -> tuple[list[str], str | None]:
         """Generate audio files concurrently with coordination."""
 
     @abstractmethod

@@ -7,7 +7,6 @@ Uses the unified Google Gen AI SDK for language model operations.
 import asyncio
 import logging
 import time
-from typing import Optional
 
 from google import genai
 from google.genai import types
@@ -31,7 +30,7 @@ class GeminiLLMProvider(ILLMProvider):
     ):
         self.api_key = api_key
         self.model_name = model_name
-        self._initialization_error: Optional[str] = None  # Deferred error handling
+        self._initialization_error: str | None = None  # Deferred error handling
         self.client = self._init_client()
 
         # Rate limiting configuration
@@ -40,7 +39,7 @@ class GeminiLLMProvider(ILLMProvider):
         self.requests_per_minute = requests_per_minute
         self.request_semaphore = asyncio.Semaphore(self.max_concurrent_requests)
 
-    def _init_client(self) -> Optional[genai.Client]:
+    def _init_client(self) -> genai.Client | None:
         """Initialize the Gemini client with API key validation."""
         if not self.api_key or self.api_key == "YOUR_GOOGLE_AI_API_KEY":
             self._initialization_error = "Gemini API key not configured"

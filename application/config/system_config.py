@@ -65,11 +65,12 @@ Environment Variables
 - FLASK_DEBUG: Override flask.debug setting
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 import logging
 import os
 from pathlib import Path
-from typing import Callable, Optional, Union, cast
+from typing import cast
 
 import yaml
 
@@ -83,9 +84,9 @@ from .processing_configs import LLMConfig, OCRConfig, PerformanceConfig, TextPro
 logger = logging.getLogger(__name__)
 
 # Type for YAML configuration values
-YAMLValue = Union[str, int, float, bool, list[str], dict[str, object], None]
+YAMLValue = str | int | float | bool | list[str] | dict[str, object] | None
 # Type for config accessor function
-ConfigAccessor = Callable[[str, Optional[YAMLValue]], YAMLValue]
+ConfigAccessor = Callable[[str, YAMLValue | None], YAMLValue]
 
 
 @dataclass(frozen=True)
@@ -103,8 +104,8 @@ class SystemConfig:
     llm: LLMConfig
 
     # Engine-specific configs (only one should be set based on tts.engine)
-    gemini: Optional[GeminiConfig] = None
-    piper: Optional[PiperConfig] = None
+    gemini: GeminiConfig | None = None
+    piper: PiperConfig | None = None
 
     # Logging configuration (default INFO, auto-derived from flask.debug in from_yaml)
     logging_config: LoggingConfig = field(default_factory=LoggingConfig)
@@ -190,7 +191,7 @@ class SystemConfig:
     def _create_config_accessor(cls, yaml_config: dict[str, object]) -> ConfigAccessor:
         """Create helper function to access nested YAML values."""
 
-        def get_config(yaml_path: str, default: Optional[YAMLValue] = None) -> YAMLValue:
+        def get_config(yaml_path: str, default: YAMLValue | None = None) -> YAMLValue:
             keys = yaml_path.split(".")
             value: YAMLValue = yaml_config
             for key in keys:
@@ -458,14 +459,14 @@ class SystemConfig:
         return str(value)
 
     @staticmethod
-    def _parse_optional_string_value(value: YAMLValue, default: Optional[str] = None) -> Optional[str]:
+    def _parse_optional_string_value(value: YAMLValue, default: str | None = None) -> str | None:
         """Parse optional string from YAML value."""
         if value is None:
             return default
         return str(value)
 
     @staticmethod
-    def _parse_bool_value(value: YAMLValue, default: Optional[bool] = None) -> bool:
+    def _parse_bool_value(value: YAMLValue, default: bool | None = None) -> bool:
         """Parse boolean from various representations."""
         if value is None:
             if default is None:
@@ -480,9 +481,7 @@ class SystemConfig:
         return default if default is not None else False
 
     @staticmethod
-    def _parse_int_value(
-        value: YAMLValue, default: int, min_val: Optional[int] = None, max_val: Optional[int] = None
-    ) -> int:
+    def _parse_int_value(value: YAMLValue, default: int, min_val: int | None = None, max_val: int | None = None) -> int:
         """Parse integer from various representations with validation."""
         if value is None:
             return default
@@ -505,7 +504,7 @@ class SystemConfig:
         return parsed
 
     @staticmethod
-    def _parse_optional_int_value(value: YAMLValue, default: Optional[int] = None) -> Optional[int]:
+    def _parse_optional_int_value(value: YAMLValue, default: int | None = None) -> int | None:
         """Parse optional integer from YAML value."""
         if value is None:
             return default
@@ -521,7 +520,7 @@ class SystemConfig:
 
     @staticmethod
     def _parse_float_value(
-        value: YAMLValue, default: float, min_val: Optional[float] = None, max_val: Optional[float] = None
+        value: YAMLValue, default: float, min_val: float | None = None, max_val: float | None = None
     ) -> float:
         """Parse float from various representations with validation."""
         if value is None:
@@ -542,7 +541,7 @@ class SystemConfig:
 
         return parsed
 
-    def log_summary(self, log: Optional[logging.Logger] = None) -> None:
+    def log_summary(self, log: logging.Logger | None = None) -> None:
         """Log configuration summary."""
         log = log or logger
         lines = [

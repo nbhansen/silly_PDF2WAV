@@ -3,7 +3,6 @@
 
 import io
 import logging
-from typing import Optional
 import wave
 
 from google import genai
@@ -44,9 +43,9 @@ class GeminiTTSProvider(ITTSEngine):
         self.max_concurrent_requests = max_concurrent_requests
         self.requests_per_minute = requests_per_minute
         self.output_format = "mp3"  # Gemini audio is typically MP3
-        self._initialization_error: Optional[str] = None  # Deferred error handling
+        self._initialization_error: str | None = None  # Deferred error handling
 
-        self.client: Optional[genai.Client] = None
+        self.client: genai.Client | None = None
         try:
             self.client = genai.Client(api_key=self.api_key)
             logger.info(f"Gemini TTS initialized with model={model_name}, voice={voice_name}")

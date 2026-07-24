@@ -8,7 +8,6 @@ import re
 import ssl
 import subprocess  # nosec B404
 import tempfile
-from typing import Optional
 import urllib.error
 from urllib.parse import urlparse
 import urllib.request
@@ -38,7 +37,7 @@ class PiperTTSProvider(ITTSEngine):
         self,
         config: PiperConfig,
         repository_url: str = "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0",
-        project_root: Optional[str] = None,
+        project_root: str | None = None,
     ):
         """Initialize Piper TTS Provider.
 
@@ -58,7 +57,7 @@ class PiperTTSProvider(ITTSEngine):
         self.models_dir = config.download_dir
         self.voice_instance = None
         self.repository_url = repository_url
-        self._initialization_error: Optional[str] = None  # Deferred error handling
+        self._initialization_error: str | None = None  # Deferred error handling
 
         # Check what's available
         self._check_piper_availability()

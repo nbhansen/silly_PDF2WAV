@@ -9,7 +9,7 @@ from collections.abc import Awaitable, Coroutine
 from contextlib import suppress
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 from ..errors import Result, audio_generation_error
 from ..interfaces import IAudioDurationMeasurer, IAudioEngine, IFileManager, ITTSEngine
@@ -33,12 +33,12 @@ class AudioEngine(IAudioEngine):
         tts_engine: ITTSEngine,
         file_manager: IFileManager,
         timing_engine: "ITimingEngine",
-        duration_measurer: Optional[IAudioDurationMeasurer] = None,
+        duration_measurer: IAudioDurationMeasurer | None = None,
         max_concurrent: int = 4,
         audio_target_chunk_size: int = 2000,
         audio_max_chunk_size: int = 3000,
         enable_async: bool = True,
-        chunking_strategy: Optional[IChunkingStrategy] = None,
+        chunking_strategy: IChunkingStrategy | None = None,
     ):
         self.tts_engine = tts_engine
         self.file_manager = file_manager
@@ -201,9 +201,9 @@ class AudioEngine(IAudioEngine):
         logger.debug("Starting parallel processing at %.2f", start_time)
         return {"start_time": start_time}
 
-    def _create_chunk_tasks(self, processed_chunks: list[str]) -> list[Coroutine[Any, Any, Optional[bytes]]]:
+    def _create_chunk_tasks(self, processed_chunks: list[str]) -> list[Coroutine[Any, Any, bytes | None]]:
         """Create async tasks for all valid chunks."""
-        tasks: list[Coroutine[Any, Any, Optional[bytes]]] = []
+        tasks: list[Coroutine[Any, Any, bytes | None]] = []
         for i, chunk in enumerate(processed_chunks):
             if not chunk.strip():
                 continue
@@ -214,22 +214,20 @@ class AudioEngine(IAudioEngine):
         return tasks
 
     async def _execute_tasks_with_rate_limiting(
-        self, tasks: list[Coroutine[Any, Any, Optional[bytes]]]
-    ) -> list[Union[Optional[bytes], BaseException]]:
+        self, tasks: list[Coroutine[Any, Any, bytes | None]]
+    ) -> list[bytes | None | BaseException]:
         """Execute tasks with semaphore-based rate limiting."""
         # Apply rate limiting
         semaphore = asyncio.Semaphore(self.max_concurrent)
         limited_tasks = [self._limited_chunk_processing(semaphore, task) for task in tasks]
 
         # Execute all tasks concurrently
-        results: list[Union[Optional[bytes], BaseException]] = await asyncio.gather(
-            *limited_tasks, return_exceptions=True
-        )
+        results: list[bytes | None | BaseException] = await asyncio.gather(*limited_tasks, return_exceptions=True)
         return results
 
     def _process_async_results(
         self,
-        results: list[Union[Optional[bytes], BaseException]],
+        results: list[bytes | None | BaseException],
         processed_chunks: list[str],
         timing_context: dict[str, float],
     ) -> list[bytes]:
@@ -269,8 +267,8 @@ class AudioEngine(IAudioEngine):
         return audio_chunks
 
     async def _limited_chunk_processing(
-        self, semaphore: asyncio.Semaphore, task: Awaitable[Optional[bytes]]
-    ) -> Optional[bytes]:
+        self, semaphore: asyncio.Semaphore, task: Awaitable[bytes | None]
+    ) -> bytes | None:
         """Apply semaphore limiting to chunk processing."""
         async with semaphore:
             result = await task
@@ -278,7 +276,7 @@ class AudioEngine(IAudioEngine):
             await asyncio.sleep(self.base_delay)
             return result
 
-    async def _process_single_chunk_async(self, chunk: str, chunk_num: int, total_chunks: int) -> Optional[bytes]:
+    async def _process_single_chunk_async(self, chunk: str, chunk_num: int, total_chunks: int) -> bytes | None:
         """Process a single chunk asynchronously."""
         import time
 
@@ -444,7 +442,7 @@ class AudioEngine(IAudioEngine):
 
     async def generate_audio_async(
         self, text_chunks: list[str], output_name: str, output_dir: str
-    ) -> tuple[list[str], Optional[str]]:
+    ) -> tuple[list[str], str | None]:
         """Generate audio files concurrently with intelligent coordination.
 
         Async function for backward compatibility - returns tuple directly.
@@ -523,7 +521,7 @@ class AudioEngine(IAudioEngine):
 
     async def _generate_single_audio_file(
         self, semaphore: asyncio.Semaphore, text_chunk: str, filename: str, output_dir: str, chunk_number: int
-    ) -> Optional[str]:
+    ) -> str | None:
         """Generate a single audio file with rate limiting."""
         async with semaphore:
             try:

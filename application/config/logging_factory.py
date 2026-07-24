@@ -7,7 +7,6 @@ without using global state, supporting the hexagonal architecture pattern.
 import logging
 import logging.handlers
 from threading import RLock
-from typing import Optional
 
 from application.config.logging_config import LoggingConfig, setup_logging
 
@@ -24,7 +23,7 @@ class ThreadSafeLoggerFactory:
         self._config = config
         self._lock = RLock()
         self._loggers: dict[str, logging.Logger] = {}
-        self._app_logger: Optional[logging.Logger] = None
+        self._app_logger: logging.Logger | None = None
 
         # Initialize main application logger
         with self._lock:
