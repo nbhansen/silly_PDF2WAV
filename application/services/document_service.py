@@ -144,6 +144,7 @@ class DocumentProcessingService:
                     "base_filename": base_filename,
                     "original_filename": original_filename,
                     "audio_result": audio_result,
+                    "page_range": page_range,
                 },
             )
 

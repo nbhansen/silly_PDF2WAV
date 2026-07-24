@@ -4,6 +4,7 @@ This module provides the Flask application factory that creates and configures
 the Flask app with all dependencies properly injected, eliminating global state.
 """
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
 
@@ -62,12 +63,20 @@ def create_app(config_path: Path | None = None) -> Flask:
             check_interval_seconds=300,
         )
 
+    # Bounded worker pool for background document processing: caps concurrent
+    # operations at the configured limit, uploads beyond it queue up.
+    background_executor = ThreadPoolExecutor(
+        max_workers=app_config.performance.max_concurrent_operations,
+        thread_name_prefix="pdf2wav-worker",
+    )
+
     # Create application context
     app_context = ApplicationContext(
         config=app_config,
         service_container=service_container,
         logger_factory=logger_factory,
         progress_store=service_container.get(ThreadSafeProgressStore),
+        background_executor=background_executor,
         cleanup_scheduler=cleanup_scheduler,
     )
 

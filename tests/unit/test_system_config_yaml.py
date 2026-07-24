@@ -78,6 +78,28 @@ class TestSystemConfigYAMLLoading:
         assert config.cleanup.enabled is False
         assert config.cleanup.max_file_age_hours == 48.0
 
+    def test_from_yaml_max_concurrent_operations(self, tmp_path: Path):
+        """Should parse the background-processing concurrency cap."""
+        config_data = {"tts": {"engine": "piper"}, "performance": {"max_concurrent_operations": 4}}
+
+        config_file = _write_yaml_config(tmp_path, config_data)
+        config = SystemConfig.from_yaml(config_file)
+        assert config.performance.max_concurrent_operations == 4
+
+    def test_from_yaml_max_concurrent_operations_default(self, tmp_path: Path):
+        """Should default the concurrency cap to 2."""
+        config_file = _write_yaml_config(tmp_path, {"tts": {"engine": "piper"}})
+        config = SystemConfig.from_yaml(config_file)
+        assert config.performance.max_concurrent_operations == 2
+
+    def test_from_yaml_max_concurrent_operations_out_of_range(self, tmp_path: Path):
+        """Should reject values outside the 1-8 range."""
+        config_data = {"tts": {"engine": "piper"}, "performance": {"max_concurrent_operations": 99}}
+
+        config_file = _write_yaml_config(tmp_path, config_data)
+        with pytest.raises(ValueError, match="<= 8"):
+            SystemConfig.from_yaml(config_file)
+
     def test_from_yaml_missing_file_raises_error(self):
         """Test that missing YAML file raises appropriate error."""
         with pytest.raises(FileNotFoundError) as exc_info:

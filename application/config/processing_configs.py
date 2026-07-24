@@ -41,3 +41,4 @@ class PerformanceConfig:
 
     enable_async_audio: bool = True
     audio_concurrent_chunks: int = 4
+    max_concurrent_operations: int = 2

@@ -9,7 +9,6 @@ import json
 import logging
 import os
 from pathlib import Path
-import threading
 import time
 from typing import Any
 import uuid
@@ -250,8 +249,8 @@ def register_routes(app: Flask) -> None:
         if not audio_result:
             return "No processing result available", 500
 
-        # We need to reconstruct the page range - for now use default
-        page_range = PageRange(start_page=None, end_page=None)  # Default to all pages
+        # Page range travels through result_data so the result page reflects the selection
+        page_range = result_data.get("page_range") or PageRange(start_page=None, end_page=None)
 
         # Check if this was a timing-enabled operation
         enable_timing = progress.stage in ["complete"] and audio_result.timing_data is not None
@@ -370,24 +369,21 @@ def register_routes(app: Flask) -> None:
         # Convert form data to dict (Flask objects don't work in threads)
         form_data = dict(request.form)
 
-        # Start background processing with app context
+        # Submit to the bounded worker pool; uploads beyond the concurrency cap queue up
         from flask import current_app
 
-        thread = threading.Thread(
-            target=background_process_document,
-            args=(
-                operation_id,
-                form_data,
-                str(saved_path),
-                original_filename,
-                enable_timing,
-                get_app_context(),
-                current_app._get_current_object(),  # type: ignore[attr-defined]
-            ),
-            daemon=True,
+        context = get_app_context()
+        context.background_executor.submit(
+            background_process_document,
+            operation_id,
+            form_data,
+            str(saved_path),
+            original_filename,
+            enable_timing,
+            context,
+            current_app._get_current_object(),  # type: ignore[attr-defined]
         )
-        thread.start()
-        route_logger.info("Background processing started: op=%s", operation_id[:8])
+        route_logger.info("Background processing queued: op=%s", operation_id[:8])
 
         # Return processing page immediately
         return render_template("processing.html", operation_id=operation_id, enable_timing=enable_timing)

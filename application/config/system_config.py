@@ -341,6 +341,9 @@ class SystemConfig:
         return PerformanceConfig(
             enable_async_audio=cls._parse_bool_value(get_config("performance.enable_async_audio", True), True),
             audio_concurrent_chunks=cls._parse_int_value(get_config("audio.concurrent_chunks", 4), 4, 1, 20),
+            max_concurrent_operations=cls._parse_int_value(
+                get_config("performance.max_concurrent_operations", 2), 2, 1, 8
+            ),
         )
 
     @classmethod
