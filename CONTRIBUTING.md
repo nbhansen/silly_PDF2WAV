@@ -42,7 +42,7 @@ Please be respectful and considerate of others when contributing to this project
 1. Clone the repository:
    ```bash
    git clone <repository-url>
-   cd silly_PDF2WAV
+   cd VerbatimPapers
    ```
 
 2. Install system dependencies:
