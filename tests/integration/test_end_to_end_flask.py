@@ -493,3 +493,64 @@ class TestBackgroundProcessingModel:
 
         assert response.status_code == 200
         assert "pages" not in response.get_data(as_text=True).lower().split("doc.pdf")[1][:30]
+
+
+class TestBackgroundCompletionHandler:
+    """Tests for the Future done-callback that surfaces escaped exceptions."""
+
+    def test_escaped_exception_marks_operation_failed(self) -> None:
+        """An exception stored on the Future must reach the progress store."""
+        from concurrent.futures import Future
+
+        from application.services.progress_store import ThreadSafeProgressStore
+        from routes import handle_background_completion
+
+        store = ThreadSafeProgressStore()
+        store.update("op-boom", "processing", 50, "Working")
+
+        future: Future[None] = Future()
+        future.set_exception(RuntimeError("worker exploded"))
+        handle_background_completion(future, "op-boom", store)
+
+        progress = store.get("op-boom")
+        assert progress is not None
+        assert progress.is_error is True
+        assert progress.error_message is not None
+        assert "worker exploded" in progress.error_message
+
+    def test_successful_future_leaves_progress_untouched(self) -> None:
+        """A clean completion must not overwrite the final progress state."""
+        from concurrent.futures import Future
+
+        from application.services.progress_store import ThreadSafeProgressStore
+        from routes import handle_background_completion
+
+        store = ThreadSafeProgressStore()
+        store.update("op-ok", "complete", 100, "Done", is_complete=True)
+
+        future: Future[None] = Future()
+        future.set_result(None)
+        handle_background_completion(future, "op-ok", store)
+
+        progress = store.get("op-ok")
+        assert progress is not None
+        assert progress.is_error is False
+        assert progress.stage == "complete"
+
+    def test_cancelled_future_is_ignored(self) -> None:
+        """A cancelled queued upload must not be reported as an error."""
+        from concurrent.futures import Future
+
+        from application.services.progress_store import ThreadSafeProgressStore
+        from routes import handle_background_completion
+
+        store = ThreadSafeProgressStore()
+        store.update("op-cancelled", "starting", 0, "Queued")
+
+        future: Future[None] = Future()
+        future.cancel()
+        handle_background_completion(future, "op-cancelled", store)
+
+        progress = store.get("op-cancelled")
+        assert progress is not None
+        assert progress.is_error is False

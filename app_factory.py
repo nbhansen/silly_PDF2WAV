@@ -4,6 +4,7 @@ This module provides the Flask application factory that creates and configures
 the Flask app with all dependencies properly injected, eliminating global state.
 """
 
+import atexit
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
@@ -69,6 +70,9 @@ def create_app(config_path: Path | None = None) -> Flask:
         max_workers=app_config.performance.max_concurrent_operations,
         thread_name_prefix="pdf2wav-worker",
     )
+    # On process exit: let in-flight conversions finish, but drop queued ones
+    # instead of draining the whole queue before shutdown completes.
+    atexit.register(background_executor.shutdown, wait=False, cancel_futures=True)
 
     # Create application context
     app_context = ApplicationContext(

@@ -4,7 +4,9 @@ This module provides all route handlers that use ApplicationContext for
 dependency injection, eliminating global state.
 """
 
+from concurrent.futures import Future
 import contextlib
+from functools import partial
 import json
 import logging
 import os
@@ -75,6 +77,26 @@ def background_process_document(
             get_progress_store().update(
                 operation_id, "error", 0, "Processing failed unexpectedly", is_error=True, error_message=enhanced_error
             )
+
+
+def handle_background_completion(
+    future: Future[None], operation_id: str, progress_store: ThreadSafeProgressStore
+) -> None:
+    """Surface exceptions that escaped background_process_document's own handling.
+
+    Without this, an exception raised outside the wrapper's try block would sit
+    silently on the discarded Future while the operation hangs at its last
+    progress state.
+    """
+    if future.cancelled():
+        return
+    exc = future.exception()
+    if exc is None:
+        return
+    logging.getLogger(__name__).error("Uncaught error in background operation %s", operation_id[:8], exc_info=exc)
+    progress_store.update(
+        operation_id, "error", 0, "Processing failed unexpectedly", is_error=True, error_message=str(exc)
+    )
 
 
 def get_app_context() -> ApplicationContext:
@@ -373,7 +395,7 @@ def register_routes(app: Flask) -> None:
         from flask import current_app
 
         context = get_app_context()
-        context.background_executor.submit(
+        future = context.background_executor.submit(
             background_process_document,
             operation_id,
             form_data,
@@ -382,6 +404,9 @@ def register_routes(app: Flask) -> None:
             enable_timing,
             context,
             current_app._get_current_object(),  # type: ignore[attr-defined]
+        )
+        future.add_done_callback(
+            partial(handle_background_completion, operation_id=operation_id, progress_store=context.progress_store)
         )
         route_logger.info("Background processing queued: op=%s", operation_id[:8])
 
