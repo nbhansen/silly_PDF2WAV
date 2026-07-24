@@ -146,6 +146,14 @@ silly_PDF2WAV/
 - `GET /api/timing/<filename>` — Timing metadata as JSON
 - `GET /api/progress/<operation_id>` — Processing progress
 
+## Design Constraints
+
+This is a single-user home app, and the background-processing model is deliberately simple:
+
+- Uploads are processed by a bounded in-process worker pool (`performance.max_concurrent_operations` in `config.yaml`, default 2). Uploads beyond the cap queue up rather than being rejected.
+- Progress and results live in memory only. A restart loses in-flight work and pending result pages, even though finished audio files remain on disk.
+- Run it as a single process (the Flask dev server). Multiple WSGI workers would each get their own progress store, so progress polling would 404 at random.
+
 ## Testing
 
 ```bash

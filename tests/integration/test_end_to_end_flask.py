@@ -21,7 +21,7 @@ from application.config.processing_configs import LLMConfig, OCRConfig, Performa
 from application.config.system_config import SystemConfig
 from domain.config.tts_config import PiperConfig, TTSConfig, TTSEngine
 from domain.errors import Result
-from domain.models import PDFInfo
+from domain.models import PageRange, PDFInfo, TimedAudioResult
 from routes import register_routes
 
 # === Flask App Test Fixtures ===
@@ -438,3 +438,119 @@ class TestEndToEndPDFConversion:
             json_data = api_response.get_json()
             assert "total_duration" in json_data, "API should return timing data"
             assert "text_segments" in json_data, "API should include text segments"
+
+
+class TestBackgroundProcessingModel:
+    """Tests for the bounded worker pool and result-page state handling."""
+
+    def test_background_executor_uses_configured_cap(self, test_app: Flask, flask_test_config: SystemConfig) -> None:
+        """The app's worker pool must honor performance.max_concurrent_operations."""
+        context = test_app.config["APP_CONTEXT"]
+        expected = flask_test_config.performance.max_concurrent_operations
+        assert context.background_executor._max_workers == expected
+
+    def test_result_page_shows_selected_page_range(self, test_app: Flask, client: FlaskClient) -> None:
+        """/result must display the page range the user selected, not the full document."""
+        context = test_app.config["APP_CONTEXT"]
+        context.progress_store.update(
+            "op-range",
+            "complete",
+            100,
+            "Processing complete!",
+            is_complete=True,
+            result_data={
+                "base_filename": "doc",
+                "original_filename": "doc.pdf",
+                "audio_result": TimedAudioResult(audio_files=["doc.mp3"], combined_mp3=None),
+                "page_range": PageRange(start_page=2, end_page=5),
+            },
+        )
+
+        response = client.get("/result/op-range")
+
+        assert response.status_code == 200
+        assert "pages 2-5" in response.get_data(as_text=True)
+
+    def test_result_page_defaults_to_full_document_without_page_range(
+        self, test_app: Flask, client: FlaskClient
+    ) -> None:
+        """Older result_data without a page_range entry must still render."""
+        context = test_app.config["APP_CONTEXT"]
+        context.progress_store.update(
+            "op-full",
+            "complete",
+            100,
+            "Processing complete!",
+            is_complete=True,
+            result_data={
+                "base_filename": "doc",
+                "original_filename": "doc.pdf",
+                "audio_result": TimedAudioResult(audio_files=["doc.mp3"], combined_mp3=None),
+            },
+        )
+
+        response = client.get("/result/op-full")
+
+        assert response.status_code == 200
+        assert "pages" not in response.get_data(as_text=True).lower().split("doc.pdf")[1][:30]
+
+
+class TestBackgroundCompletionHandler:
+    """Tests for the Future done-callback that surfaces escaped exceptions."""
+
+    def test_escaped_exception_marks_operation_failed(self) -> None:
+        """An exception stored on the Future must reach the progress store."""
+        from concurrent.futures import Future
+
+        from application.services.progress_store import ThreadSafeProgressStore
+        from routes import handle_background_completion
+
+        store = ThreadSafeProgressStore()
+        store.update("op-boom", "processing", 50, "Working")
+
+        future: Future[None] = Future()
+        future.set_exception(RuntimeError("worker exploded"))
+        handle_background_completion(future, "op-boom", store)
+
+        progress = store.get("op-boom")
+        assert progress is not None
+        assert progress.is_error is True
+        assert progress.error_message is not None
+        assert "worker exploded" in progress.error_message
+
+    def test_successful_future_leaves_progress_untouched(self) -> None:
+        """A clean completion must not overwrite the final progress state."""
+        from concurrent.futures import Future
+
+        from application.services.progress_store import ThreadSafeProgressStore
+        from routes import handle_background_completion
+
+        store = ThreadSafeProgressStore()
+        store.update("op-ok", "complete", 100, "Done", is_complete=True)
+
+        future: Future[None] = Future()
+        future.set_result(None)
+        handle_background_completion(future, "op-ok", store)
+
+        progress = store.get("op-ok")
+        assert progress is not None
+        assert progress.is_error is False
+        assert progress.stage == "complete"
+
+    def test_cancelled_future_is_ignored(self) -> None:
+        """A cancelled queued upload must not be reported as an error."""
+        from concurrent.futures import Future
+
+        from application.services.progress_store import ThreadSafeProgressStore
+        from routes import handle_background_completion
+
+        store = ThreadSafeProgressStore()
+        store.update("op-cancelled", "starting", 0, "Queued")
+
+        future: Future[None] = Future()
+        future.cancel()
+        handle_background_completion(future, "op-cancelled", store)
+
+        progress = store.get("op-cancelled")
+        assert progress is not None
+        assert progress.is_error is False

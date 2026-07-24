@@ -4,12 +4,13 @@ This module provides all route handlers that use ApplicationContext for
 dependency injection, eliminating global state.
 """
 
+from concurrent.futures import Future
 import contextlib
+from functools import partial
 import json
 import logging
 import os
 from pathlib import Path
-import threading
 import time
 from typing import Any
 import uuid
@@ -76,6 +77,26 @@ def background_process_document(
             get_progress_store().update(
                 operation_id, "error", 0, "Processing failed unexpectedly", is_error=True, error_message=enhanced_error
             )
+
+
+def handle_background_completion(
+    future: Future[None], operation_id: str, progress_store: ThreadSafeProgressStore
+) -> None:
+    """Surface exceptions that escaped background_process_document's own handling.
+
+    Without this, an exception raised outside the wrapper's try block would sit
+    silently on the discarded Future while the operation hangs at its last
+    progress state.
+    """
+    if future.cancelled():
+        return
+    exc = future.exception()
+    if exc is None:
+        return
+    logging.getLogger(__name__).error("Uncaught error in background operation %s", operation_id[:8], exc_info=exc)
+    progress_store.update(
+        operation_id, "error", 0, "Processing failed unexpectedly", is_error=True, error_message=str(exc)
+    )
 
 
 def get_app_context() -> ApplicationContext:
@@ -250,8 +271,8 @@ def register_routes(app: Flask) -> None:
         if not audio_result:
             return "No processing result available", 500
 
-        # We need to reconstruct the page range - for now use default
-        page_range = PageRange(start_page=None, end_page=None)  # Default to all pages
+        # Page range travels through result_data so the result page reflects the selection
+        page_range = result_data.get("page_range") or PageRange(start_page=None, end_page=None)
 
         # Check if this was a timing-enabled operation
         enable_timing = progress.stage in ["complete"] and audio_result.timing_data is not None
@@ -370,24 +391,24 @@ def register_routes(app: Flask) -> None:
         # Convert form data to dict (Flask objects don't work in threads)
         form_data = dict(request.form)
 
-        # Start background processing with app context
+        # Submit to the bounded worker pool; uploads beyond the concurrency cap queue up
         from flask import current_app
 
-        thread = threading.Thread(
-            target=background_process_document,
-            args=(
-                operation_id,
-                form_data,
-                str(saved_path),
-                original_filename,
-                enable_timing,
-                get_app_context(),
-                current_app._get_current_object(),  # type: ignore[attr-defined]
-            ),
-            daemon=True,
+        context = get_app_context()
+        future = context.background_executor.submit(
+            background_process_document,
+            operation_id,
+            form_data,
+            str(saved_path),
+            original_filename,
+            enable_timing,
+            context,
+            current_app._get_current_object(),  # type: ignore[attr-defined]
         )
-        thread.start()
-        route_logger.info("Background processing started: op=%s", operation_id[:8])
+        future.add_done_callback(
+            partial(handle_background_completion, operation_id=operation_id, progress_store=context.progress_store)
+        )
+        route_logger.info("Background processing queued: op=%s", operation_id[:8])
 
         # Return processing page immediately
         return render_template("processing.html", operation_id=operation_id, enable_timing=enable_timing)

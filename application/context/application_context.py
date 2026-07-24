@@ -4,6 +4,7 @@ This module provides the ApplicationContext class which encapsulates all applica
 dependencies and eliminates global state, following hexagonal architecture principles.
 """
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 import logging
 from typing import Protocol
@@ -38,6 +39,7 @@ class ApplicationContext:
     service_container: ServiceContainer
     logger_factory: LoggerFactory
     progress_store: ThreadSafeProgressStore
+    background_executor: ThreadPoolExecutor
     cleanup_scheduler: FileCleanupScheduler | None = None
 
     @property
