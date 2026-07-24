@@ -7,9 +7,9 @@ packages = ["application", "domain", "infrastructure"]
 
 [project]
 name = "pdf2wav"
-version = "1.0.0"
+version = "0.1.0"
 description = "Convert PDF documents to audio files with TTS engines"
-authors = [{name = "PDF2WAV Team"}]
+authors = [{name = "Nicolai Hansen", email = "nbhansen@gmail.com"}]
 license = "MIT"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -241,6 +241,7 @@ omit = [
     "*/test_*.py",
     "uploads/*",
     "audio_outputs/*",
+    "app.py",  # dev-server entry script, not exercised by tests
 ]
 
 [tool.coverage.report]
