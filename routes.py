@@ -25,11 +25,7 @@ from application.services.document_service import DocumentProcessingService
 from application.services.error_formatting import (
     get_processing_stage_error,
 )
-from application.services.progress_store import (
-    cancel_operation,
-    get_progress,
-    update_progress,
-)
+from application.services.progress_store import ThreadSafeProgressStore
 from domain.interfaces import IFileManager
 from domain.models import PageRange, TimedAudioResult
 from utils import (
@@ -77,7 +73,7 @@ def background_process_document(
         except Exception as e:
             get_logger("routes").exception(f"Background process wrapper failed: {e}")
             enhanced_error = get_processing_stage_error("processing", e, original_filename)
-            update_progress(
+            get_progress_store().update(
                 operation_id, "error", 0, "Processing failed unexpectedly", is_error=True, error_message=enhanced_error
             )
 
@@ -108,6 +104,11 @@ def is_processor_available() -> bool:
 def get_app_config() -> SystemConfig:
     """Get app config from context."""
     return get_app_context().config
+
+
+def get_progress_store() -> ThreadSafeProgressStore:
+    """Get the progress store from context."""
+    return get_app_context().progress_store
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -189,7 +190,7 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/progress/<operation_id>")
     def get_progress_status(operation_id: str) -> Response | tuple[Response, int]:
         """Get current progress status for an operation."""
-        progress = get_progress(operation_id)
+        progress = get_progress_store().get(operation_id)
         if progress is None:
             return jsonify({"error": "Operation not found"}), 404
 
@@ -210,21 +211,21 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/cancel/<operation_id>", methods=["POST"])
     def cancel_processing_operation(operation_id: str) -> Response | tuple[Response, int]:
         """Cancel a running operation."""
-        progress = get_progress(operation_id)
+        progress = get_progress_store().get(operation_id)
         if progress is None:
             return jsonify({"error": "Operation not found"}), 404
 
         if progress.is_complete:
             return jsonify({"message": "Operation already completed", "cancelled": False}), 200
 
-        cancel_operation(operation_id)
+        get_progress_store().cancel(operation_id)
         get_logger("routes").info("Cancellation requested for operation: %s", operation_id[:8])
         return jsonify({"message": "Cancellation requested", "cancelled": True})
 
     @app.route("/result/<operation_id>")
     def show_result(operation_id: str) -> str | tuple[str, int]:
         """Show results for a completed operation."""
-        progress = get_progress(operation_id)
+        progress = get_progress_store().get(operation_id)
         if progress is None:
             return "Operation not found", 404
 
@@ -352,7 +353,9 @@ def register_routes(app: Flask) -> None:
 
         # Initialize progress tracking
         timing_suffix = " with timing data" if enable_timing else ""
-        update_progress(operation_id, "starting", 0, f"Upload received, starting processing{timing_suffix}...")
+        get_progress_store().update(
+            operation_id, "starting", 0, f"Upload received, starting processing{timing_suffix}..."
+        )
 
         # Save file first before passing to thread (FileStorage closes after request)
         config = get_app_config()

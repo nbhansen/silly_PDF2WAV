@@ -69,6 +69,7 @@ class ServiceContainer(IServiceContainer):
     def _build_core_services(self) -> dict[ServiceKey, ServiceFactory]:
         """Build all core service factories upfront (immutable pattern)."""
         from application.services.document_service import DocumentProcessingService
+        from application.services.progress_store import ThreadSafeProgressStore
         from domain.audio.audio_engine import AudioEngine
         from domain.audio.duration_measurer import AudioDurationMeasurer
         from domain.audio.timing_engine import ITimingEngine, TimingEngine, TimingMode
@@ -89,7 +90,10 @@ class ServiceContainer(IServiceContainer):
         # Build all factories in a single immutable dict
         factories: dict[ServiceKey, ServiceFactory] = {
             # Application Services
-            DocumentProcessingService: lambda: DocumentProcessingService(service_container=self, config=self.config),
+            ThreadSafeProgressStore: lambda: ThreadSafeProgressStore(),
+            DocumentProcessingService: lambda: DocumentProcessingService(
+                service_container=self, config=self.config, progress_store=self.get(ThreadSafeProgressStore)
+            ),
             # File Manager
             IFileManager: lambda: FileManager(
                 upload_folder=self.config.files.upload_folder, output_folder=self.config.files.audio_folder

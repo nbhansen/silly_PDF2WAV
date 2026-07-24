@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from domain.models import TimingMetadata
 
 from application.services.error_formatting import clean_text_for_display, get_processing_stage_error
-from application.services.progress_store import is_operation_cancelled, update_progress
+from application.services.progress_store import ThreadSafeProgressStore
 from domain.interfaces import IAudioEngine, IDocumentEngine, IFileManager, ITextPipeline
 from domain.models import ProcessingRequest
 from utils import parse_page_range_from_form, parse_plain_english_from_form
@@ -27,9 +27,15 @@ logger = logging.getLogger(__name__)
 class DocumentProcessingService:
     """Service for orchestrating document-to-audio conversion pipeline."""
 
-    def __init__(self, service_container: "ServiceContainer", config: "SystemConfig"):
+    def __init__(
+        self,
+        service_container: "ServiceContainer",
+        config: "SystemConfig",
+        progress_store: ThreadSafeProgressStore,
+    ):
         self.container = service_container
         self.config = config
+        self.progress_store = progress_store
 
     def process_document_background(
         self,
@@ -42,20 +48,20 @@ class DocumentProcessingService:
         """Process a document in the background with progress reporting."""
         try:
             logger.info(f"Starting document processing for operation {operation_id}, file: {original_filename}")
-            update_progress(operation_id, "starting", 5, "Initializing document processing...")
+            self.progress_store.update(operation_id, "starting", 5, "Initializing document processing...")
 
-            if is_operation_cancelled(operation_id):
+            if self.progress_store.is_cancelled(operation_id):
                 return
 
             # 1. Validate and prepare file info (10%)
-            update_progress(operation_id, "validating", 10, "Validating uploaded file...")
+            self.progress_store.update(operation_id, "validating", 10, "Validating uploaded file...")
 
             # Simplified file info extraction
             base_filename = Path(original_filename).stem
             page_range = parse_page_range_from_form(request_form)
             enable_plain_english = parse_plain_english_from_form(request_form)
 
-            if is_operation_cancelled(operation_id):
+            if self.progress_store.is_cancelled(operation_id):
                 return
 
             # 2. Execute processing (20-95%)
@@ -77,7 +83,7 @@ class DocumentProcessingService:
                 text_pipeline = self.container.get("plain_english_text_pipeline")
                 logger.info("Using TextPipeline with plain English conversion enabled")
 
-            update_progress(operation_id, "processing", 20, "Starting document processing...")
+            self.progress_store.update(operation_id, "processing", 20, "Starting document processing...")
 
             request_obj = ProcessingRequest(pdf_path=saved_file_path, output_name=base_filename, page_range=page_range)
             logger.debug(
@@ -94,14 +100,14 @@ class DocumentProcessingService:
                 request_obj, audio_engine, text_pipeline, enable_timing, self.config.text_processing.llm_chunk_size
             )
 
-            if is_operation_cancelled(operation_id):
+            if self.progress_store.is_cancelled(operation_id):
                 return
 
             logger.debug("Processing result: success=%s", processing_result.is_success)
             if processing_result.is_failure:
                 error_msg = str(processing_result.error)
                 enhanced_error = get_processing_stage_error("audio_generation", Exception(error_msg), original_filename)
-                update_progress(
+                self.progress_store.update(
                     operation_id,
                     "error",
                     0,
@@ -114,7 +120,7 @@ class DocumentProcessingService:
             # 3. Finalize result (100%)
             audio_result = processing_result.value
             if audio_result is None:
-                update_progress(
+                self.progress_store.update(
                     operation_id,
                     "error",
                     0,
@@ -128,7 +134,7 @@ class DocumentProcessingService:
             if enable_timing and audio_result.timing_data:
                 self._save_timing_data(base_filename, audio_result.timing_data)
 
-            update_progress(
+            self.progress_store.update(
                 operation_id,
                 "complete",
                 100,
@@ -144,7 +150,7 @@ class DocumentProcessingService:
         except Exception as e:
             logger.exception(f"Unexpected error in background processing: {e}")
             enhanced_error = get_processing_stage_error("processing", e, original_filename)
-            update_progress(
+            self.progress_store.update(
                 operation_id,
                 "error",
                 0,
