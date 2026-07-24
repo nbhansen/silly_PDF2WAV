@@ -116,16 +116,19 @@ silly_PDF2WAV/
 ├── app.py                 # Flask entry point
 ├── app_factory.py         # Application factory with DI
 ├── routes.py              # Flask route handlers
-├── application/           # App config, context, orchestration
-│   ├── config/            # SystemConfig, logging
-│   ├── context/           # ApplicationContext (DI wrapper)
-│   └── services/          # DocumentProcessingService
-├── domain/                # Core business logic (no external deps)
+├── application/           # App config, DI container, orchestration
+│   ├── config/            # SystemConfig and section configs
+│   ├── container/         # ServiceContainer (concrete DI implementation)
+│   ├── context/           # ApplicationContext (immutable app-wide state)
+│   └── services/          # DocumentProcessingService, progress store
+├── domain/                # Core business logic (stdlib-only, enforced by a test)
 │   ├── audio/             # AudioEngine, TimingEngine
+│   ├── config/            # TTS config models
+│   ├── container/         # IServiceContainer interface
+│   ├── document/          # DocumentEngine (extraction + OCR fallback logic)
 │   ├── text/              # TextPipeline, chunking strategies
-│   ├── document/          # DocumentEngine (PDF processing)
-│   ├── container/         # ServiceContainer (immutable DI)
 │   ├── interfaces.py      # Abstract interfaces
+│   ├── models.py          # Domain models
 │   └── errors.py          # Result[T] pattern
 ├── infrastructure/        # External service implementations
 │   ├── tts/
@@ -133,8 +136,9 @@ silly_PDF2WAV/
 │   │   └── gemini_tts_provider.py  # Gemini TTS (cloud)
 │   ├── llm/               # Gemini LLM for text cleaning
 │   ├── ocr/               # Tesseract OCR
+│   ├── pdf/               # pdfplumber text extraction
 │   └── file/              # File management, cleanup scheduler
-└── tests/                 # Unit, integration, and benchmark tests
+└── tests/                 # Unit, infrastructure, integration, and benchmark tests
 ```
 
 ## API Endpoints
@@ -145,6 +149,9 @@ silly_PDF2WAV/
 - `GET /read-along/<filename>` — Synchronized reading interface
 - `GET /api/timing/<filename>` — Timing metadata as JSON
 - `GET /api/progress/<operation_id>` — Processing progress
+- `POST /api/cancel/<operation_id>` — Cancel a running operation
+- `GET /result/<operation_id>` — Result page for a completed operation
+- `/admin/*` — File stats and manual cleanup; disabled by default (`admin.enabled` in config.yaml, optional `secrets.admin_token` checked as the `X-Admin-Token` header)
 
 ## Design Constraints
 
@@ -153,6 +160,15 @@ This is a single-user home app, and the background-processing model is deliberat
 - Uploads are processed by a bounded in-process worker pool (`performance.max_concurrent_operations` in `config.yaml`, default 2). Uploads beyond the cap queue up rather than being rejected.
 - Progress and results live in memory only. A restart loses in-flight work and pending result pages, even though finished audio files remain on disk.
 - Run it as a single process (the Flask dev server). Multiple WSGI workers would each get their own progress store, so progress polling would 404 at random.
+
+## Deployment
+
+There is deliberately no production deployment story. Before running this anywhere other than your own machine, know:
+
+- The supported run mode is the Flask dev server (`uv run python app.py`), which is not hardened for production traffic.
+- Do **not** put it behind gunicorn/uwsgi with multiple workers. Progress and results live in one process's memory (see Design Constraints), so with several workers the progress polling and result pages would 404 at random depending on which worker answers.
+- The server binds to `127.0.0.1` by default. If you change `app.host` in config.yaml to expose it on a network, anyone who can reach it can upload PDFs and consume CPU/disk. The `/admin/*` endpoints stay hidden (404) unless you explicitly set `admin.enabled: true`; if you do, also set `secrets.admin_token` so they require an `X-Admin-Token` header.
+- For containers, config can be overridden with `PDF2WAV_*` environment variables (see above) — but the single-process constraint still applies: one container, one process.
 
 ## Testing
 
