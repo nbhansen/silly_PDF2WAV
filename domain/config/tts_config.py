@@ -30,7 +30,6 @@ class PiperConfig:
     """Configuration for Piper TTS engine."""
 
     model_name: str = "en_US-lessac-medium"
-    models_dir: str = ".local/piper_models"
     length_scale: float = 1.0  # Speed: 1.0=normal, <1.0=faster, >1.0=slower
     model_repository_url: str = "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0"
     model_path: str | None = None

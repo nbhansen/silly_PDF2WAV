@@ -97,18 +97,18 @@ tts:
 
   piper:
     model_name: "en_GB-alba-medium"  # British female voice
-    models_dir: ".local/piper_models"
+    download_dir: "piper_models"
 ```
 
 **Text Cleaning** (optional): Requires a Google AI API key for LLM text processing. Get one free at https://aistudio.google.com/app/apikey
 
 ### Environment Variables
 
-When running in a container, override config using environment variables prefixed with `PDF2WAV_`:
+All configuration lives in `config.yaml`; only a few environment variables are read:
 
-- `PDF2WAV_TTS_ENGINE` — `piper` or `gemini`
-- `PDF2WAV_SECRETS_GOOGLE_AI_API_KEY` — Your Google AI API key
-- `PDF2WAV_APP_PORT` — Port to run on (default 5000)
+- `GEMINI_API_KEY` — Google AI API key (alternative to `secrets.google_ai_api_key` in config.yaml)
+- `FLASK_DEBUG` — Override `app.debug`
+- `PROJECT_ROOT` — Override the project root used to resolve relative paths
 
 ## Architecture
 
@@ -181,7 +181,7 @@ There is deliberately no production deployment story. Before running this anywhe
 - The supported run mode is the Flask dev server (`uv run python app.py`), which is not hardened for production traffic.
 - Do **not** put it behind gunicorn/uwsgi with multiple workers. Progress and results live in one process's memory (see Design Constraints), so with several workers the progress polling and result pages would 404 at random depending on which worker answers.
 - The server binds to `127.0.0.1` by default. If you change `app.host` in config.yaml to expose it on a network, anyone who can reach it can upload PDFs and consume CPU/disk. The `/admin/*` endpoints stay hidden (404) unless you explicitly set `admin.enabled: true`; if you do, also set `secrets.admin_token` so they require an `X-Admin-Token` header.
-- For containers, config can be overridden with `PDF2WAV_*` environment variables (see above) — but the single-process constraint still applies: one container, one process.
+- For containers, mount a `config.yaml` into the container (plus the environment variables above if needed) — and the single-process constraint still applies: one container, one process.
 
 ## Testing
 
@@ -197,7 +197,7 @@ uv run pre-commit run --all-files             # Linting + formatting + type chec
 
 **"Audio generation failed"**: Check your TTS engine config in config.yaml and ensure system dependencies are installed.
 
-**"No audio output"**: Check that voice models downloaded correctly (look in `.local/piper_models/` or the configured `models_dir`).
+**"No audio output"**: Check that voice models downloaded correctly (look in `piper_models/` or the configured `download_dir`).
 
 **"Text cleaning failed"**: Verify your Google AI API key is set correctly, or disable text cleaning in config.yaml.
 

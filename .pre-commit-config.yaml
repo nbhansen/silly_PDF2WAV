@@ -4,26 +4,30 @@
 
 repos:
   # Ruff - Fast comprehensive Python linting and auto-fixing
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.4
+  - repo: local
     hooks:
       - id: ruff
         name: ruff-linting
-        args: [--fix, --exit-non-zero-on-fix]
-        description: "Run Ruff linter with auto-fix"
+        entry: uv run ruff check --fix --exit-non-zero-on-fix
+        language: system
+        types_or: [python, pyi]
+        description: "Run Ruff linter with auto-fix (project venv, same as CI)"
       - id: ruff-format
         name: ruff-formatting
-        description: "Run Ruff formatter"
+        entry: uv run ruff format
+        language: system
+        types_or: [python, pyi]
+        description: "Run Ruff formatter (project venv, same as CI)"
 
   # MyPy - Type checking
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.14.0
+  - repo: local
     hooks:
       - id: mypy
         name: mypy-type-checking
-        additional_dependencies: [types-PyYAML]
-        args: [--config-file=pyproject.toml]
-        description: "Static type checking with MyPy"
+        entry: uv run mypy .
+        language: system
+        pass_filenames: false
+        description: "Static type checking with MyPy (project venv, same as CI)"
 
   # Bandit - Security vulnerability scanning
   - repo: https://github.com/PyCQA/bandit

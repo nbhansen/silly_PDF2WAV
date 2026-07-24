@@ -1,4 +1,3 @@
-// static/js/enhanced_read_along.js
 /**
  * Enhanced Read-Along Player with audiobook-quality features
  */

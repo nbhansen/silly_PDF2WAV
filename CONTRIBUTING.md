@@ -1,4 +1,4 @@
-# Contributing to PDF to Audio Converter
+# Contributing to VerbatimPapers
 
 Thank you for your interest in contributing to this project! This document provides guidelines and instructions for contributing.
 
@@ -48,24 +48,23 @@ Please be respectful and considerate of others when contributing to this project
 2. Install system dependencies:
    ```bash
    # Fedora
-   sudo dnf install tesseract ffmpeg espeak-ng python3-virtualenv
+   sudo dnf install tesseract ffmpeg espeak-ng
 
    # Ubuntu/Debian
-   sudo apt install tesseract-ocr ffmpeg espeak-ng python3-venv
+   sudo apt install tesseract-ocr ffmpeg espeak-ng
 
    # Arch
-   sudo pacman -S tesseract ffmpeg espeak-ng python
+   sudo pacman -S tesseract ffmpeg espeak-ng
    ```
 
-3. Create and activate a virtual environment:
+3. Install [uv](https://docs.astral.sh/uv/) (if not already installed):
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
 
-4. Install dependencies:
+4. Install dependencies and pre-commit hooks:
    ```bash
-   pip install -r requirements.txt
+   make dev-setup   # runs: uv sync --extra dev && uv run pre-commit install
    ```
 
 5. Copy and configure the application:
@@ -76,12 +75,7 @@ Please be respectful and considerate of others when contributing to this project
 
 6. Run tests to verify setup:
    ```bash
-   python -m pytest tests/unit/
-   ```
-
-7. Install pre-commit hooks:
-   ```bash
-   pre-commit install
+   make test-unit   # runs: uv run python -m pytest tests/unit/
    ```
 
 ### Code Style
@@ -94,9 +88,10 @@ Please be respectful and considerate of others when contributing to this project
 
 Run all checks:
 ```bash
-pre-commit run --all-files             # All linting/formatting checks
-ruff check . --fix && ruff format .    # Lint + format
-mypy .                                 # Type checking
+make check       # pre-commit (lint + format + typecheck) + unit tests
+make lint        # uv run ruff check . --fix
+make format      # uv run ruff format .
+make typecheck   # uv run mypy .
 ```
 
 ### Architecture Guidelines
@@ -110,7 +105,7 @@ This project uses **hexagonal architecture** — dependencies always point inwar
 Key patterns:
 - **`Result[T]`** (`domain/errors.py`) — Return `Result.success(value)` or `Result.failure(ApplicationError(...))` instead of raising exceptions
 - **Deferred error handling** — TTS provider constructors never raise; initialization errors are stored and returned as `Result.failure()` on first use
-- **Immutable DI** — `ServiceContainer` (`domain/container/service_container.py`) uses lazy initialization with factory lambdas
+- **Immutable DI** — `ServiceContainer` (`application/container/service_container.py`, implementing `IServiceContainer` from `domain/container/`) uses lazy initialization with factory lambdas
 - **Interfaces** — Define clear interfaces in `domain/interfaces.py` for all external dependencies
 
 ### Testing
@@ -119,12 +114,12 @@ The project uses pytest with markers for test categorization:
 
 1. **Run the test suite**:
    ```bash
-   python -m pytest                       # All tests
-   python -m pytest tests/unit/           # Unit tests only
-   python -m pytest tests/integration/    # Integration tests
-   python -m pytest tests/benchmarks/     # Benchmarks
-   python -m pytest -k "test_name"        # Specific test
-   python -m pytest -m unit               # By marker
+   uv run python -m pytest                       # All tests (or: make test)
+   uv run python -m pytest tests/unit/           # Unit tests only (or: make test-unit)
+   uv run python -m pytest tests/integration/    # Integration tests (or: make test-integration)
+   uv run python -m pytest tests/benchmarks/     # Benchmarks
+   uv run python -m pytest -k "test_name"        # Specific test
+   uv run python -m pytest -m unit               # By marker
    ```
 
 2. **Test Categories** (markers defined in `pyproject.toml`):
@@ -143,7 +138,6 @@ The project uses pytest with markers for test categorization:
 
 - Update README.md if architectural changes are made
 - Add docstrings to new functions and classes following Google style
-- Update CLAUDE.md for development guidance changes
 
 ### Adding New Features
 
@@ -168,8 +162,8 @@ The project uses pytest with markers for test categorization:
 
 ## Pull Request Process
 
-1. Ensure all tests pass (`python -m pytest`)
-2. Ensure code style checks pass (`pre-commit run --all-files`)
+1. Ensure all tests pass (`make test`)
+2. Ensure code style checks pass (`make check`)
 3. Update documentation if needed
 4. The PR will be merged once you have the sign-off of at least one maintainer
 

@@ -259,9 +259,6 @@ class SystemConfig:
             model_name=cls._parse_string_value(
                 get_config("tts.piper.model_name", "en_US-lessac-medium"), "en_US-lessac-medium"
             ),
-            models_dir=cls._parse_string_value(
-                get_config("tts.piper.models_dir", ".local/piper_models"), ".local/piper_models"
-            ),
             length_scale=cls._parse_float_value(get_config("tts.piper.length_scale", 1.0), 1.0, 0.5, 2.0),
             model_repository_url=cls._parse_string_value(
                 get_config(
@@ -428,7 +425,7 @@ class SystemConfig:
         for folder_name, folder_path in [
             ("UPLOAD_FOLDER", self.files.upload_folder),
             ("AUDIO_FOLDER", self.files.audio_folder),
-            ("PIPER_MODELS_DIR", self.piper.models_dir if self.piper else ""),
+            ("PIPER_DOWNLOAD_DIR", self.piper.download_dir if self.piper else ""),
         ]:
             if folder_path:  # Skip if piper is None
                 self._validate_directory_security(folder_name, folder_path, self.project_root)
@@ -566,7 +563,7 @@ class SystemConfig:
         log = log or logger
         lines = [
             "=" * 50,
-            "PDF to Audio Converter - Configuration",
+            "VerbatimPapers - Configuration",
             "=" * 50,
             f"Log Level: {self.logging_config.level}",
             f"TTS Engine: {self.tts.engine.value}",
@@ -603,7 +600,7 @@ class SystemConfig:
             lines.extend(
                 [
                     f"Piper Model: {self.piper.model_name}",
-                    f"Piper Models Dir: {self.piper.models_dir}",
+                    f"Piper Models Dir: {self.piper.download_dir}",
                 ]
             )
 
