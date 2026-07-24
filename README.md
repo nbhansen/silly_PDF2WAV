@@ -64,7 +64,7 @@ sudo pacman -S tesseract ffmpeg espeak-ng python
 
 ```bash
 git clone <repository-url>
-cd silly_PDF2WAV
+cd VerbatimPapers
 
 # Install uv (if not already installed)
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -112,7 +112,7 @@ When running in a container, override config using environment variables prefixe
 ## Project Structure
 
 ```
-silly_PDF2WAV/
+VerbatimPapers/
 ├── app.py                 # Flask entry point
 ├── app_factory.py         # Application factory with DI
 ├── routes.py              # Flask route handlers
