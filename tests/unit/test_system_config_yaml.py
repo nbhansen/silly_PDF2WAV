@@ -100,6 +100,26 @@ class TestSystemConfigYAMLLoading:
         with pytest.raises(ValueError, match="<= 8"):
             SystemConfig.from_yaml(config_file)
 
+    def test_from_yaml_admin_disabled_by_default(self, tmp_path: Path):
+        """Admin endpoints should be opt-in."""
+        config_file = _write_yaml_config(tmp_path, {"tts": {"engine": "piper"}})
+        config = SystemConfig.from_yaml(config_file)
+        assert config.admin.enabled is False
+        assert config.admin.token is None
+
+    def test_from_yaml_admin_enabled_with_token(self, tmp_path: Path):
+        """Should parse admin.enabled and the token from the secrets section."""
+        config_data = {
+            "tts": {"engine": "piper"},
+            "admin": {"enabled": True},
+            "secrets": {"admin_token": "s3cret-token"},
+        }
+
+        config_file = _write_yaml_config(tmp_path, config_data)
+        config = SystemConfig.from_yaml(config_file)
+        assert config.admin.enabled is True
+        assert config.admin.token == "s3cret-token"  # noqa: S105
+
     def test_from_yaml_missing_file_raises_error(self):
         """Test that missing YAML file raises appropriate error."""
         with pytest.raises(FileNotFoundError) as exc_info:

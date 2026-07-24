@@ -7,11 +7,12 @@ dependency injection, eliminating global state.
 from concurrent.futures import Future
 import contextlib
 from functools import partial
+import hmac
 import json
 import logging
+import math
 import os
 from pathlib import Path
-import time
 from typing import Any
 import uuid
 
@@ -426,9 +427,28 @@ def register_routes(app: Flask) -> None:
             return "Read-along mode is not available with Gemini TTS. Please use regular upload or switch to Piper TTS."
         return _handle_upload(enable_timing=True)
 
+    def _require_admin() -> tuple[Response, int] | None:
+        """Gate /admin endpoints: 404 while disabled, 403 on missing/wrong token.
+
+        Returning 404 when disabled hides the endpoints' existence, matching the
+        default config where the server binds to non-localhost hosts at will.
+        """
+        admin = get_app_config().admin
+        if not admin.enabled:
+            return jsonify({"error": "Not found"}), 404
+        if admin.token:
+            provided = request.headers.get("X-Admin-Token", "")
+            if not hmac.compare_digest(provided.encode(), admin.token.encode()):
+                return jsonify({"error": "Forbidden"}), 403
+        return None
+
     @app.route("/admin/file_stats")
     def get_file_stats() -> Response | tuple[Response, int]:
         """Get file management statistics (admin endpoint)."""
+        denied = _require_admin()
+        if denied is not None:
+            return denied
+
         service = get_pdf_service()
         if not is_processor_available():
             return jsonify({"error": "Service not available"}), 500
@@ -459,6 +479,10 @@ def register_routes(app: Flask) -> None:
     @app.route("/admin/cleanup", methods=["POST"])
     def manual_cleanup() -> Response | tuple[Response, int]:
         """Trigger manual file cleanup (admin endpoint)."""
+        denied = _require_admin()
+        if denied is not None:
+            return denied
+
         service = get_pdf_service()
         if not is_processor_available():
             return jsonify({"error": "Service not available"}), 500
@@ -467,30 +491,23 @@ def register_routes(app: Flask) -> None:
             if not service.has(IFileManager):
                 return jsonify({"error": "File management not available"}), 404
 
-            max_age_hours = float(request.form.get("max_age_hours", 24.0))
-            audio_dir = Path(app.config["AUDIO_FOLDER"])
-            cutoff_time = time.time() - (max_age_hours * 3600)
+            try:
+                max_age_hours = float(request.form.get("max_age_hours", 24.0))
+            except ValueError:
+                return jsonify({"error": "max_age_hours must be a number"}), 400
+            if not math.isfinite(max_age_hours) or max_age_hours <= 0:
+                return jsonify({"error": "max_age_hours must be a positive number"}), 400
 
-            removed_files = 0
-            bytes_freed = 0
-            errors: list[str] = []
+            cleanup_result = service.get(IFileManager).cleanup_old_files(max_age_hours)
+            if cleanup_result.is_failure or cleanup_result.value is None:
+                return jsonify({"error": str(cleanup_result.error)}), 500
 
-            for filepath in audio_dir.iterdir():
-                if filepath.is_file() and filepath.stat().st_mtime < cutoff_time:
-                    try:
-                        file_size = filepath.stat().st_size
-                        filepath.unlink()
-                        removed_files += 1
-                        bytes_freed += file_size
-                        get_logger("routes").info("Cleaned up old file: %s", filepath.name)
-                    except Exception as e:
-                        errors.append(f"Failed to remove {filepath.name}: {e!s}")
-
+            stats = cleanup_result.value
             result = {
-                "files_removed": removed_files,
-                "bytes_freed": bytes_freed,
-                "mb_freed": bytes_freed / (1024 * 1024),
-                "errors": errors,
+                "files_removed": stats.files_removed,
+                "bytes_freed": stats.bytes_freed,
+                "mb_freed": stats.bytes_freed / (1024 * 1024),
+                "errors": list(stats.errors),
                 "max_age_hours": max_age_hours,
             }
             return jsonify(result)
@@ -502,6 +519,10 @@ def register_routes(app: Flask) -> None:
     @app.route("/admin/cleanup_scheduler", methods=["POST"])
     def trigger_scheduler_cleanup() -> Response | tuple[Response, int]:
         """Trigger scheduler's manual cleanup."""
+        denied = _require_admin()
+        if denied is not None:
+            return denied
+
         try:
             context = get_app_context()
             scheduler = context.cleanup_scheduler
@@ -509,11 +530,7 @@ def register_routes(app: Flask) -> None:
             if scheduler is None:
                 return jsonify({"error": "Cleanup scheduler not available"}), 500
 
-            if hasattr(scheduler, "run_manual_cleanup"):
-                result = scheduler.run_manual_cleanup()
-                return jsonify(result)
-            else:
-                return jsonify({"error": "Manual cleanup not supported by scheduler"}), 404
+            return jsonify(scheduler.run_manual_cleanup())
 
         except Exception as e:
             get_logger("routes").error("Scheduler cleanup error: %s", str(e))
@@ -522,6 +539,10 @@ def register_routes(app: Flask) -> None:
     @app.route("/admin/test")
     def test_admin() -> Response | tuple[Response, int]:
         """Test endpoint to check what's available."""
+        denied = _require_admin()
+        if denied is not None:
+            return denied
+
         try:
             service = get_pdf_service()
 

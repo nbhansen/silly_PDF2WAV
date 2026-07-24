@@ -627,3 +627,28 @@ class TestIntegration:
             )
 
             assert mock_file_manager.delete_file.call_count == expired_count
+
+
+class TestRunManualCleanup:
+    """Test the on-demand cleanup entry point used by /admin/cleanup_scheduler."""
+
+    def test_deletes_expired_files_and_reports_count(self, scheduler, mock_file_manager, mock_time):
+        """Should run one pass immediately and report how many files were deleted."""
+        mock_time.return_value = 1000.0
+        scheduler.schedule("/audio/expired.wav")
+        mock_time.return_value = 1000.0 + scheduler.max_file_age_seconds + 1
+
+        result = scheduler.run_manual_cleanup()
+
+        assert result == {"files_deleted": 1}
+        mock_file_manager.delete_file.assert_called_once_with("/audio/expired.wav")
+
+    def test_reports_zero_when_nothing_expired(self, scheduler, mock_file_manager, mock_time):
+        """Should report zero deletions when no tracked file has expired."""
+        mock_time.return_value = 1000.0
+        scheduler.schedule("/audio/fresh.wav")
+
+        result = scheduler.run_manual_cleanup()
+
+        assert result == {"files_deleted": 0}
+        mock_file_manager.delete_file.assert_not_called()

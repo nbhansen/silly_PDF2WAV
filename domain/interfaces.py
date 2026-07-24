@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from .errors import Result
-from .models import PageRange, PDFInfo, PdfPageText, ProcessingRequest, TimedAudioResult
+from .models import CleanupStats, PageRange, PDFInfo, PdfPageText, ProcessingRequest, TimedAudioResult
 
 # --- Core Service Interfaces ---
 
@@ -31,6 +31,10 @@ class IFileManager(ABC):
     @abstractmethod
     def get_output_dir(self) -> str:
         """Returns the path to the output directory."""
+
+    @abstractmethod
+    def cleanup_old_files(self, max_age_hours: float) -> Result[CleanupStats]:
+        """Deletes output files older than max_age_hours; fails on non-positive or non-finite age."""
 
 
 class ILLMProvider(ABC):
