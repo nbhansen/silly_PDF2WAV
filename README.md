@@ -1,11 +1,12 @@
-# PDF to Audio Converter
+# VerbatimPapers
 
 ```
- ____  ____  _____   ____   ____   ____  ____
-|  _ \|  _ \|  ___| |___ \ |  _ \ / ___|/ ___|
-| |_) | | | | |_      __) || |_) | |   \___ \
-|  __/| |_| |  _|    / __/ |  _ <| |___ ___) |
-|_|   |____/|_|     |_____||_| \_\\____|____/
+__     __        _           _   _           ____
+\ \   / /__ _ __| |__   __ _| |_(_)_ __ ___ |  _ \ __ _ _ __   ___ _ __ ___
+ \ \ / / _ \ '__| '_ \ / _` | __| | '_ ` _ \| |_) / _` | '_ \ / _ \ '__/ __|
+  \ V /  __/ |  | |_) | (_| | |_| | | | | | |  __/ (_| | |_) |  __/ |  \__ \
+   \_/ \___|_|  |_.__/ \__,_|\__|_|_| |_| |_|_|   \__,_| .__/ \___|_|  |___/
+                                                       |_|
 
   Convert academic papers to listenable audio
 ```
@@ -27,13 +28,13 @@ This tool converts PDF documents to audio files so you can listen to academic pa
 
 ```mermaid
 graph TD
-    A[User Uploads PDF] --> B["Web Server (Flask)"];
-    B --> C[DocumentProcessingService];
-    C --> D["1. Text Extraction (DocumentEngine)<br/>- OCR Fallback"];
-    D --> E["2. Text Cleaning (TextPipeline)<br/>- Optional LLM Enhancement"];
-    E --> F["3. Audio Generation (AudioEngine)<br/>- TTS Conversion"];
-    F --> G[MP3 Audio File];
-    G --> H[User Listens/Downloads];
+    A[User uploads PDF] --> B["Web server (Flask)"]
+    B --> C[DocumentProcessingService]
+    C --> D["Text extraction (DocumentEngine, OCR fallback)"]
+    D --> E["Text cleaning (TextPipeline, optional LLM)"]
+    E --> F["Audio generation (AudioEngine, TTS)"]
+    F --> G[MP3 audio file]
+    G --> H[User listens or downloads]
 ```
 
 ## Current TTS Voices Available (Piper)
