@@ -5,11 +5,8 @@ No exceptions thrown - all errors returned as Result[T].
 """
 
 from contextlib import suppress
-import io
 import logging
 from typing import Any
-
-import pdfplumber
 
 from ..errors import (
     ErrorCode,
@@ -17,7 +14,14 @@ from ..errors import (
     audio_generation_error,
     text_extraction_error,
 )
-from ..interfaces import IAudioEngine, IDocumentEngine, IFileManager, IOCRProvider, ITextPipeline
+from ..interfaces import (
+    IAudioEngine,
+    IDocumentEngine,
+    IFileManager,
+    IOCRProvider,
+    IPdfTextExtractor,
+    ITextPipeline,
+)
 from ..models import PageRange, PDFInfo, ProcessingRequest, TimedAudioResult
 
 logger = logging.getLogger(__name__)
@@ -33,11 +37,13 @@ class DocumentEngine(IDocumentEngine):
         self,
         ocr_provider: IOCRProvider,
         file_manager: IFileManager,
+        pdf_extractor: IPdfTextExtractor,
         min_text_threshold: int = 100,
         audio_target_chunk_size: int = 4000,
     ):
         self.ocr_provider = ocr_provider
         self.file_manager = file_manager
+        self.pdf_extractor = pdf_extractor
         self.min_text_threshold = min_text_threshold
         self.audio_target_chunk_size = audio_target_chunk_size
         logger.debug("DocumentEngine initialized with Result[T] pattern")
@@ -63,31 +69,30 @@ class DocumentEngine(IDocumentEngine):
 
         Returns Result with extracted text or error.
         """
+        pages_result = self.pdf_extractor.extract_text_by_page(pdf_path, pages)
+        if pages_result.is_failure:
+            return Result.failure(pages_result.error)  # type: ignore[arg-type]
+
         extracted_text = []
+        for page in pages_result.value or []:
+            text = page.text
 
-        try:
-            with pdfplumber.open(pdf_path) as pdf:
-                page_indices = pages if pages else range(len(pdf.pages))
+            # If direct extraction is poor, try OCR fallback
+            if not text or len(text.strip()) < self.min_text_threshold:
+                logger.debug("Page %d has low text quality, using OCR", page.page_index + 1)
+                ocr_text = self._ocr_page(pdf_path, page.page_index)
+                # Use whichever text is longer
+                if len(ocr_text) > len(text):
+                    text = ocr_text
 
-                for i in page_indices:
-                    if i >= len(pdf.pages):
-                        continue
+            if text.strip():
+                extracted_text.append(text.strip())
+            # Continue on empty pages - partial extraction is better than none
 
-                    page = pdf.pages[i]
-                    text_result = self._extract_page_text(page, i + 1)
+        if not extracted_text:
+            return Result.failure(text_extraction_error("No text could be extracted from the PDF"))
 
-                    if text_result.is_success and text_result.value and text_result.value.strip():
-                        extracted_text.append(text_result.value.strip())
-                    # Continue on page errors - partial extraction is better than none
-
-            if not extracted_text:
-                return Result.failure(text_extraction_error("No text could be extracted from the PDF"))
-
-            return Result.success(extracted_text)
-
-        except Exception as e:
-            logger.exception("Error extracting text from %s: %s", pdf_path, e)
-            return Result.from_exception(e, ErrorCode.TEXT_EXTRACTION_FAILED, retryable=True)
+        return Result.success(extracted_text)
 
     def process_document(
         self,
@@ -257,54 +262,29 @@ class DocumentEngine(IDocumentEngine):
 
         return Result.success(list(range(start - 1, end)))  # Convert to 0-based indexing
 
-    def _extract_page_text(self, page: pdfplumber.page.Page, page_num: int) -> Result[str]:
-        """Extract text from a single page with OCR fallback."""
-        try:
-            # Try direct text extraction first
-            text = page.extract_text()
-
-            # If direct extraction is poor, try OCR fallback
-            if not text or len(text.strip()) < self.min_text_threshold:
-                logger.debug("Page %d has low text quality, using OCR", page_num)
-                ocr_result = self._ocr_page(page)
-
-                if ocr_result.is_success and ocr_result.value is not None:
-                    ocr_text = ocr_result.value
-                    # Use whichever text is longer
-                    if len(ocr_text) > len(text or ""):
-                        text = ocr_text
-
-            return Result.success(text or "")
-
-        except Exception as e:
-            return Result.from_exception(e, ErrorCode.TEXT_EXTRACTION_FAILED, retryable=True)
-
-    def _ocr_page(self, page: pdfplumber.page.Page) -> Result[str]:
-        """Perform OCR on a single PDF page."""
+    def _ocr_page(self, pdf_path: str, page_index: int) -> str:
+        """Perform OCR on a single PDF page, returning empty text on any failure."""
         temp_image_path = None
 
         try:
-            # Convert page to high-resolution image
-            img = page.to_image(resolution=300).original
+            image_result = self.pdf_extractor.render_page_image(pdf_path, page_index)
+            if image_result.is_failure or image_result.value is None:
+                logger.warning("Page image rendering failed: %s", image_result.error)
+                return ""
 
-            # Save as temporary PNG file
-            with io.BytesIO() as temp_buffer:
-                img.save(temp_buffer, format="PNG")
-                image_bytes = temp_buffer.getvalue()
-
-            temp_image_path = self.file_manager.save_temp_file(image_bytes, suffix=".png")
+            temp_image_path = self.file_manager.save_temp_file(image_result.value, suffix=".png")
 
             # Perform OCR using the provider
             ocr_result = self.ocr_provider.perform_ocr(temp_image_path)
             if ocr_result.is_success:
-                return Result.success(ocr_result.value or "")
+                return ocr_result.value or ""
             else:
                 logger.warning("OCR provider failed: %s", ocr_result.error)
-                return Result.success("")  # Return empty string on OCR failure, not an error
+                return ""
 
         except Exception as e:
             logger.exception("OCR failed for page: %s", e)
-            return Result.success("")  # Return empty string on failure
+            return ""
 
         finally:
             # Clean up temporary file
