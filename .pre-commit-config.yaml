@@ -15,15 +15,6 @@ repos:
         name: ruff-formatting
         description: "Run Ruff formatter"
 
-  # Black - Code formatting (backup to Ruff formatter)
-  - repo: https://github.com/psf/black
-    rev: 24.10.0
-    hooks:
-      - id: black
-        name: black-formatting
-        language_version: python3.13
-        description: "Format Python code with Black"
-
   # MyPy - Type checking
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.14.0

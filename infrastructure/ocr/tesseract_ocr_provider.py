@@ -4,7 +4,7 @@ Combines direct text extraction with OCR fallback for reliable text extraction.
 """
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 import pdfplumber
 import pytesseract
@@ -21,9 +21,9 @@ class TesseractOCRProvider(IOCRProvider):
 
     def __init__(
         self,
-        tesseract_cmd: Optional[str] = None,
-        poppler_path_custom: Optional[str] = None,
-        config: Optional[object] = None,
+        tesseract_cmd: str | None = None,
+        poppler_path_custom: str | None = None,
+        config: object | None = None,
     ) -> None:
         if tesseract_cmd:
             pytesseract.pytesseract.tesseract_cmd = tesseract_cmd

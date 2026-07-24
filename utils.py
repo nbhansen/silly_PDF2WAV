@@ -1,10 +1,10 @@
 # utils.py - Pure utility functions with no domain dependencies
-from typing import Any, Optional, Union
+from typing import Any, Union
 
 from domain.models import PageRange
 
 # Type alias for form data (can be dict-like or Flask's ImmutableMultiDict)
-FormData = Union[dict[str, Any], Any]  # Any covers Flask's ImmutableMultiDict
+FormData = Union[dict[str, Any], Any]  # noqa: UP007  # Any covers Flask's ImmutableMultiDict
 
 
 def allowed_file(filename: str) -> bool:
@@ -19,8 +19,8 @@ def parse_page_range_from_form(form: FormData) -> PageRange:
     if not use_page_range:
         return PageRange()
 
-    start_page: Optional[int] = None
-    end_page: Optional[int] = None
+    start_page: int | None = None
+    end_page: int | None = None
 
     start_page_str = str(form.get("start_page", "")).strip()
     end_page_str = str(form.get("end_page", "")).strip()

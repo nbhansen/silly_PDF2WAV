@@ -1,7 +1,7 @@
 # domain/errors.py
 from dataclasses import dataclass
 from enum import Enum
-from typing import Generic, Optional, TypeVar
+from typing import Generic, TypeVar
 
 
 class ErrorCode(Enum):
@@ -27,7 +27,7 @@ class ApplicationError:
 
     code: ErrorCode
     message: str
-    details: Optional[str] = None
+    details: str | None = None
     retryable: bool = False
 
     def __str__(self) -> str:
@@ -47,8 +47,8 @@ T = TypeVar("T")
 class Result(Generic[T]):
     """Result type that either contains a value or an error."""
 
-    value: Optional[T] = None
-    error: Optional[ApplicationError] = None
+    value: T | None = None
+    error: ApplicationError | None = None
 
     @property
     def is_success(self) -> bool:
@@ -93,7 +93,7 @@ def text_extraction_error(details: str) -> ApplicationError:
     )
 
 
-def audio_generation_error(details: Optional[str] = None) -> ApplicationError:
+def audio_generation_error(details: str | None = None) -> ApplicationError:
     """Create an error for audio generation failures."""
     return ApplicationError(
         code=ErrorCode.AUDIO_GENERATION_FAILED,
@@ -103,7 +103,7 @@ def audio_generation_error(details: Optional[str] = None) -> ApplicationError:
     )
 
 
-def tts_engine_error(details: Optional[str] = None) -> ApplicationError:
+def tts_engine_error(details: str | None = None) -> ApplicationError:
     """Create an error for TTS engine failures."""
     return ApplicationError(
         code=ErrorCode.TTS_ENGINE_ERROR,
@@ -113,7 +113,7 @@ def tts_engine_error(details: Optional[str] = None) -> ApplicationError:
     )
 
 
-def llm_provider_error(details: Optional[str] = None) -> ApplicationError:
+def llm_provider_error(details: str | None = None) -> ApplicationError:
     """Create an error for LLM provider failures."""
     return ApplicationError(
         code=ErrorCode.LLM_PROVIDER_ERROR,

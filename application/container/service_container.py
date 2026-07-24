@@ -6,10 +6,11 @@ which would violate hexagonal architecture if placed in domain/.
 The domain layer only contains the IServiceContainer interface.
 """
 
+from collections.abc import Callable
 import logging
 import threading
 import types
-from typing import Callable, TypeVar, Union
+from typing import TypeVar
 
 from application.config.system_config import SystemConfig
 from domain.container.service_container import IServiceContainer, ServiceFactory, ServiceKey
@@ -39,7 +40,7 @@ class ServiceContainer(IServiceContainer):
         self._singletons: dict[ServiceKey, object] = {}
         self._lock = threading.RLock()
 
-    def get(self, interface: Union[type[T], str]) -> T:
+    def get(self, interface: type[T] | str) -> T:
         """Get service instance (singleton pattern, thread-safe)."""
         interface_name = getattr(interface, "__name__", str(interface))
         if interface in self._singletons:
@@ -61,7 +62,7 @@ class ServiceContainer(IServiceContainer):
             logger.debug("Service created: %s -> %s", interface_name, type(instance).__name__)
             return instance  # type: ignore[return-value]
 
-    def has(self, interface: Union[type[T], str]) -> bool:
+    def has(self, interface: type[T] | str) -> bool:
         """Check if service is registered."""
         return interface in self._factories
 
@@ -200,7 +201,7 @@ class ImmutableServiceContainerBuilder:
         self.config = config
         self._additional_factories: dict[ServiceKey, ServiceFactory] = {}
 
-    def register(self, interface: Union[type[T], str], factory: Callable[[], T]) -> "ImmutableServiceContainerBuilder":
+    def register(self, interface: type[T] | str, factory: Callable[[], T]) -> "ImmutableServiceContainerBuilder":
         """Register additional service factory (builder pattern)."""
         self._additional_factories[interface] = factory
         return self

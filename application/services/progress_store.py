@@ -9,7 +9,7 @@ from dataclasses import dataclass
 import logging
 import threading
 import time
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +24,8 @@ class ProgressStatus:
     message: str
     is_complete: bool = False
     is_error: bool = False
-    error_message: Optional[str] = None
-    result_data: Optional[dict[str, Any]] = None
+    error_message: str | None = None
+    result_data: dict[str, Any] | None = None
     cancelled: bool = False
 
 
@@ -58,8 +58,8 @@ class ThreadSafeProgressStore:
         message: str,
         is_complete: bool = False,
         is_error: bool = False,
-        error_message: Optional[str] = None,
-        result_data: Optional[dict[str, Any]] = None,
+        error_message: str | None = None,
+        result_data: dict[str, Any] | None = None,
     ) -> None:
         """Update progress for an operation (thread-safe).
 
@@ -87,7 +87,7 @@ class ThreadSafeProgressStore:
             self._timestamps[operation_id] = time.time()
             self._cleanup_if_needed()
 
-    def get(self, operation_id: str) -> Optional[ProgressStatus]:
+    def get(self, operation_id: str) -> ProgressStatus | None:
         """Get current progress for an operation (thread-safe)."""
         with self._lock:
             return self._progress.get(operation_id)
@@ -140,7 +140,7 @@ class ThreadSafeProgressStore:
 
 # Module-level instance, set by app_factory.py during startup via set_progress_store().
 # No default — forces explicit initialization.
-_progress_store: Optional[ThreadSafeProgressStore] = None
+_progress_store: ThreadSafeProgressStore | None = None
 
 
 def set_progress_store(store: ThreadSafeProgressStore) -> None:
@@ -167,8 +167,8 @@ def update_progress(
     message: str,
     is_complete: bool = False,
     is_error: bool = False,
-    error_message: Optional[str] = None,
-    result_data: Optional[dict[str, Any]] = None,
+    error_message: str | None = None,
+    result_data: dict[str, Any] | None = None,
 ) -> None:
     """Update progress for an operation."""
     get_progress_store().update(
@@ -183,7 +183,7 @@ def update_progress(
     )
 
 
-def get_progress(operation_id: str) -> Optional[ProgressStatus]:
+def get_progress(operation_id: str) -> ProgressStatus | None:
     """Get current progress for an operation."""
     return get_progress_store().get(operation_id)
 

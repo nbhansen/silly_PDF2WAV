@@ -7,7 +7,6 @@ and belong in the application layer rather than root-level utils.
 from pathlib import Path
 import re
 import shutil
-from typing import Optional
 
 from application.config.system_config import SystemConfig
 from domain.errors import ApplicationError, ErrorCode
@@ -83,7 +82,7 @@ def _get_retry_suggestion(error: ApplicationError, config: SystemConfig) -> str:
 # Enhanced Error Message Functions for Better User Experience
 
 
-def _get_specific_error_context(error: ApplicationError) -> Optional[str]:
+def _get_specific_error_context(error: ApplicationError) -> str | None:
     """Extract specific context from error details for more helpful messages."""
     if not error.details:
         return None
@@ -268,7 +267,7 @@ def _get_enhanced_retry_suggestion(error: ApplicationError, config: SystemConfig
     return _get_retry_suggestion(error, config)
 
 
-def _extract_size_info(details: str) -> Optional[dict[str, str]]:
+def _extract_size_info(details: str) -> dict[str, str] | None:
     """Extract file size information from error details."""
     # Look for patterns like "45.2MB exceeds limit of 100MB"
     match = re.search(r"(\d+\.?\d*)\s*MB.*?(\d+\.?\d*)\s*MB", details)
@@ -290,7 +289,7 @@ def _get_available_disk_space() -> str:
 def get_contextual_error_message(
     error: ApplicationError,
     config: SystemConfig,
-    filename: Optional[str] = None,
+    filename: str | None = None,
 ) -> str:
     """Get a complete, contextual error message with filename and suggestions."""
     enhanced_message = _get_enhanced_error_message(error)
@@ -308,7 +307,7 @@ def get_contextual_error_message(
 def get_processing_stage_error(
     stage: str,
     error: Exception,
-    filename: Optional[str] = None,
+    filename: str | None = None,
 ) -> str:
     """Get error message for specific processing stages with context."""
     file_info = f" for '{filename}'" if filename else ""
@@ -369,7 +368,7 @@ def get_disk_space_info() -> dict[str, str]:
         }
 
 
-def get_file_size_info(file_path: str) -> Optional[str]:
+def get_file_size_info(file_path: str) -> str | None:
     """Get human-readable file size for a given path."""
     try:
         size = Path(file_path).stat().st_size

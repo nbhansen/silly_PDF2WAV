@@ -7,7 +7,7 @@ No exceptions thrown - all errors returned as Result[T].
 from contextlib import suppress
 import io
 import logging
-from typing import Any, Optional
+from typing import Any
 
 import pdfplumber
 
@@ -58,7 +58,7 @@ class DocumentEngine(IDocumentEngine):
         except Exception as e:
             return Result.from_exception(e, ErrorCode.INVALID_PAGE_RANGE, retryable=False)
 
-    def extract_text(self, pdf_path: str, pages: Optional[list[int]] = None) -> Result[list[str]]:
+    def extract_text(self, pdf_path: str, pages: list[int] | None = None) -> Result[list[str]]:
         """Extract text from PDF with intelligent OCR fallback.
 
         Returns Result with extracted text or error.
@@ -237,7 +237,7 @@ class DocumentEngine(IDocumentEngine):
         except Exception as e:
             return Result.from_exception(e, ErrorCode.AUDIO_GENERATION_FAILED, retryable=True)
 
-    def _convert_page_range_to_list(self, pdf_path: str, page_range: PageRange) -> Result[Optional[list[int]]]:
+    def _convert_page_range_to_list(self, pdf_path: str, page_range: PageRange) -> Result[list[int] | None]:
         """Convert PageRange to 0-based page list."""
         if page_range.is_full_document():
             return Result.success(None)
