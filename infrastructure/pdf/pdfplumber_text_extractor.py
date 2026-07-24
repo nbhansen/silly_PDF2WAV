@@ -29,7 +29,7 @@ class PdfPlumberTextExtractor(IPdfTextExtractor):
         """
         try:
             with pdfplumber.open(pdf_path) as pdf:
-                page_indices = pages if pages else range(len(pdf.pages))
+                page_indices = pages if pages is not None else range(len(pdf.pages))
 
                 extracted: list[PdfPageText] = []
                 for i in page_indices:

@@ -58,6 +58,16 @@ class TestExtractTextByPage:
         assert result.value == [PdfPageText(page_index=0, text="only page")]
 
     @patch("pdfplumber.open")
+    def test_empty_page_list_extracts_nothing(self, mock_open):
+        """An explicit empty page list must extract no pages, not the whole document."""
+        mock_open.return_value.__enter__.return_value = make_mock_pdf(["a", "b"])
+
+        result = PdfPlumberTextExtractor().extract_text_by_page("test.pdf", pages=[])
+
+        assert result.is_success
+        assert result.value == []
+
+    @patch("pdfplumber.open")
     def test_none_text_becomes_empty_string(self, mock_open):
         """Should normalize None from extract_text() to an empty string."""
         mock_open.return_value.__enter__.return_value = make_mock_pdf([None])
