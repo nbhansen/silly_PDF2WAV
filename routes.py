@@ -32,6 +32,7 @@ from domain.interfaces import IFileManager
 from domain.models import PageRange, TimedAudioResult
 from utils import (
     allowed_file,
+    parse_page_range_from_form,
 )
 
 
@@ -305,9 +306,10 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": f"Invalid file '{filename}'. Only PDF files are supported for processing."}), 400
 
         try:
-            # Save temporary file
-            original_filename = secure_filename(file.filename)
-            temp_path = Path(app.config["UPLOAD_FOLDER"]) / f"temp_{original_filename}"
+            # Save temporary file; UUID prefix avoids collisions between
+            # concurrent requests uploading identically-named files
+            original_filename = secure_filename(file.filename) or "upload.pdf"
+            temp_path = Path(app.config["UPLOAD_FOLDER"]) / f"temp_{uuid.uuid4().hex}_{original_filename}"
             file.save(str(temp_path))
 
             # Use document engine to get PDF info
@@ -368,6 +370,13 @@ def register_routes(app: Flask) -> None:
         if error or file is None:
             return error or "No file provided"
 
+        # Reject bad page ranges before the file is saved and queued; the same
+        # parse in the background thread would surface as a generic failure.
+        try:
+            parse_page_range_from_form(request.form)
+        except ValueError as e:
+            return f"Invalid page range: {e}", 400
+
         route_logger = get_logger("routes")
 
         # Generate unique operation ID
@@ -383,7 +392,8 @@ def register_routes(app: Flask) -> None:
         config = get_app_config()
         if not file.filename:
             return "No filename provided", 400
-        original_filename = secure_filename(file.filename)
+        # secure_filename can strip a hostile name down to nothing
+        original_filename = secure_filename(file.filename) or "upload.pdf"
         saved_path = Path(config.files.upload_folder) / f"{operation_id}_{original_filename}"
         file.save(str(saved_path))
         route_logger.info("Upload received: %s (timing=%s, op=%s)", original_filename, enable_timing, operation_id[:8])

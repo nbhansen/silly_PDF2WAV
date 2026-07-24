@@ -654,3 +654,35 @@ class TestAdminCleanupEndpoint:
         assert payload["max_age_hours"] == 1.0
         assert not old_file.exists()
         assert new_file.exists()
+
+
+class TestUploadPageRangeValidation:
+    """Bad page ranges must be rejected at upload time, not in the background."""
+
+    @pytest.mark.parametrize(
+        ("start", "end", "expected_fragment"),
+        [
+            ("abc", "5", "whole number"),
+            ("0", "5", "1 or greater"),
+            ("7", "3", "cannot be after"),
+        ],
+    )
+    def test_invalid_page_range_returns_400(
+        self, client: FlaskClient, start: str, end: str, expected_fragment: str
+    ) -> None:
+        """The upload should fail fast with a clear validation message."""
+        response = client.post(
+            "/upload",
+            data={
+                "pdf_file": (BytesIO(b"%PDF-1.4 fake"), "doc.pdf"),
+                "use_page_range": "on",
+                "start_page": start,
+                "end_page": end,
+            },
+            content_type="multipart/form-data",
+        )
+
+        assert response.status_code == 400
+        body = response.get_data(as_text=True)
+        assert "Invalid page range" in body
+        assert expected_fragment in body
