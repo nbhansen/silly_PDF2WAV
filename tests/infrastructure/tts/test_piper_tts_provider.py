@@ -435,6 +435,9 @@ class TestPiperTTSProviderSecureDownload:
         self, mock_urlopen: Mock, basic_piper_config: PiperConfig, temp_models_dir: str
     ) -> None:
         """Should successfully download files with SSL verification."""
+        # Pre-create model files so the constructor's auto-download is skipped
+        (Path(temp_models_dir) / "en_US-lessac-medium.onnx").touch()
+        (Path(temp_models_dir) / "en_US-lessac-medium.onnx.json").touch()
         provider = PiperTTSProvider(basic_piper_config)
 
         # Mock successful download
@@ -482,6 +485,8 @@ class TestPiperTTSProviderModelManagement:
         )
 
         provider = PiperTTSProvider(config)
+        # The constructor also attempts an auto-download; only count the explicit call
+        mock_download.reset_mock()
         model_path, config_path = provider._ensure_model()
 
         # Verify download was called for both files
