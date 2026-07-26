@@ -8,6 +8,7 @@ import re
 import ssl
 import subprocess  # nosec B404
 import tempfile
+from typing import TYPE_CHECKING
 import urllib.error
 from urllib.parse import urlparse
 import urllib.request
@@ -15,6 +16,9 @@ import urllib.request
 from domain.config import PiperConfig
 from domain.errors import Result, tts_engine_error
 from domain.interfaces import ITTSEngine
+
+if TYPE_CHECKING:
+    from piper.config import SynthesisConfig
 
 logger = logging.getLogger("piper_tts")
 
@@ -282,8 +286,27 @@ class PiperTTSProvider(ITTSEngine):
             logger.debug("Failed to initialize Piper Python library: %s", e)
             self.voice_instance = None
 
+    def _build_synthesis_config(self) -> "SynthesisConfig":
+        """Build Piper's SynthesisConfig from our PiperConfig.
+
+        Note the field rename: our `noise_w` is Piper's `noise_w_scale`.
+        """
+        from piper.config import SynthesisConfig
+
+        return SynthesisConfig(
+            speaker_id=self.config.speaker_id,
+            length_scale=self.config.length_scale,
+            noise_scale=self.config.noise_scale,
+            noise_w_scale=self.config.noise_w,
+        )
+
     def _generate_with_python_lib(self, text: str) -> bytes:
-        """Generate using Python library."""
+        """Generate using the Piper Python library.
+
+        Piper emits one audio chunk per sentence. `sentence_silence` is not applied by
+        the library, so silence is written between chunks here - the same approach
+        piper's own CLI takes.
+        """
         try:
             from io import BytesIO
             import wave
@@ -291,17 +314,40 @@ class PiperTTSProvider(ITTSEngine):
             if self.voice_instance is None:
                 raise Exception("Voice instance not initialized")
 
+            syn_config = self._build_synthesis_config()
+
             audio_buffer = BytesIO()
             with wave.open(audio_buffer, "wb") as wav_file:
-                # Piper's Python library can handle basic SSML
-                self.voice_instance.synthesize(text, wav_file)
+                wav_params_set = False
+                silence_bytes = b""
 
-            audio_data = audio_buffer.getvalue()
+                for i, chunk in enumerate(self.voice_instance.synthesize(text, syn_config)):
+                    if not wav_params_set:
+                        wav_file.setframerate(chunk.sample_rate)
+                        wav_file.setsampwidth(chunk.sample_width)
+                        wav_file.setnchannels(chunk.sample_channels)
+                        # 16-bit silence sized to the configured inter-sentence gap
+                        silence_bytes = bytes(
+                            int(chunk.sample_rate * self.config.sentence_silence)
+                            * chunk.sample_width
+                            * chunk.sample_channels
+                        )
+                        wav_params_set = True
 
-            return audio_data
+                    if i > 0 and silence_bytes:
+                        wav_file.writeframes(silence_bytes)
+
+                    wav_file.writeframes(chunk.audio_int16_bytes)
+
+                if not wav_params_set:
+                    raise Exception("Piper produced no audio chunks")
+
+            return audio_buffer.getvalue()
 
         except Exception as e:
-            logger.debug("Python library generation failed, falling back to command line: %s", e)
+            # Loud on purpose: a silent fall-through here means every chunk pays for a
+            # subprocess and a full model reload, which is easy to miss.
+            logger.warning("Piper Python library generation failed, falling back to command line: %s", e)
             return self._generate_with_command_line(text)
 
     def _generate_with_command_line(self, text: str) -> bytes:
@@ -324,6 +370,12 @@ class PiperTTSProvider(ITTSEngine):
                 temp_path,
                 "--length_scale",
                 str(self.config.length_scale),
+                "--noise_scale",
+                str(self.config.noise_scale),
+                "--noise_w",
+                str(self.config.noise_w),
+                "--sentence_silence",
+                str(self.config.sentence_silence),
             ]
 
             if self.config_path and Path(self.config_path).exists():

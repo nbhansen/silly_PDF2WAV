@@ -18,10 +18,14 @@ piper:                  # PiperConfig - Piper-specific settings
   model_name            # Voice model (e.g., "en_US-lessac-medium")
   download_dir          # Where to store downloaded models
   length_scale          # Speech speed (1.0 = normal)
+  noise_scale           # Speech variability
+  noise_w               # Pronunciation/timing variability
+  sentence_silence      # Seconds of silence between sentences
 
 gemini:                 # GeminiConfig - Gemini API settings (optional)
   api_key               # API key (or set GEMINI_API_KEY env var)
   model_name            # Model to use
+  style_prompt          # Delivery/tone directive prefixed to the text
   use_measurement_mode  # Use precise timing vs estimation
 
 files:                  # FileConfig - File storage paths
@@ -36,7 +40,6 @@ cleanup:                # FileCleanupConfig - Auto-cleanup scheduler
 
 text_processing:        # TextProcessingConfig - Text pipeline settings
   enable_cleaning       # Use LLM for text cleaning
-  enable_natural_formatting # Add speech pauses
   enable_plain_english  # Simplify language
   llm_chunk_size        # Max chars per chunk sent to LLM for cleaning
 
@@ -324,9 +327,6 @@ class SystemConfig:
         """Parse text processing configuration."""
         return TextProcessingConfig(
             enable_cleaning=cls._parse_bool_value(get_config("text_processing.enable_text_cleaning", True), True),
-            enable_natural_formatting=cls._parse_bool_value(
-                get_config("text_processing.enable_natural_formatting", True), True
-            ),
             enable_plain_english=cls._parse_bool_value(
                 get_config("text_processing.enable_plain_english_conversion", False), False
             ),
@@ -568,7 +568,6 @@ class SystemConfig:
             f"Log Level: {self.logging_config.level}",
             f"TTS Engine: {self.tts.engine.value}",
             f"Text Cleaning: {'Enabled' if self.text_processing.enable_cleaning else 'Disabled'}",
-            f"Natural Formatting: {'Enabled' if self.text_processing.enable_natural_formatting else 'Disabled'}",
             f"Plain English Conversion: {'Enabled' if self.text_processing.enable_plain_english else 'Disabled'}",
             f"Async Audio: {'Enabled' if self.performance.enable_async_audio else 'Disabled'}",
             f"Audio Concurrent Chunks: {self.performance.audio_concurrent_chunks}",

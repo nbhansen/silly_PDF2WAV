@@ -27,12 +27,10 @@ class TextPipeline(ITextPipeline):
         self,
         llm_provider: Optional["ILLMProvider"] = None,
         enable_cleaning: bool = True,
-        enable_natural_formatting: bool = True,
         enable_plain_english: bool = False,
     ):
         self.llm_provider = llm_provider
         self.enable_cleaning = enable_cleaning
-        self.enable_natural_formatting = enable_natural_formatting
         self.enable_plain_english = enable_plain_english
 
     def _maybe_apply_plain_english(self, text: str) -> str:
@@ -162,32 +160,6 @@ class TextPipeline(ITextPipeline):
             except Exception:
                 return Result.from_exception(e, ErrorCode.TEXT_CLEANING_FAILED, retryable=True)
 
-    def enhance_with_natural_formatting(self, text: str) -> Result[str]:
-        """Add natural formatting for better speech synthesis.
-
-        Returns Result with enhanced text or error.
-        """
-        if not text:
-            return Result.failure(
-                ApplicationError(
-                    code=ErrorCode.TEXT_EXTRACTION_FAILED,
-                    message="Empty text provided for enhancement",
-                    retryable=False,
-                )
-            )
-
-        try:
-            if not self.enable_natural_formatting:
-                return Result.success(text)
-
-            enhanced = self._enhance_with_natural_formatting(text)
-            return Result.success(enhanced)
-
-        except Exception as e:
-            # On error, return original text
-            logger.exception("Enhancement failed: %s", e)
-            return Result.success(text)
-
     def split_into_sentences(self, text: str) -> Result[list[str]]:
         """Split text into sentences for individual processing.
 
@@ -197,7 +169,6 @@ class TextPipeline(ITextPipeline):
             return Result.success([])
 
         try:
-            # Use text directly since we only generate natural formatting (no markup)
             clean_text = text
 
             # Handle abbreviations better - don't split on Dr., Mr., etc.
@@ -288,11 +259,18 @@ class TextPipeline(ITextPipeline):
 
         Pure function.
         """
-        pause_instruction = """Use natural punctuation for better speech rhythm:
-- Use "..." for medium pauses (between paragraphs or sections)
-- Use "...." or "....." for longer pauses (after major sections)
-- Add extra commas where natural pauses would occur in speech
-- Use line breaks to create natural breathing points"""
+        # Speech pacing comes from ordinary punctuation, which the synthesizer honours:
+        # a comma buys ~290ms, a semicolon/dash ~325ms, a colon ~360ms, and a period
+        # starts a new sentence (where inter-sentence silence is inserted). Repeated or
+        # invented punctuation buys nothing - "." and ".." are phonetically identical,
+        # and "..." actively erases the sentence boundary. So the instruction is to
+        # restore correct punctuation, never to invent decorative pauses.
+        punctuation_instruction = """Restore correct punctuation, which PDF extraction often damages:
+- Re-join sentences broken across line breaks, and split sentences that were run together
+- Restore commas that were dropped: after introductory clauses, around asides, between list items
+- Keep the source's own commas, semicolons, colons and dashes - these carry the speech rhythm
+- Prefer commas or dashes over parentheses for asides (parentheses are silent when spoken)
+- Use ordinary punctuation only. Do NOT add "..." or repeated punctuation for emphasis or pauses"""
 
         return f"""Clean this text for text-to-speech by removing ONLY:
 - Page numbers, headers, footers
@@ -300,7 +278,7 @@ class TextPipeline(ITextPipeline):
 - Broken hyphenations across lines
 - Excessive whitespace
 
-{pause_instruction}
+{punctuation_instruction}
 
 Return ONLY the cleaned text, nothing else.
 
@@ -428,79 +406,3 @@ Text to convert:
         except Exception as e:
             logger.exception("Plain English: Exception during conversion: %s", e)
             return Result.success(text)
-
-    def _enhance_with_natural_formatting(self, text: str) -> str:
-        """Apply natural formatting tricks for TTS engines.
-
-        Pure function - no exceptions thrown.
-        """
-        enhanced = text
-
-        # 1. Add natural emphasis (order matters)
-        enhanced = self._add_natural_emphasis(enhanced)
-
-        # 2. Add academic formatting (universal approach)
-        enhanced = self._add_natural_academic_formatting(enhanced)
-
-        # 3. Enhance punctuation for better rhythm
-        enhanced = self._enhance_punctuation_for_natural_speech(enhanced)
-
-        return enhanced
-
-    def _add_natural_emphasis(self, text: str) -> str:
-        """Add natural emphasis without SSML tags.
-
-        Pure function.
-        """
-        # Already quoted text gets natural emphasis from quotes
-        # No changes needed for quoted text as TTS engines naturally emphasize quotes
-        return text
-
-    def _add_natural_academic_formatting(self, text: str) -> str:
-        """Add natural formatting for academic content.
-
-        Pure function.
-        """
-        # Add extra dots after section headers for longer pauses
-        text = re.sub(
-            r"(Abstract|Introduction|Conclusion|References)(\s*[:\.]?\s*)", r"\1\2... ", text, flags=re.IGNORECASE
-        )
-
-        # Add pause after numbered sections with extra dots
-        text = re.sub(r"(\d+\.\s*[A-Z][^.]*\.)", r"\1.. ", text)
-
-        # Add line breaks around major transitions for natural pauses
-        text = re.sub(r"(However|Therefore|Furthermore|Moreover),", r"\n\1,", text, flags=re.IGNORECASE)
-
-        return text
-
-    def _enhance_punctuation_for_natural_speech(self, text: str) -> str:
-        """Enhance punctuation for better natural speech rhythm.
-
-        Pure function.
-        """
-        # Add extra comma pauses where beneficial
-        # After introductory phrases
-        text = re.sub(
-            r"^(In this paper|In this study|We present|We propose|This work),",
-            r"\1,,",
-            text,
-            flags=re.IGNORECASE | re.MULTILINE,
-        )
-
-        # Convert single dots between sentences to double for slightly longer pauses
-        # But preserve ellipsis (...)
-        text = re.sub(r"(?<![.])\.(?![.])\s+(?=[A-Z])", r".. ", text)
-
-        # Add commas after "First", "Second", etc. if not already present
-        text = re.sub(
-            r"\b(First|Second|Third|Fourth|Fifth|Finally|Additionally|Specifically)(?!,)\s",
-            r"\1, ",
-            text,
-            flags=re.IGNORECASE,
-        )
-
-        # Ensure ellipsis has consistent spacing
-        text = re.sub(r"\.{3,}", "... ", text)
-
-        return text

@@ -9,7 +9,6 @@ class TextProcessingConfig:
     """Text processing configuration."""
 
     enable_cleaning: bool = True
-    enable_natural_formatting: bool = True
     enable_plain_english: bool = False
     llm_chunk_size: int = 50000  # Large chunks for LLM text cleaning
     audio_target_chunk_size: int = 3000

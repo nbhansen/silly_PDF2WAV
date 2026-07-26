@@ -345,6 +345,10 @@ class TestPiperTTSProviderCommandLineGeneration:
         assert "0.8" in cmd  # custom length scale
         assert "--speaker" in cmd
         assert "1" in cmd  # custom speaker ID
+        # All prosody settings must reach the CLI, not just length_scale (issue #59)
+        assert "--noise_scale" in cmd
+        assert "--noise_w" in cmd
+        assert "--sentence_silence" in cmd
 
     @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
     @patch("subprocess.run")
@@ -587,3 +591,47 @@ class TestPiperTTSProviderRealWorldScenarios:
         assert len(providers) == 2
         assert providers[0].config.model_name != providers[1].config.model_name
         assert all(p.models_dir == temp_models_dir for p in providers)
+
+
+class TestPiperSynthesisConfig:
+    """Test that PiperConfig prosody settings reach Piper's SynthesisConfig.
+
+    These settings were parsed from config but never applied - see issue #59.
+    """
+
+    @staticmethod
+    def _provider(config: PiperConfig) -> PiperTTSProvider:
+        """Build a provider without touching model files or the network."""
+        with patch.object(PiperTTSProvider, "_check_piper_availability"):
+            provider = PiperTTSProvider.__new__(PiperTTSProvider)
+            provider.config = config
+            return provider
+
+    def test_synthesis_config_carries_all_prosody_settings(self, temp_models_dir: str) -> None:
+        """Every prosody knob should be forwarded, with noise_w renamed correctly."""
+        config = PiperConfig(
+            download_dir=temp_models_dir,
+            length_scale=1.25,
+            noise_scale=0.5,
+            noise_w=0.9,
+            sentence_silence=0.4,
+            speaker_id=3,
+        )
+
+        syn_config = self._provider(config)._build_synthesis_config()
+
+        assert syn_config.length_scale == 1.25
+        assert syn_config.noise_scale == 0.5
+        # Our `noise_w` is Piper's `noise_w_scale` - an easy rename to get wrong
+        assert syn_config.noise_w_scale == 0.9
+        assert syn_config.speaker_id == 3
+
+    def test_synthesis_config_uses_config_defaults(self, temp_models_dir: str) -> None:
+        """Defaults should pass through rather than being dropped to Piper's own."""
+        config = PiperConfig(download_dir=temp_models_dir)
+
+        syn_config = self._provider(config)._build_synthesis_config()
+
+        assert syn_config.length_scale == config.length_scale
+        assert syn_config.noise_scale == config.noise_scale
+        assert syn_config.noise_w_scale == config.noise_w

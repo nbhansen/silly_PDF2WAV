@@ -12,7 +12,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from domain.errors import ErrorCode
-from infrastructure.tts.gemini_tts_provider import GeminiTTSProvider
+from infrastructure.tts.gemini_tts_provider import DEFAULT_STYLE_PROMPT, GeminiTTSProvider
 
 
 def make_audio_response(data: bytes, mime_type: str = "audio/mp3") -> SimpleNamespace:
@@ -143,7 +143,8 @@ class TestGeminiTTSProviderSyncGeneration:
         mock_client.models.generate_content.assert_called_once()
         call_kwargs = mock_client.models.generate_content.call_args.kwargs
         assert call_kwargs["model"] == "gemini-1.5-flash"
-        assert call_kwargs["contents"] == "Hello, this is a test."
+        # Text is sent with the delivery directive prefixed - Gemini's only prosody control
+        assert call_kwargs["contents"] == f"{DEFAULT_STYLE_PROMPT}\n\nHello, this is a test."
 
     def test_generate_audio_data_handles_unicode(self, basic_gemini_provider: GeminiTTSProvider) -> None:
         """Should pass Unicode text through to the API."""
@@ -156,7 +157,7 @@ class TestGeminiTTSProviderSyncGeneration:
         result = provider.generate_audio_data(unicode_text)
 
         assert result.is_success
-        assert mock_client.models.generate_content.call_args.kwargs["contents"] == unicode_text
+        assert mock_client.models.generate_content.call_args.kwargs["contents"].endswith(unicode_text)
 
     def test_generate_audio_data_wraps_pcm_in_wav(self, basic_gemini_provider: GeminiTTSProvider) -> None:
         """PCM responses should get a WAV header."""
@@ -271,6 +272,58 @@ class TestGeminiTTSProviderResponseParsing:
         assert result.value is not None
         with wave.open(io.BytesIO(result.value), "rb") as wav_file:
             assert wav_file.getframerate() == 16000
+
+
+class TestGeminiTTSProviderStylePrompt:
+    """Test the style prompt, which is how Gemini takes prosody direction.
+
+    Gemini has no SSML; delivery is steered by a natural-language directive
+    prefixed to the text. See issue #61.
+    """
+
+    @staticmethod
+    def _provider(style_prompt: str | None) -> GeminiTTSProvider:
+        return GeminiTTSProvider(
+            model_name="gemini-1.5-flash",
+            api_key="test_key",
+            voice_name="Kore",
+            style_prompt=style_prompt,
+        )
+
+    def test_defaults_to_builtin_style_prompt(self) -> None:
+        """Omitting style_prompt should apply the academic-reading default."""
+        assert self._provider(None).style_prompt == DEFAULT_STYLE_PROMPT
+
+    def test_custom_style_prompt_is_used_verbatim(self) -> None:
+        """A configured style prompt should replace the default."""
+        provider = self._provider("Read this slowly.")
+
+        assert provider.style_prompt == "Read this slowly."
+        assert provider._build_prompt("Body text.") == "Read this slowly.\n\nBody text."
+
+    def test_empty_style_prompt_sends_text_bare(self) -> None:
+        """An empty string is the opt-out - no directive is prefixed."""
+        provider = self._provider("")
+
+        assert provider._build_prompt("Body text.") == "Body text."
+
+    @pytest.mark.asyncio
+    async def test_style_prompt_applied_on_async_path(self) -> None:
+        """The async path must prefix the directive too, not just the sync one."""
+        provider = self._provider("Read this slowly.")
+        mock_client = Mock()
+
+        async def fake_generate(**kwargs: object) -> SimpleNamespace:
+            return make_audio_response(b"audio")
+
+        mock_client.aio.models.generate_content = Mock(side_effect=fake_generate)
+        provider.client = mock_client
+
+        result = await provider.generate_audio_data_async("Body text.")
+
+        assert result.is_success
+        contents = mock_client.aio.models.generate_content.call_args.kwargs["contents"]
+        assert contents == "Read this slowly.\n\nBody text."
 
 
 class TestGeminiTTSProviderConfiguration:

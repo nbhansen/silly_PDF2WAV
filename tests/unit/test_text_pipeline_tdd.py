@@ -20,16 +20,14 @@ class TestTextPipelineBasicFunctionality:
 
         assert pipeline.llm_provider is None
         assert pipeline.enable_cleaning is True
-        assert pipeline.enable_natural_formatting is True
 
     def test_text_pipeline_creation_with_custom_settings(self):
         """Should create text pipeline with custom configuration."""
         mock_llm = Mock()
-        pipeline = TextPipeline(llm_provider=mock_llm, enable_cleaning=False, enable_natural_formatting=False)
+        pipeline = TextPipeline(llm_provider=mock_llm, enable_cleaning=False)
 
         assert pipeline.llm_provider == mock_llm
         assert pipeline.enable_cleaning is False
-        assert pipeline.enable_natural_formatting is False
 
     def test_text_pipeline_implements_interface(self):
         """Should properly implement ITextPipeline interface."""
@@ -38,7 +36,6 @@ class TestTextPipelineBasicFunctionality:
 
         # Check all interface methods are implemented
         assert hasattr(pipeline, "clean_text")
-        assert hasattr(pipeline, "enhance_with_natural_formatting")
         assert hasattr(pipeline, "split_into_sentences")
 
 
@@ -164,45 +161,66 @@ class TestTextCleaningTDD:
         assert result.value == "Text with spacing."
 
 
-class TestNaturalFormattingTDD:
-    """TDD tests for natural formatting functionality."""
+class TestNoPauseMarkupInjectionTDD:
+    """The pipeline must not invent punctuation to fake speech pauses.
 
-    def test_natural_formatting_disabled_returns_original(self):
-        """Should return original text when natural formatting is disabled."""
-        pipeline = TextPipeline(enable_natural_formatting=False)
+    Measured against Piper: "." and ".." are phonetically identical, and "..."
+    erases the sentence boundary entirely (espeak-ng merges the words), which
+    also suppresses the inter-sentence silence. See issue #58.
+    """
 
-        text = "This is plain text."
-        result = pipeline.enhance_with_natural_formatting(text)
+    def test_cleaning_does_not_double_sentence_punctuation(self):
+        """Basic cleanup must leave sentence-ending periods alone."""
+        pipeline = TextPipeline(enable_cleaning=False)
+
+        result = pipeline.clean_text("First sentence. Second sentence. Third sentence.")
+
+        assert result.is_success
+        assert result.value is not None
+        assert result.value == "First sentence. Second sentence. Third sentence."
+        assert ".." not in result.value
+
+    def test_cleaning_does_not_inject_ellipses_after_section_headers(self):
+        """Section headers must not gain trailing dots - they destroy the boundary."""
+        pipeline = TextPipeline(enable_cleaning=False)
+
+        result = pipeline.clean_text("Abstract. This paper presents a method. Introduction. We begin here.")
+
+        assert result.is_success
+        assert result.value is not None
+        assert "..." not in result.value
+        assert "Abstract. This paper" in result.value
+
+    def test_abbreviations_survive_cleaning_intact(self):
+        """Trailing dots on abbreviations broke sentence splitting downstream."""
+        pipeline = TextPipeline(enable_cleaning=False)
+
+        result = pipeline.clean_text("We follow Smith et al. and cf. Jones for the setup.")
+
+        assert result.is_success
+        assert result.value is not None
+        assert "et al.." not in result.value
+        assert "cf.." not in result.value
+
+    def test_cleaning_does_not_double_commas(self):
+        """Doubled commas are a no-op acoustically and corrupt the text."""
+        pipeline = TextPipeline(enable_cleaning=False)
+
+        result = pipeline.clean_text("In this paper, we present a method.")
+
+        assert result.is_success
+        assert result.value is not None
+        assert ",," not in result.value
+
+    def test_ordinary_punctuation_is_preserved(self):
+        """Commas, semicolons, colons and dashes carry the rhythm - keep them."""
+        pipeline = TextPipeline(enable_cleaning=False)
+
+        text = "We tested three cases: the first, the second; and the third."
+        result = pipeline.clean_text(text)
 
         assert result.is_success
         assert result.value == text
-
-    def test_natural_formatting_adds_natural_pauses(self):
-        """Should add natural formatting for better speech."""
-        pipeline = TextPipeline(enable_natural_formatting=True)
-
-        text = "Abstract This is the abstract. Introduction This is the intro."
-        result = pipeline.enhance_with_natural_formatting(text)
-
-        # Should add natural formatting (dots, etc.) not SSML
-        assert result.is_success
-        assert result.value is not None
-        assert "Abstract" in result.value
-        assert "Introduction" in result.value
-        # Natural formatting uses dots, not SSML tags
-        assert "..." in result.value
-
-    def test_natural_formatting_handles_empty_text(self):
-        """Should handle empty or whitespace-only text."""
-        pipeline = TextPipeline(enable_natural_formatting=True)
-
-        empty_result = pipeline.enhance_with_natural_formatting("")
-        assert empty_result.is_failure  # Empty text should fail
-
-        whitespace_result = pipeline.enhance_with_natural_formatting("   ")
-        assert whitespace_result.is_success
-        assert whitespace_result.value is not None
-        assert whitespace_result.value.strip() == ""
 
 
 class TestSentenceSplittingTDD:
@@ -312,7 +330,7 @@ class TestTextPipelineIntegrationTDD:
             "This paper presents our algorithm methodology. We propose a new approach."
         )
 
-        pipeline = TextPipeline(llm_provider=mock_llm, enable_cleaning=True, enable_natural_formatting=True)
+        pipeline = TextPipeline(llm_provider=mock_llm, enable_cleaning=True)
 
         raw_text = "Raw   academic   text about algorithms."
 
@@ -322,27 +340,20 @@ class TestTextPipelineIntegrationTDD:
         assert cleaned.value is not None
         assert "algorithm" in cleaned.value
 
-        # Enhance with natural formatting
-        enhanced = pipeline.enhance_with_natural_formatting(cleaned.value)
-        # Natural formatting adds double dots between sentences and commas after academic phrases
-        assert enhanced.is_success
-        assert enhanced.value is not None
-        assert ".. " in enhanced.value or ",," in enhanced.value  # Natural formatting enhancements
-
         # Split into sentences
-        sentences = pipeline.split_into_sentences(enhanced.value)
+        sentences = pipeline.split_into_sentences(cleaned.value)
         assert sentences.is_success
         assert sentences.value is not None
         assert len(sentences.value) >= 1
 
-        # Verify no SSML in results (natural formatting only)
+        # Cleaning must not introduce markup
         all_text = " ".join(sentences.value)
         assert "<emphasis>" not in all_text
         assert "algorithm" in all_text
 
     def test_pipeline_consistency_across_operations(self):
         """Should maintain text consistency through all operations."""
-        pipeline = TextPipeline(enable_cleaning=False, enable_natural_formatting=True)
+        pipeline = TextPipeline(enable_cleaning=False)
 
         original_text = "Test sentence one. Test sentence two."
 
@@ -350,10 +361,7 @@ class TestTextPipelineIntegrationTDD:
         cleaned = pipeline.clean_text(original_text)
         assert cleaned.is_success
         assert cleaned.value is not None
-        enhanced = pipeline.enhance_with_natural_formatting(cleaned.value)
-        assert enhanced.is_success
-        assert enhanced.value is not None
-        sentences = pipeline.split_into_sentences(enhanced.value)
+        sentences = pipeline.split_into_sentences(cleaned.value)
         assert sentences.is_success
         assert sentences.value is not None
 
@@ -363,43 +371,34 @@ class TestTextPipelineIntegrationTDD:
         assert final.is_success
         assert final.value is not None
 
-        # Should preserve core content (may have formatting enhancements like double dots)
+        # Should preserve core content verbatim
         assert any("Test sentence one" in sentence for sentence in final.value)
         assert any("Test sentence two" in sentence for sentence in final.value)
 
     def test_pipeline_handles_large_text_efficiently(self):
         """Should handle larger text blocks without issues."""
-        pipeline = TextPipeline(enable_cleaning=False, enable_natural_formatting=True)
+        pipeline = TextPipeline(enable_cleaning=False)
 
         # Create larger text block
         large_text = " ".join([f"Sentence number {i} with content." for i in range(100)])
 
-        # Should process without errors
-        result = pipeline.enhance_with_natural_formatting(large_text)
-        assert result.is_success
-        assert result.value is not None
-        assert len(result.value) >= len(large_text)  # Should have added natural formatting
-
-        sentences = pipeline.split_into_sentences(result.value)
+        sentences = pipeline.split_into_sentences(large_text)
         assert sentences.is_success
         assert sentences.value is not None
         assert len(sentences.value) == 100  # Should split correctly
 
     def test_pipeline_with_all_features_disabled(self):
         """Should work correctly with all enhancement features disabled."""
-        pipeline = TextPipeline(enable_cleaning=False, enable_natural_formatting=False)
+        pipeline = TextPipeline(enable_cleaning=False)
 
         text = "Simple   text   with   spacing."
 
         cleaned = pipeline.clean_text(text)
         assert cleaned.is_success
         assert cleaned.value is not None
-        enhanced = pipeline.enhance_with_natural_formatting(cleaned.value)
-        assert enhanced.is_success
-        assert enhanced.value is not None
 
-        # Should still do basic cleanup but no natural formatting
-        assert enhanced.value == "Simple text with spacing."
+        # Basic cleanup only - text is passed through to TTS verbatim otherwise
+        assert cleaned.value == "Simple text with spacing."
 
     def test_pipeline_error_resilience(self):
         """Should be resilient to various error conditions."""
@@ -409,9 +408,6 @@ class TestTextPipelineIntegrationTDD:
         # Should handle empty strings gracefully
         clean_empty = pipeline.clean_text("")
         assert clean_empty.is_failure  # Empty text should fail for cleaning
-
-        enhance_empty = pipeline.enhance_with_natural_formatting("")
-        assert enhance_empty.is_failure  # Empty text should fail for enhancement
 
         split_empty = pipeline.split_into_sentences("")
         assert split_empty.is_success
@@ -459,7 +455,10 @@ class TestTextPipelinePromptGenerationTDD:
 
         assert "Clean this text for text-to-speech" in prompt
         assert "Page numbers, headers, footers" in prompt
-        assert "natural punctuation" in prompt
+        assert "Restore correct punctuation" in prompt
+        # Speech rhythm comes from ordinary punctuation; invented pause markup is a
+        # no-op at best and erases sentence boundaries at worst.
+        assert 'Do NOT add "..."' in prompt
 
 
 class TestTextPipelineEdgeCasesTDD:
@@ -517,15 +516,3 @@ class TestTextPipelineEdgeCasesTDD:
         assert result.is_success
         assert result.value is not None
         assert len(result.value) == 0
-
-    def test_handles_mixed_case_section_headers(self):
-        """Should handle section headers in various cases."""
-        pipeline = TextPipeline(enable_natural_formatting=True)
-
-        text = "ABSTRACT This is content. abstract This too. Abstract: Also this."
-        result = pipeline.enhance_with_natural_formatting(text)
-
-        # Should handle different cases of section headers with natural formatting
-        assert result.is_success
-        assert result.value is not None
-        assert "..." in result.value  # Natural formatting uses dots instead of SSML
