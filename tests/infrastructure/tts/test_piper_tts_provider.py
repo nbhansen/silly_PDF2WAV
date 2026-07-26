@@ -272,9 +272,7 @@ class TestPiperTTSProviderTextValidation:
 
     @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
     @patch("subprocess.run")
-    def test_synthesize_rejects_ssml_only_content(
-        self, mock_run: Mock, basic_piper_config: PiperConfig
-    ) -> None:
+    def test_synthesize_rejects_ssml_only_content(self, mock_run: Mock, basic_piper_config: PiperConfig) -> None:
         """Should reject content that becomes empty after SSML removal."""
         mock_run.return_value = Mock(returncode=0)
         provider = PiperTTSProvider(basic_piper_config)
@@ -429,9 +427,7 @@ class TestPiperTTSProviderAsyncGeneration:
     @pytest.mark.asyncio
     @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
     @patch("subprocess.run")
-    async def test_synthesize_async_calls_sync_method(
-        self, mock_run: Mock, basic_piper_config: PiperConfig
-    ) -> None:
+    async def test_synthesize_async_calls_sync_method(self, mock_run: Mock, basic_piper_config: PiperConfig) -> None:
         """Should call sync method in thread pool."""
         # Mock successful piper availability
         mock_run.return_value = Mock(returncode=0)
@@ -590,9 +586,7 @@ class TestPiperTTSProviderRealWorldScenarios:
 
         with patch.object(provider, "_synthesize_with_command_line") as mock_generate:
             mock_generate.return_value = [
-                SynthesizedSegment(
-                    text=long_text, pcm=b"\x00\x00" * 10, sample_rate=100, sample_width=2, channels=1
-                )
+                SynthesizedSegment(text=long_text, pcm=b"\x00\x00" * 10, sample_rate=100, sample_width=2, channels=1)
             ]
 
             result = provider.synthesize(long_text)
@@ -611,9 +605,7 @@ class TestPiperTTSProviderRealWorldScenarios:
 
         with patch.object(provider, "_synthesize_with_command_line") as mock_generate:
             mock_generate.return_value = [
-                SynthesizedSegment(
-                    text=unicode_text, pcm=b"\x00\x00" * 10, sample_rate=100, sample_width=2, channels=1
-                )
+                SynthesizedSegment(text=unicode_text, pcm=b"\x00\x00" * 10, sample_rate=100, sample_width=2, channels=1)
             ]
 
             result = provider.synthesize(unicode_text)

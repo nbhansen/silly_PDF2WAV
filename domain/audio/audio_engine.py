@@ -305,9 +305,7 @@ class AudioEngine(IAudioEngine):
             chunk_time = chunk_end - chunk_start
 
             if result.is_success and result.value:
-                logger.debug(
-                    "Chunk %d completed in %.2fs (%d segments)", chunk_num, chunk_time, len(result.value)
-                )
+                logger.debug("Chunk %d completed in %.2fs (%d segments)", chunk_num, chunk_time, len(result.value))
                 return list(result.value)
             else:
                 error_msg = result.error if result.is_failure else "No audio data"

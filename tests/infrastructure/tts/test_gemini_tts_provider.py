@@ -171,9 +171,7 @@ class TestGeminiTTSProviderSyncGeneration:
         provider = basic_gemini_provider
         mock_client = Mock()
         pcm = b"\x00\x01" * 100
-        mock_client.models.generate_content.return_value = make_audio_response(
-            pcm, mime_type="audio/pcm;rate=24000"
-        )
+        mock_client.models.generate_content.return_value = make_audio_response(pcm, mime_type="audio/pcm;rate=24000")
         provider.client = mock_client
 
         result = provider.synthesize("Hello")
@@ -225,9 +223,7 @@ class TestGeminiTTSProviderAsyncGeneration:
         assert result.value[0].text == "Test text for async generation"
 
     @pytest.mark.asyncio
-    async def test_synthesize_async_handles_api_exception(
-        self, basic_gemini_provider: GeminiTTSProvider
-    ) -> None:
+    async def test_synthesize_async_handles_api_exception(self, basic_gemini_provider: GeminiTTSProvider) -> None:
         """Async API exceptions should become failure Results."""
         provider = basic_gemini_provider
         mock_client = Mock()
