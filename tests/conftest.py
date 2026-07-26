@@ -42,7 +42,6 @@ def test_config(temp_dir):
         cleanup=FileCleanupConfig(enabled=False),  # Don't interfere with tests
         text_processing=TextProcessingConfig(
             enable_cleaning=False,  # Fast tests
-            enable_natural_formatting=False,  # Fast tests
         ),
         performance=PerformanceConfig(),
         flask=FlaskConfig(),

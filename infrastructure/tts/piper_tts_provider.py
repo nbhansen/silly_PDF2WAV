@@ -8,6 +8,7 @@ import re
 import ssl
 import subprocess  # nosec B404
 import tempfile
+from typing import TYPE_CHECKING
 import urllib.error
 from urllib.parse import urlparse
 import urllib.request
@@ -15,6 +16,9 @@ import urllib.request
 from domain.config import PiperConfig
 from domain.errors import Result, tts_engine_error
 from domain.interfaces import ITTSEngine
+
+if TYPE_CHECKING:
+    from piper.config import SynthesisConfig
 
 logger = logging.getLogger("piper_tts")
 
@@ -282,8 +286,34 @@ class PiperTTSProvider(ITTSEngine):
             logger.debug("Failed to initialize Piper Python library: %s", e)
             self.voice_instance = None
 
+    def _build_synthesis_config(self) -> "SynthesisConfig":
+        """Build Piper's SynthesisConfig from our PiperConfig.
+
+        Note the field rename: our `noise_w` is Piper's `noise_w_scale`.
+        """
+        from piper.config import SynthesisConfig
+
+        return SynthesisConfig(
+            speaker_id=self.config.speaker_id,
+            length_scale=self.config.length_scale,
+            noise_scale=self.config.noise_scale,
+            noise_w_scale=self.config.noise_w,
+            # Piper normalizes per *chunk*, and a chunk is one sentence - so leaving this
+            # on peaks "However." to the same level as a full paragraph, and the output
+            # pumps at every sentence seam. Measured on en_US-lessac-medium: peaks go
+            # [1.0, 1.0] with normalization on versus [0.70, 0.52] with it off.
+            normalize_audio=False,
+        )
+
     def _generate_with_python_lib(self, text: str) -> bytes:
-        """Generate using Python library."""
+        """Generate using the Piper Python library.
+
+        Piper emits one audio chunk per sentence and applies no inter-sentence silence,
+        so the gaps are written here. Note this deliberately differs from piper's own
+        CLI, which only gaps *within* one synthesize() call: our callers concatenate
+        these blobs, so a trailing gap is what keeps the seam between two chunks from
+        running two sentences together.
+        """
         try:
             from io import BytesIO
             import wave
@@ -291,17 +321,38 @@ class PiperTTSProvider(ITTSEngine):
             if self.voice_instance is None:
                 raise Exception("Voice instance not initialized")
 
+            syn_config = self._build_synthesis_config()
+
+            # Materialize before opening the wave writer: raising inside the `with` would
+            # be masked by Wave_write.close() failing on unset params, replacing the real
+            # error with a confusing "# channels not specified".
+            chunks = list(self.voice_instance.synthesize(text, syn_config))
+            if not chunks:
+                raise Exception("Piper produced no audio chunks")
+
+            first = chunks[0]
+            # 16-bit silence sized to the configured inter-sentence gap
+            silence_bytes = bytes(
+                int(first.sample_rate * self.config.sentence_silence) * first.sample_width * first.sample_channels
+            )
+
             audio_buffer = BytesIO()
             with wave.open(audio_buffer, "wb") as wav_file:
-                # Piper's Python library can handle basic SSML
-                self.voice_instance.synthesize(text, wav_file)
+                wav_file.setframerate(first.sample_rate)
+                wav_file.setsampwidth(first.sample_width)
+                wav_file.setnchannels(first.sample_channels)
 
-            audio_data = audio_buffer.getvalue()
+                for chunk in chunks:
+                    wav_file.writeframes(chunk.audio_int16_bytes)
+                    if silence_bytes:
+                        wav_file.writeframes(silence_bytes)
 
-            return audio_data
+            return audio_buffer.getvalue()
 
         except Exception as e:
-            logger.debug("Python library generation failed, falling back to command line: %s", e)
+            # Loud on purpose: a silent fall-through here means every chunk pays for a
+            # subprocess and a full model reload, which is easy to miss.
+            logger.warning("Piper Python library generation failed, falling back to command line: %s", e)
             return self._generate_with_command_line(text)
 
     def _generate_with_command_line(self, text: str) -> bytes:
@@ -324,6 +375,12 @@ class PiperTTSProvider(ITTSEngine):
                 temp_path,
                 "--length_scale",
                 str(self.config.length_scale),
+                "--noise_scale",
+                str(self.config.noise_scale),
+                "--noise_w",
+                str(self.config.noise_w),
+                "--sentence_silence",
+                str(self.config.sentence_silence),
             ]
 
             if self.config_path and Path(self.config_path).exists():

@@ -52,7 +52,6 @@ def flask_test_config(temp_dir: Path) -> SystemConfig:
         cleanup=FileCleanupConfig(enabled=False),  # No cleanup during tests
         text_processing=TextProcessingConfig(
             enable_cleaning=True,
-            enable_natural_formatting=True,
             llm_chunk_size=500,  # Small chunks for testing
         ),
         performance=PerformanceConfig(),

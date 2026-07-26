@@ -126,7 +126,6 @@ def pipeline_config(pipeline_test_dirs: tuple[str, str]) -> SystemConfig:
         cleanup=FileCleanupConfig(enabled=False),
         text_processing=TextProcessingConfig(
             enable_cleaning=False,  # Disable LLM to focus on pipeline
-            enable_natural_formatting=True,
             llm_chunk_size=500,
             audio_target_chunk_size=1000,
             audio_max_chunk_size=2000,

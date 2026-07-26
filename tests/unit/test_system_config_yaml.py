@@ -44,7 +44,7 @@ class TestSystemConfigYAMLLoading:
                 "piper": {"model_name": "en_US-test-high", "models_dir": "test_models", "length_scale": 1.2},
             },
             "secrets": {"google_ai_api_key": "test-api-key-123"},
-            "text_processing": {"enable_text_cleaning": False, "enable_natural_formatting": False},
+            "text_processing": {"enable_text_cleaning": False},
             "files": {
                 "upload_folder": "test_uploads",
                 "audio_folder": "test_audio",
@@ -68,7 +68,6 @@ class TestSystemConfigYAMLLoading:
 
         # Text processing
         assert config.text_processing.enable_cleaning is False
-        assert config.text_processing.enable_natural_formatting is False
 
         # File settings
         assert config.files.upload_folder == "test_uploads"
@@ -140,7 +139,6 @@ class TestSystemConfigYAMLLoading:
             "tts": {"engine": "piper", "piper": {"length_scale": "1.5"}},  # String float
             "text_processing": {
                 "enable_text_cleaning": "true",  # String boolean
-                "enable_natural_formatting": 1,  # Integer boolean
                 "audio_target_chunk_size": 2500,
             },
             "files": {
@@ -158,7 +156,6 @@ class TestSystemConfigYAMLLoading:
 
         # Boolean conversions
         assert config.text_processing.enable_cleaning is True
-        assert config.text_processing.enable_natural_formatting is True
         assert config.cleanup.enabled is True
 
         # Integer conversions

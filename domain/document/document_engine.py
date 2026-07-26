@@ -183,23 +183,19 @@ class DocumentEngine(IDocumentEngine):
                 else:
                     logger.debug("Cleaning returned None, skipping chunk")
 
-            # Step 3: Re-combine all cleaned text and enhance with natural formatting
+            # Step 3: Re-combine all cleaned text
             all_cleaned_text = " ".join(cleaned_chunks)
             logger.debug("Combined all cleaned text: %d chars total", len(all_cleaned_text))
 
-            logger.debug("Calling text_pipeline.enhance_with_natural_formatting() on combined text...")
-            enhance_result = text_pipeline.enhance_with_natural_formatting(all_cleaned_text)
-            if enhance_result.is_failure:
-                return Result.failure(enhance_result.error)  # type: ignore[arg-type]
+            # An image-only PDF extracts as whitespace and cleans down to nothing. Without
+            # this, _split_for_tts("") returns [] and the caller only rejects None, so the
+            # run reports success having produced no audio at all.
+            if not all_cleaned_text.strip():
+                return Result.failure(text_extraction_error("No usable text remained after cleaning"))
 
-            enhanced_text = enhance_result.value
-            if enhanced_text is None:
-                return Result.failure(text_extraction_error("Text enhancement returned None"))
-            logger.debug("Enhanced text (%d chars): '%s...'", len(enhanced_text), enhanced_text[:100])
-
-            # Step 4: Split enhanced text back into optimal chunks for TTS
-            processed_chunks = self._split_for_tts(enhanced_text, self.audio_target_chunk_size)
-            logger.debug("Split enhanced text into %d TTS-optimized chunks", len(processed_chunks))
+            # Step 4: Split cleaned text into optimal chunks for TTS
+            processed_chunks = self._split_for_tts(all_cleaned_text, self.audio_target_chunk_size)
+            logger.debug("Split cleaned text into %d TTS-optimized chunks", len(processed_chunks))
 
             logger.info(
                 "Processed through optimized pipeline: %d -> %d -> %d chunks",

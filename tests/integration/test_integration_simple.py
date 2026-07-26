@@ -21,7 +21,6 @@ def create_test_config() -> SystemConfig:
         cleanup=FileCleanupConfig(enabled=False),
         text_processing=TextProcessingConfig(
             enable_cleaning=False,
-            enable_natural_formatting=False,
         ),
         performance=PerformanceConfig(),
         flask=FlaskConfig(),
@@ -36,7 +35,6 @@ def test_configuration_loading():
     config = create_test_config()
     assert config.tts.engine == TTSEngine.PIPER
     assert config.text_processing.enable_cleaning is False
-    assert config.text_processing.enable_natural_formatting is False
     assert config.cleanup.enabled is False
     # Test LLM model configuration
     assert config.llm.model_name == "test-llm-model"

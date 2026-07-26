@@ -109,13 +109,11 @@ class ServiceContainer(IServiceContainer):
             ITextPipeline: lambda: TextPipeline(
                 llm_provider=self.get(GeminiLLMProvider) if self.config.gemini and self.config.gemini.api_key else None,
                 enable_cleaning=self.config.text_processing.enable_cleaning,
-                enable_natural_formatting=self.config.text_processing.enable_natural_formatting,
             ),
             # Plain English variant of TextPipeline
             "plain_english_text_pipeline": lambda: TextPipeline(
                 llm_provider=self.get(GeminiLLMProvider) if self.config.gemini and self.config.gemini.api_key else None,
                 enable_cleaning=self.config.text_processing.enable_cleaning,
-                enable_natural_formatting=self.config.text_processing.enable_natural_formatting,
                 enable_plain_english=True,
             ),
             # Timing Engine
@@ -185,6 +183,7 @@ class ServiceContainer(IServiceContainer):
                 model_name=self.config.gemini.model_name,
                 api_key=self.config.gemini.api_key,
                 voice_name=self.config.gemini.voice_name,
+                style_prompt=self.config.gemini.style_prompt,
                 min_request_interval=self.config.tts.request_delay_seconds,
                 max_concurrent_requests=self.config.tts.concurrent_requests,
                 requests_per_minute=30,  # Default rate limit for Flash TTS

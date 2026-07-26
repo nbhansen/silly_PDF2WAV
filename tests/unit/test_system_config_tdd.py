@@ -61,7 +61,6 @@ class TestSystemConfigCreation:
         assert config.files.upload_folder == "uploads"
         assert config.files.audio_folder == "audio_outputs"
         assert config.text_processing.enable_cleaning is True
-        assert config.text_processing.enable_natural_formatting is True
 
     def test_system_config_with_custom_values(self):
         """Should create SystemConfig with custom values."""
@@ -74,7 +73,6 @@ class TestSystemConfigCreation:
             cleanup=FileCleanupConfig(),
             text_processing=TextProcessingConfig(
                 enable_cleaning=False,
-                enable_natural_formatting=False,
             ),
             performance=PerformanceConfig(),
             flask=FlaskConfig(),
@@ -87,7 +85,6 @@ class TestSystemConfigCreation:
         assert config.files.upload_folder == "custom_uploads"
         assert config.files.audio_folder == "custom_audio"
         assert config.text_processing.enable_cleaning is False
-        assert config.text_processing.enable_natural_formatting is False
 
     def test_system_config_post_init_sets_default_extensions(self):
         """Should set default file extensions in FileConfig."""
@@ -489,7 +486,7 @@ class TestSystemConfigHelperMethodsTDD:
             cleanup=FileCleanupConfig(
                 enabled=True, max_file_age_hours=48.0, auto_cleanup_interval_hours=12.0, max_disk_usage_mb=2000
             ),
-            text_processing=TextProcessingConfig(enable_cleaning=True, enable_natural_formatting=False),
+            text_processing=TextProcessingConfig(enable_cleaning=True),
             performance=PerformanceConfig(enable_async_audio=True, audio_concurrent_chunks=8),
             flask=FlaskConfig(),
             ocr=OCRConfig(),
@@ -510,7 +507,6 @@ class TestSystemConfigHelperMethodsTDD:
 
             assert "TTS Engine: gemini" in logged_text
             assert "Text Cleaning: Enabled" in logged_text
-            assert "Natural Formatting: Disabled" in logged_text
             assert "Async Audio: Enabled" in logged_text
             assert "Audio Concurrent Chunks: 8" in logged_text
             assert "Upload Folder: test_uploads" in logged_text

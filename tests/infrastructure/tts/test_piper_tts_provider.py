@@ -345,6 +345,10 @@ class TestPiperTTSProviderCommandLineGeneration:
         assert "0.8" in cmd  # custom length scale
         assert "--speaker" in cmd
         assert "1" in cmd  # custom speaker ID
+        # All prosody settings must reach the CLI, not just length_scale (issue #59)
+        assert "--noise_scale" in cmd
+        assert "--noise_w" in cmd
+        assert "--sentence_silence" in cmd
 
     @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
     @patch("subprocess.run")
@@ -587,3 +591,144 @@ class TestPiperTTSProviderRealWorldScenarios:
         assert len(providers) == 2
         assert providers[0].config.model_name != providers[1].config.model_name
         assert all(p.models_dir == temp_models_dir for p in providers)
+
+
+class TestPiperSynthesisConfig:
+    """Test that PiperConfig prosody settings reach Piper's SynthesisConfig.
+
+    These settings were parsed from config but never applied - see issue #59.
+    """
+
+    @staticmethod
+    def _provider(config: PiperConfig) -> PiperTTSProvider:
+        """Build a provider without touching model files or the network."""
+        with patch.object(PiperTTSProvider, "_check_piper_availability"):
+            provider = PiperTTSProvider.__new__(PiperTTSProvider)
+            provider.config = config
+            return provider
+
+    def test_synthesis_config_carries_all_prosody_settings(self, temp_models_dir: str) -> None:
+        """Every prosody knob should be forwarded, with noise_w renamed correctly."""
+        config = PiperConfig(
+            download_dir=temp_models_dir,
+            length_scale=1.25,
+            noise_scale=0.5,
+            noise_w=0.9,
+            sentence_silence=0.4,
+            speaker_id=3,
+        )
+
+        syn_config = self._provider(config)._build_synthesis_config()
+
+        assert syn_config.length_scale == 1.25
+        assert syn_config.noise_scale == 0.5
+        # Our `noise_w` is Piper's `noise_w_scale` - an easy rename to get wrong
+        assert syn_config.noise_w_scale == 0.9
+        assert syn_config.speaker_id == 3
+
+    def test_synthesis_config_disables_per_chunk_normalization(self, temp_models_dir: str) -> None:
+        """Piper normalizes per chunk, and a chunk is one sentence.
+
+        Left on, a one-word sentence is peaked to the same level as a paragraph and the
+        output pumps at every sentence seam. Measured on en_US-lessac-medium: peaks are
+        [1.0, 1.0] with it on versus [0.70, 0.52] with it off.
+        """
+        config = PiperConfig(download_dir=temp_models_dir)
+
+        syn_config = self._provider(config)._build_synthesis_config()
+
+        assert syn_config.normalize_audio is False
+
+    def test_synthesis_config_uses_config_defaults(self, temp_models_dir: str) -> None:
+        """Defaults should pass through rather than being dropped to Piper's own."""
+        config = PiperConfig(download_dir=temp_models_dir)
+
+        syn_config = self._provider(config)._build_synthesis_config()
+
+        assert syn_config.length_scale == config.length_scale
+        assert syn_config.noise_scale == config.noise_scale
+        assert syn_config.noise_w_scale == config.noise_w
+
+
+class TestPiperPythonLibraryAudioAssembly:
+    """Test WAV assembly on the Piper Python-library path.
+
+    Covers the silence placement that survives concatenation, and the zero-chunk
+    error path that used to be masked by the wave writer.
+    """
+
+    @staticmethod
+    def _provider(config: PiperConfig, chunks: list[Mock]) -> PiperTTSProvider:
+        """Provider wired to a fake voice yielding the given chunks."""
+        with patch.object(PiperTTSProvider, "_check_piper_availability"):
+            provider = PiperTTSProvider.__new__(PiperTTSProvider)
+        provider.config = config
+        voice = Mock()
+        voice.synthesize.return_value = iter(chunks)
+        provider.voice_instance = voice  # type: ignore[assignment]
+        return provider
+
+    @staticmethod
+    def _chunk(frames: int = 100) -> Mock:
+        """One sentence of 16-bit mono audio at 100 Hz, for cheap frame math."""
+        chunk = Mock()
+        chunk.sample_rate = 100
+        chunk.sample_width = 2
+        chunk.sample_channels = 1
+        chunk.audio_int16_bytes = b"\x01\x00" * frames
+        return chunk
+
+    def test_zero_chunks_reports_the_real_error(self, temp_models_dir: str) -> None:
+        """The raise must not happen inside the wave writer's context manager.
+
+        Raising in there means Wave_write.close() fails on unset params and replaces
+        the real message with a confusing "# channels not specified".
+        """
+        provider = self._provider(PiperConfig(download_dir=temp_models_dir), [])
+
+        with patch.object(provider, "_generate_with_command_line", side_effect=Exception("cli disabled")):
+            try:
+                provider._generate_with_python_lib("text")
+            except Exception as exc:
+                # The CLI fallback error is what surfaces, but the *cause* must be ours
+                assert "channels not specified" not in str(exc.__context__)
+                assert "no audio chunks" in str(exc.__context__)
+
+    def test_trailing_silence_survives_chunk_concatenation(self, temp_models_dir: str) -> None:
+        """A gap after the last sentence is what keeps concatenated seams apart.
+
+        Callers synthesize ~3000-char chunks separately and concatenate them, so
+        gapping only *between* sentences leaves two sentences running together at
+        every chunk boundary.
+        """
+        import io
+        import wave
+
+        config = PiperConfig(download_dir=temp_models_dir, sentence_silence=0.5)
+        provider = self._provider(config, [self._chunk(frames=100)])
+
+        with wave.open(io.BytesIO(provider._generate_with_python_lib("One sentence.")), "rb") as wav:
+            # 100 frames of speech + 0.5s at 100 Hz = 50 frames of trailing silence
+            assert wav.getnframes() == 150
+
+    def test_silence_written_between_every_sentence(self, temp_models_dir: str) -> None:
+        """Three sentences at 0.5s should gap after each one."""
+        import io
+        import wave
+
+        config = PiperConfig(download_dir=temp_models_dir, sentence_silence=0.5)
+        provider = self._provider(config, [self._chunk(frames=100) for _ in range(3)])
+
+        with wave.open(io.BytesIO(provider._generate_with_python_lib("Three. Short. Sentences.")), "rb") as wav:
+            assert wav.getnframes() == 3 * (100 + 50)
+
+    def test_zero_sentence_silence_writes_no_padding(self, temp_models_dir: str) -> None:
+        """sentence_silence=0 must produce exactly the speech frames."""
+        import io
+        import wave
+
+        config = PiperConfig(download_dir=temp_models_dir, sentence_silence=0.0)
+        provider = self._provider(config, [self._chunk(frames=100) for _ in range(2)])
+
+        with wave.open(io.BytesIO(provider._generate_with_python_lib("Two. Sentences.")), "rb") as wav:
+            assert wav.getnframes() == 200

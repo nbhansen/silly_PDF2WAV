@@ -165,37 +165,22 @@ class TimingEngine(ITimingEngine):
             logger.debug("TimingEngine: Processing %d chunks individually", len(text_chunks))
 
             for i, chunk in enumerate(text_chunks):
-                # Enhance text with natural formatting if available
-                if self.text_pipeline:
-                    enhance_result = self.text_pipeline.enhance_with_natural_formatting(chunk)
-                    if enhance_result.is_failure:
-                        logger.warning("TimingEngine: Enhancement failed for chunk %d, using original", i + 1)
-                        enhanced_chunk = chunk
-                    elif enhance_result.value is not None:
-                        enhanced_chunk = enhance_result.value
-                    else:
-                        enhanced_chunk = chunk
-                else:
-                    enhanced_chunk = chunk
-
-                logger.debug(
-                    "TimingEngine: Processing chunk %d/%d (%d chars)", i + 1, len(text_chunks), len(enhanced_chunk)
-                )
+                logger.debug("TimingEngine: Processing chunk %d/%d (%d chars)", i + 1, len(text_chunks), len(chunk))
 
                 # Check chunk size
-                if len(enhanced_chunk) > 3000:
+                if len(chunk) > 3000:
                     logger.warning(
                         "TimingEngine: Chunk %d too large (%d chars), falling back to measurement mode",
                         i + 1,
-                        len(enhanced_chunk),
+                        len(chunk),
                     )
                     return self._generate_with_measurement(text_chunks, output_filename)
 
-                if not enhanced_chunk.strip():
+                if not chunk.strip():
                     continue
 
                 # Use engine's native timestamping for this chunk
-                result = self.tts_engine.generate_audio_with_timestamps(enhanced_chunk)
+                result = self.tts_engine.generate_audio_with_timestamps(chunk)
 
                 if result.is_failure:
                     logger.warning("TimingEngine: Engine failed for chunk %d: %s", i + 1, result.error)
@@ -319,22 +304,14 @@ class TimingEngine(ITimingEngine):
         Returns ChunkProcessingResult or None on failure.
         """
         try:
-            # Enhance text if pipeline is available
+            # Split into sentences if pipeline is available
             if self.text_pipeline:
-                enhance_result = self.text_pipeline.enhance_with_natural_formatting(chunk)
-                if enhance_result.is_success and enhance_result.value is not None:
-                    enhanced_chunk = enhance_result.value
-                else:
-                    enhanced_chunk = chunk
-
-                # Split into sentences
-                sentences_result = self.text_pipeline.split_into_sentences(enhanced_chunk)
+                sentences_result = self.text_pipeline.split_into_sentences(chunk)
                 if sentences_result.is_success and sentences_result.value is not None:
                     sentences = sentences_result.value
                 else:
-                    sentences = [enhanced_chunk]
+                    sentences = [chunk]
             else:
-                enhanced_chunk = chunk
                 sentences = [chunk]
 
             logger.debug("TimingEngine: Chunk %d has %d sentences", chunk_index + 1, len(sentences))

@@ -13,6 +13,13 @@ from domain.interfaces import ITTSEngine
 
 logger = logging.getLogger(__name__)
 
+# Gemini takes delivery direction as natural language rather than SSML, so this is the
+# only prosody control the engine exposes. Tuned for long-form academic reading.
+DEFAULT_STYLE_PROMPT = (
+    "Read the following text aloud in a measured, clear academic tone. "
+    "Pace it for comprehension rather than speed, and pause between sections."
+)
+
 
 class GeminiTTSProvider(ITTSEngine):
     """Gemini TTS Provider using Google Gen AI SDK."""
@@ -22,6 +29,7 @@ class GeminiTTSProvider(ITTSEngine):
         model_name: str,
         api_key: str,
         voice_name: str = "Kore",
+        style_prompt: str | None = None,
         min_request_interval: float = 2.0,
         max_concurrent_requests: int = 4,
         requests_per_minute: int = 30,
@@ -32,6 +40,8 @@ class GeminiTTSProvider(ITTSEngine):
             model_name: Gemini model (e.g. gemini-2.0-flash-exp)
             api_key: Google AI API Key
             voice_name: Voice to use (e.g. "Kore", "Puck", "Charon", "Fenrir", "Aoede")
+            style_prompt: Delivery directive prefixed to the text. None uses
+                DEFAULT_STYLE_PROMPT; pass an empty string to send the text bare.
             min_request_interval: Minimum seconds between API requests
             max_concurrent_requests: Maximum number of concurrent API requests
             requests_per_minute: Rate limit for API requests per minute
@@ -39,6 +49,7 @@ class GeminiTTSProvider(ITTSEngine):
         self.model_name = model_name
         self.api_key = api_key
         self.voice_name = voice_name
+        self.style_prompt = DEFAULT_STYLE_PROMPT if style_prompt is None else style_prompt
         self.min_request_interval = min_request_interval
         self.max_concurrent_requests = max_concurrent_requests
         self.requests_per_minute = requests_per_minute
@@ -52,6 +63,12 @@ class GeminiTTSProvider(ITTSEngine):
         except Exception as e:
             self._initialization_error = f"Failed to initialize Gemini Client: {e}"
             logger.error(self._initialization_error)
+
+    def _build_prompt(self, text: str) -> str:
+        """Prefix the delivery directive to the text, if one is configured."""
+        if not self.style_prompt:
+            return text
+        return f"{self.style_prompt}\n\n{text}"
 
     def generate_audio_data(self, text: str) -> Result[bytes]:
         """Generate audio data from text using Gemini."""
@@ -78,8 +95,7 @@ class GeminiTTSProvider(ITTSEngine):
                 ),
             )
 
-            # Direct text input for TTS models
-            prompt = text
+            prompt = self._build_prompt(text)
 
             response = self.client.models.generate_content(model=self.model_name, contents=prompt, config=config)
             logger.debug("Gemini API call successful, extracting audio from response")
@@ -110,8 +126,7 @@ class GeminiTTSProvider(ITTSEngine):
                 ),
             )
 
-            # Direct text input for TTS models
-            prompt = text
+            prompt = self._build_prompt(text)
 
             # Use async client
             response = await self.client.aio.models.generate_content(
@@ -181,4 +196,5 @@ class GeminiTTSProvider(ITTSEngine):
 
     def supports_ssml(self) -> bool:
         """Whether this engine supports SSML."""
-        return False  # Gemini Audio model takes text prompt, not SSML (prompt engineering used instead)
+        # Gemini takes a text prompt, not SSML. Delivery is steered by style_prompt instead.
+        return False

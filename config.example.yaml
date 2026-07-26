@@ -25,10 +25,14 @@ tts:
     # Speech speed (1.0 = normal, 0.8 = slower, 1.2 = faster)
     length_scale: 1.0
 
-    # Advanced audio settings
+    # Pause inserted between sentences, in seconds. This is the main cadence
+    # control - raise it for a slower, more deliberate read.
+    sentence_silence: 0.2
+
+    # Synthesis variability. noise_scale affects tone, noise_w affects the
+    # timing/pronunciation of individual phonemes.
     noise_scale: 0.667
     noise_w: 0.8
-    sentence_silence: 0.2
 
   # Gemini TTS Settings (Cloud)
   gemini:
@@ -36,13 +40,17 @@ tts:
     model_name: "gemini-2.5-flash"
     max_retries: 3
 
+    # Delivery direction, prefixed to the text. Gemini takes tone and pacing as
+    # natural language rather than SSML, so this is its only prosody control.
+    # Omit for the built-in academic-reading default; set to "" to send text bare.
+    # style_prompt: "Read this slowly and clearly, pausing between sections."
+
 # Text Processing Pipeline
 text_processing:
-  # Use LLM to clean and fix OCR errors
+  # Use LLM to clean and fix OCR errors, and repair punctuation damaged by PDF
+  # extraction. Speech rhythm comes from correct punctuation, so this matters
+  # for cadence as well as accuracy.
   enable_text_cleaning: true
-
-  # Add natural pauses (...) for better speech rhythm
-  enable_natural_formatting: true
 
   # Convert academic text to plain English (optional)
   enable_plain_english_conversion: false

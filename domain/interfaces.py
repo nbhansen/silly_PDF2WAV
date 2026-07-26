@@ -190,9 +190,5 @@ class ITextPipeline(ABC):
         """Clean and prepare text for TTS asynchronously with rate limiting."""
 
     @abstractmethod
-    def enhance_with_natural_formatting(self, text: str) -> Result[str]:
-        """Add natural formatting enhancements to text."""
-
-    @abstractmethod
     def split_into_sentences(self, text: str) -> Result[list[str]]:
         """Split text into sentences for processing."""
