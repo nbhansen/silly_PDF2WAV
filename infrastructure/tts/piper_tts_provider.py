@@ -298,14 +298,21 @@ class PiperTTSProvider(ITTSEngine):
             length_scale=self.config.length_scale,
             noise_scale=self.config.noise_scale,
             noise_w_scale=self.config.noise_w,
+            # Piper normalizes per *chunk*, and a chunk is one sentence - so leaving this
+            # on peaks "However." to the same level as a full paragraph, and the output
+            # pumps at every sentence seam. Measured on en_US-lessac-medium: peaks go
+            # [1.0, 1.0] with normalization on versus [0.70, 0.52] with it off.
+            normalize_audio=False,
         )
 
     def _generate_with_python_lib(self, text: str) -> bytes:
         """Generate using the Piper Python library.
 
-        Piper emits one audio chunk per sentence. `sentence_silence` is not applied by
-        the library, so silence is written between chunks here - the same approach
-        piper's own CLI takes.
+        Piper emits one audio chunk per sentence and applies no inter-sentence silence,
+        so the gaps are written here. Note this deliberately differs from piper's own
+        CLI, which only gaps *within* one synthesize() call: our callers concatenate
+        these blobs, so a trailing gap is what keeps the seam between two chunks from
+        running two sentences together.
         """
         try:
             from io import BytesIO
@@ -316,31 +323,29 @@ class PiperTTSProvider(ITTSEngine):
 
             syn_config = self._build_synthesis_config()
 
+            # Materialize before opening the wave writer: raising inside the `with` would
+            # be masked by Wave_write.close() failing on unset params, replacing the real
+            # error with a confusing "# channels not specified".
+            chunks = list(self.voice_instance.synthesize(text, syn_config))
+            if not chunks:
+                raise Exception("Piper produced no audio chunks")
+
+            first = chunks[0]
+            # 16-bit silence sized to the configured inter-sentence gap
+            silence_bytes = bytes(
+                int(first.sample_rate * self.config.sentence_silence) * first.sample_width * first.sample_channels
+            )
+
             audio_buffer = BytesIO()
             with wave.open(audio_buffer, "wb") as wav_file:
-                wav_params_set = False
-                silence_bytes = b""
+                wav_file.setframerate(first.sample_rate)
+                wav_file.setsampwidth(first.sample_width)
+                wav_file.setnchannels(first.sample_channels)
 
-                for i, chunk in enumerate(self.voice_instance.synthesize(text, syn_config)):
-                    if not wav_params_set:
-                        wav_file.setframerate(chunk.sample_rate)
-                        wav_file.setsampwidth(chunk.sample_width)
-                        wav_file.setnchannels(chunk.sample_channels)
-                        # 16-bit silence sized to the configured inter-sentence gap
-                        silence_bytes = bytes(
-                            int(chunk.sample_rate * self.config.sentence_silence)
-                            * chunk.sample_width
-                            * chunk.sample_channels
-                        )
-                        wav_params_set = True
-
-                    if i > 0 and silence_bytes:
-                        wav_file.writeframes(silence_bytes)
-
+                for chunk in chunks:
                     wav_file.writeframes(chunk.audio_int16_bytes)
-
-                if not wav_params_set:
-                    raise Exception("Piper produced no audio chunks")
+                    if silence_bytes:
+                        wav_file.writeframes(silence_bytes)
 
             return audio_buffer.getvalue()
 

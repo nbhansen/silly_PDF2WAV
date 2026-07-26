@@ -187,6 +187,12 @@ class DocumentEngine(IDocumentEngine):
             all_cleaned_text = " ".join(cleaned_chunks)
             logger.debug("Combined all cleaned text: %d chars total", len(all_cleaned_text))
 
+            # An image-only PDF extracts as whitespace and cleans down to nothing. Without
+            # this, _split_for_tts("") returns [] and the caller only rejects None, so the
+            # run reports success having produced no audio at all.
+            if not all_cleaned_text.strip():
+                return Result.failure(text_extraction_error("No usable text remained after cleaning"))
+
             # Step 4: Split cleaned text into optimal chunks for TTS
             processed_chunks = self._split_for_tts(all_cleaned_text, self.audio_target_chunk_size)
             logger.debug("Split cleaned text into %d TTS-optimized chunks", len(processed_chunks))
