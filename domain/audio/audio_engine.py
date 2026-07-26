@@ -13,8 +13,9 @@ from typing import TYPE_CHECKING, Any
 
 from ..errors import Result, audio_generation_error
 from ..interfaces import IAudioDurationMeasurer, IAudioEngine, IFileManager, ITTSEngine
-from ..models import TimedAudioResult
+from ..models import SynthesizedSegment, TimedAudioResult
 from ..text.chunking_strategy import ChunkingMode, IChunkingStrategy, create_chunking_strategy
+from .audio_assembler import AudioAssembler
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +40,12 @@ class AudioEngine(IAudioEngine):
         audio_max_chunk_size: int = 3000,
         enable_async: bool = True,
         chunking_strategy: IChunkingStrategy | None = None,
+        assembler: AudioAssembler | None = None,
     ):
         self.tts_engine = tts_engine
         self.file_manager = file_manager
         self.timing_engine = timing_engine
+        self.assembler = assembler or AudioAssembler()
         self.duration_measurer = duration_measurer
         self.max_concurrent = max_concurrent
         self.audio_target_chunk_size = audio_target_chunk_size
@@ -94,20 +97,23 @@ class AudioEngine(IAudioEngine):
             # Generate audio using sync or async based on config
             if self.enable_async:
                 logger.debug("Using async processing for simple audio generation")
-                audio_chunks = self._generate_chunks_with_new_async_interface(processed_chunks)
+                segments = self._generate_chunks_with_new_async_interface(processed_chunks)
             else:
                 logger.debug("Using synchronous processing for simple audio generation")
-                audio_chunks = self._generate_chunks_sync(processed_chunks)
+                segments = self._generate_chunks_sync(processed_chunks)
 
-            if not audio_chunks:
+            if not segments:
                 logger.warning("No successful audio chunks generated")
                 return Result.success(TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None))
 
-            # Combine audio chunks
-            combined_audio = self._combine_wav_chunks(audio_chunks)
-
-            if not combined_audio:
+            # One assembly point for the whole document, so the gap between chunks is
+            # the same gap as between sentences inside a chunk
+            assembled = self.assembler.to_wav(segments)
+            if assembled.is_failure or not assembled.value:
+                logger.error("Failed to assemble audio segments: %s", assembled.error)
                 return Result.success(TimedAudioResult(audio_files=[], combined_mp3=None, timing_data=None))
+
+            combined_audio = assembled.value
 
             # Save audio file as WAV first (since TTS engines typically generate WAV)
             temp_wav_filename = f"{output_filename}_temp.wav"
@@ -143,8 +149,8 @@ class AudioEngine(IAudioEngine):
             logger.exception("Simple audio generation failed: %s", e)
             return Result.failure(audio_generation_error(f"Simple audio generation failed: {e}"))
 
-    def _generate_chunks_with_new_async_interface(self, processed_chunks: list[str]) -> list[bytes]:
-        """Generate audio chunks using the new async interface with true parallelism.
+    def _generate_chunks_with_new_async_interface(self, processed_chunks: list[str]) -> list[SynthesizedSegment]:
+        """Generate segments using the async interface with true parallelism.
 
         Pure function - returns empty list on error.
         """
@@ -157,26 +163,26 @@ class AudioEngine(IAudioEngine):
             logger.exception("Async processing failed: %s", e)
             return []
 
-    def _generate_chunks_sync(self, processed_chunks: list[str]) -> list[bytes]:
-        """Generate audio chunks synchronously.
+    def _generate_chunks_sync(self, processed_chunks: list[str]) -> list[SynthesizedSegment]:
+        """Generate segments synchronously.
 
-        Pure function - returns list of successful chunks.
+        Pure function - returns the flattened segments of all successful chunks.
         """
-        audio_chunks = []
+        segments: list[SynthesizedSegment] = []
 
         for i, chunk in enumerate(processed_chunks, 1):
             logger.debug("Processing chunk %d/%d (%d chars)", i, len(processed_chunks), len(chunk))
 
-            result = self.tts_engine.generate_audio_data(chunk)
+            result = self.tts_engine.synthesize(chunk)
             if result.is_success and result.value is not None:
-                audio_chunks.append(result.value)
-                logger.debug("Chunk %d completed (%d bytes)", i, len(result.value))
+                segments.extend(result.value)
+                logger.debug("Chunk %d completed (%d segments)", i, len(result.value))
             else:
                 logger.warning("Chunk %d failed: %s", i, result.error)
 
-        return audio_chunks
+        return segments
 
-    async def _process_chunks_async(self, processed_chunks: list[str]) -> list[bytes]:
+    async def _process_chunks_async(self, processed_chunks: list[str]) -> list[SynthesizedSegment]:
         """Orchestrate parallel chunk processing with proper async coordination.
 
         Returns list of successful audio chunks.
@@ -201,9 +207,11 @@ class AudioEngine(IAudioEngine):
         logger.debug("Starting parallel processing at %.2f", start_time)
         return {"start_time": start_time}
 
-    def _create_chunk_tasks(self, processed_chunks: list[str]) -> list[Coroutine[Any, Any, bytes | None]]:
+    def _create_chunk_tasks(
+        self, processed_chunks: list[str]
+    ) -> list[Coroutine[Any, Any, list[SynthesizedSegment] | None]]:
         """Create async tasks for all valid chunks."""
-        tasks: list[Coroutine[Any, Any, bytes | None]] = []
+        tasks: list[Coroutine[Any, Any, list[SynthesizedSegment] | None]] = []
         for i, chunk in enumerate(processed_chunks):
             if not chunk.strip():
                 continue
@@ -214,35 +222,41 @@ class AudioEngine(IAudioEngine):
         return tasks
 
     async def _execute_tasks_with_rate_limiting(
-        self, tasks: list[Coroutine[Any, Any, bytes | None]]
-    ) -> list[bytes | None | BaseException]:
+        self, tasks: list[Coroutine[Any, Any, list[SynthesizedSegment] | None]]
+    ) -> list[list[SynthesizedSegment] | None | BaseException]:
         """Execute tasks with semaphore-based rate limiting."""
         # Apply rate limiting
         semaphore = asyncio.Semaphore(self.max_concurrent)
         limited_tasks = [self._limited_chunk_processing(semaphore, task) for task in tasks]
 
         # Execute all tasks concurrently
-        results: list[bytes | None | BaseException] = await asyncio.gather(*limited_tasks, return_exceptions=True)
+        results: list[list[SynthesizedSegment] | None | BaseException] = await asyncio.gather(
+            *limited_tasks, return_exceptions=True
+        )
         return results
 
     def _process_async_results(
         self,
-        results: list[bytes | None | BaseException],
+        results: list[list[SynthesizedSegment] | None | BaseException],
         processed_chunks: list[str],
         timing_context: dict[str, float],
-    ) -> list[bytes]:
-        """Process results, calculate metrics, and filter successful chunks."""
+    ) -> list[SynthesizedSegment]:
+        """Process results, calculate metrics, and flatten successful chunks.
+
+        asyncio.gather preserves input order, so flattening here keeps the segments
+        in document order even though the chunks completed out of order.
+        """
         import time
 
         end_time = time.time()
         total_time = end_time - timing_context["start_time"]
         logger.info("Parallel processing completed in %.2f seconds", total_time)
 
-        # Filter successful results (immutable) - cast is safe because we filter out non-bytes
-        audio_chunks: list[bytes] = [
-            result
+        audio_chunks: list[SynthesizedSegment] = [
+            segment
             for result in results
-            if not isinstance(result, Exception) and result is not None and isinstance(result, bytes)
+            if not isinstance(result, BaseException) and result is not None
+            for segment in result
         ]
 
         # Handle failed chunks logging
@@ -251,7 +265,7 @@ class AudioEngine(IAudioEngine):
                 logger.warning("Chunk %d failed with exception: %s", i + 1, result)
 
         logger.info(
-            "Successfully processed %d/%d chunks in %.2fs",
+            "Successfully produced %d segments from %d chunks in %.2fs",
             len(audio_chunks),
             len(processed_chunks),
             total_time,
@@ -267,8 +281,8 @@ class AudioEngine(IAudioEngine):
         return audio_chunks
 
     async def _limited_chunk_processing(
-        self, semaphore: asyncio.Semaphore, task: Awaitable[bytes | None]
-    ) -> bytes | None:
+        self, semaphore: asyncio.Semaphore, task: Awaitable[list[SynthesizedSegment] | None]
+    ) -> list[SynthesizedSegment] | None:
         """Apply semaphore limiting to chunk processing."""
         async with semaphore:
             result = await task
@@ -276,7 +290,9 @@ class AudioEngine(IAudioEngine):
             await asyncio.sleep(self.base_delay)
             return result
 
-    async def _process_single_chunk_async(self, chunk: str, chunk_num: int, total_chunks: int) -> bytes | None:
+    async def _process_single_chunk_async(
+        self, chunk: str, chunk_num: int, total_chunks: int
+    ) -> list[SynthesizedSegment] | None:
         """Process a single chunk asynchronously."""
         import time
 
@@ -284,14 +300,15 @@ class AudioEngine(IAudioEngine):
         logger.debug("Starting chunk %d/%d (%d chars)", chunk_num, total_chunks, len(chunk))
 
         try:
-            # Use the new async interface
-            result = await self.tts_engine.generate_audio_data_async(chunk)
+            result = await self.tts_engine.synthesize_async(chunk)
             chunk_end = time.time()
             chunk_time = chunk_end - chunk_start
 
             if result.is_success and result.value:
-                logger.debug("Chunk %d completed in %.2fs (%d bytes)", chunk_num, chunk_time, len(result.value))
-                return result.value
+                logger.debug(
+                    "Chunk %d completed in %.2fs (%d segments)", chunk_num, chunk_time, len(result.value)
+                )
+                return list(result.value)
             else:
                 error_msg = result.error if result.is_failure else "No audio data"
                 logger.warning("Chunk %d failed in %.2fs: %s", chunk_num, chunk_time, error_msg)
@@ -311,58 +328,6 @@ class AudioEngine(IAudioEngine):
         from .duration_measurer import AudioDurationMeasurer
 
         return AudioDurationMeasurer().get_duration(file_path)
-
-    def _combine_wav_chunks(self, audio_chunks: list[bytes]) -> bytes:
-        """Combine multiple audio chunks.
-
-        If WAV (RIFF header), uses wave module to combine properly.
-        Otherwise (e.g. MP3), concatenates bytes directly.
-        """
-        try:
-            import io
-            import wave
-
-            if not audio_chunks:
-                return b""
-
-            if len(audio_chunks) == 1:
-                return audio_chunks[0]
-
-            # Check for RIFF header to determine if it's WAV
-            if not audio_chunks[0].startswith(b"RIFF"):
-                logger.debug("Chunks do not appear to be WAV (no RIFF header), using direct concatenation")
-                return b"".join(audio_chunks)
-
-            # Read the first chunk to get audio parameters
-            first_chunk = io.BytesIO(audio_chunks[0])
-            with wave.open(first_chunk, "rb") as first_wav:
-                params = first_wav.getparams()
-
-            # Create output buffer
-            output_buffer = io.BytesIO()
-
-            # Write combined WAV file
-            with wave.open(output_buffer, "wb") as output_wav:
-                output_wav.setparams(params)
-
-                # Append audio data from each chunk
-                for chunk_data in audio_chunks:
-                    chunk_buffer = io.BytesIO(chunk_data)
-                    try:
-                        with wave.open(chunk_buffer, "rb") as chunk_wav:
-                            frames = chunk_wav.readframes(chunk_wav.getnframes())
-                            output_wav.writeframes(frames)
-                    except wave.Error:
-                        # Fallback for mixed content? Should not happen if first chunk was RIFF
-                        logger.warning("Failed to read chunk as WAV during combination")
-                        continue
-
-            return output_buffer.getvalue()
-
-        except Exception as e:
-            logger.exception("Error combining audio chunks: %s", e)
-            # Fallback: return the first chunk or concatenation if combination fails
-            return b"".join(audio_chunks) if audio_chunks else b""
 
     def combine_audio_files(self, file_paths: list[str], output_path: str) -> Result[str]:
         """Combine multiple audio files using ffmpeg.
@@ -556,9 +521,12 @@ class AudioEngine(IAudioEngine):
                 return None
 
     def _call_tts_engine(self, text: str) -> Result[bytes]:
-        """Call TTS engine (blocking operation)."""
+        """Synthesize and assemble a standalone audio file (blocking operation)."""
         try:
-            return self.tts_engine.generate_audio_data(text)
+            result = self.tts_engine.synthesize(text)
+            if result.is_failure or not result.value:
+                return Result.failure(result.error or audio_generation_error("TTS engine returned no segments"))
+            return self.assembler.to_wav(result.value)
         except Exception as e:
             return Result.failure(audio_generation_error(f"TTS engine call failed: {e!s}"))
 

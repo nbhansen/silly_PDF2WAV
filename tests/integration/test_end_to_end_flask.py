@@ -26,6 +26,7 @@ from domain.config.tts_config import PiperConfig, TTSConfig, TTSEngine
 from domain.errors import Result
 from domain.models import PageRange, PDFInfo, TimedAudioResult
 from routes import register_routes
+from tests.test_helpers import fake_segments
 
 # === Flask App Test Fixtures ===
 
@@ -233,23 +234,12 @@ class TestEndToEndPDFConversion:
 
         mock_tts_instance = MagicMock()
 
-        # Mock timing-aware TTS generation
-        def generate_timed_audio_side_effect(text: str) -> Result[bytes]:
-            # Simulate timing data generation
-            text.split(". ")
+        # Mock timing-aware TTS generation: one segment per sentence, so the
+        # timing engine gets real per-sentence durations to lay out
+        def synthesize_side_effect(text: str) -> Result[object]:
+            return Result.success(fake_segments(text))
 
-            # Return audio data with embedded timing
-            audio_size = len(text) * 10
-            fake_wav_header = (
-                b"RIFF\x24\x08\x00\x00WAVEfmt \x10\x00\x00\x00"
-                b"\x01\x00\x01\x00\x44\xac\x00\x00\x88X\x01\x00"
-                b"\x02\x00\x10\x00data\x00\x08\x00\x00"
-            )
-            audio_data = fake_wav_header + b"timed_audio_" * (audio_size // 15)
-
-            return Result.success(audio_data)
-
-        mock_tts_instance.generate_audio_data.side_effect = generate_timed_audio_side_effect
+        mock_tts_instance.synthesize.side_effect = synthesize_side_effect
         mock_tts_instance.get_output_format.return_value = "wav"
         mock_tts_instance.supports_timing.return_value = True
         mock_tts_instance.supports_ssml.return_value = True
@@ -348,7 +338,7 @@ class TestEndToEndPDFConversion:
             mock_ocr.return_value = mock_ocr_instance
 
             mock_tts_instance = MagicMock()
-            mock_tts_instance.generate_audio_data.return_value = Result.success(b"fake_audio_page1")
+            mock_tts_instance.synthesize.side_effect = lambda text: Result.success(fake_segments(text))
             mock_tts_instance.get_output_format.return_value = "wav"
             mock_tts.return_value = mock_tts_instance
 

@@ -26,7 +26,6 @@ gemini:                 # GeminiConfig - Gemini API settings (optional)
   api_key               # API key (or set GEMINI_API_KEY env var)
   model_name            # Model to use
   style_prompt          # Delivery/tone directive prefixed to the text
-  use_measurement_mode  # Use precise timing vs estimation
 
 files:                  # FileConfig - File storage paths
   upload_folder         # Where uploaded PDFs go
@@ -249,10 +248,6 @@ class SystemConfig:
             ),
             max_retries=cls._parse_int_value(get_config("tts.gemini.max_retries", 3), 3, 1, 10),
             base_retry_delay=cls._parse_int_value(get_config("tts.gemini.base_retry_delay", 16), 16, 1, 60),
-            use_measurement_mode=cls._parse_bool_value(get_config("tts.gemini.use_measurement_mode", False), False),
-            measurement_mode_interval=cls._parse_float_value(
-                get_config("tts.gemini.measurement_mode_interval", 0.8), 0.8, 0.1, 5.0
-            ),
         )
 
     @classmethod

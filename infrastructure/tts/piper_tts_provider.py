@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from contextlib import suppress
 
 # Import logger for debugging home user issues
@@ -16,6 +17,8 @@ import urllib.request
 from domain.config import PiperConfig
 from domain.errors import Result, tts_engine_error
 from domain.interfaces import ITTSEngine
+from domain.models import SynthesizedSegment
+from infrastructure.tts.text_segmenter import TextSegmenter
 
 if TYPE_CHECKING:
     from piper.config import SynthesisConfig
@@ -51,10 +54,11 @@ class PiperTTSProvider(ITTSEngine):
             project_root: Secure project root path (for binary lookup)
 
         Note: Constructor never raises exceptions. Initialization errors
-        are stored and returned on first call to generate_audio_data().
+        are stored and returned on first call to synthesize().
         """
         self.config = config
         self.output_format = "wav"
+        self.segmenter = TextSegmenter()
         self.model_path = config.model_path
         self.config_path = config.config_path
         self.project_root = project_root or str(Path.cwd())  # Secure default
@@ -105,26 +109,31 @@ class PiperTTSProvider(ITTSEngine):
 
     # === ITTSEngine Implementation ===
 
-    def generate_audio_data(self, text_to_speak: str) -> Result[bytes]:
-        """Generate audio data using Piper TTS."""
-        logger.info(f"Starting Piper TTS generation for {len(text_to_speak)} characters")
+    def synthesize(self, text: str) -> Result[Sequence[SynthesizedSegment]]:
+        """Synthesize text into one segment per sentence.
+
+        Sentences are split here rather than left to espeak so that each segment
+        carries the exact source text that produced its audio - that correspondence
+        is what lets timing be measured instead of estimated.
+        """
+        logger.info("Starting Piper TTS generation for %d characters", len(text))
 
         # Check for deferred initialization errors
         if self._initialization_error:
             logger.error("Piper TTS initialization failed: %s", self._initialization_error)
             return Result.failure(tts_engine_error(self._initialization_error))
 
-        if not text_to_speak or text_to_speak.strip() == "":
+        if not text or text.strip() == "":
             logger.warning("Empty text provided to Piper TTS")
             return Result.failure(tts_engine_error("Empty text provided"))
 
         # Skip error messages
-        if text_to_speak.startswith(("LLM cleaning skipped", "Error:", "Could not convert")):
+        if text.startswith(("LLM cleaning skipped", "Error:", "Could not convert")):
             logger.warning("Skipping TTS generation for error message")
             return Result.failure(tts_engine_error("Cannot generate audio from error message"))
 
         # Strip ALL SSML tags for Piper (it doesn't support any SSML)
-        processed_text = self._process_text_for_piper(text_to_speak)
+        processed_text = self._process_text_for_piper(text)
         if not processed_text.strip():
             logger.error("Text processing resulted in empty content after SSML removal")
             return Result.failure(tts_engine_error("Text processing resulted in empty content"))
@@ -140,34 +149,31 @@ class PiperTTSProvider(ITTSEngine):
 
         try:
             if self.piper_method == "python_library" and self.voice_instance is not None:
-                logger.info("Using Piper Python library for TTS generation")  # type: ignore[unreachable]
-                audio_data = self._generate_with_python_lib(processed_text)
+                logger.debug("Using Piper Python library for TTS generation")  # type: ignore[unreachable]
+                segments = self._synthesize_with_python_lib(processed_text)
             else:
-                logger.info("Using Piper command line for TTS generation")
-                audio_data = self._generate_with_command_line(processed_text)
+                logger.debug("Using Piper command line for TTS generation")
+                segments = self._synthesize_with_command_line(processed_text)
 
-            if not audio_data:
+            if not segments:
                 logger.error("TTS engine returned no audio data")
                 return Result.failure(tts_engine_error("TTS engine returned no audio data"))
 
-            logger.info(f"Piper TTS generation successful - produced {len(audio_data)} bytes of audio")
-            return Result.success(audio_data)
+            logger.info("Piper TTS produced %d segment(s)", len(segments))
+            return Result.success(segments)
         except subprocess.TimeoutExpired as timeout_ex:
             timeout_duration = getattr(timeout_ex, "timeout", 30)
-            logger.error(f"Piper command timed out after {timeout_duration} seconds")
+            logger.error("Piper command timed out after %s seconds", timeout_duration)
             return Result.failure(tts_engine_error(f"Piper command timed out after {timeout_duration} seconds"))
         except Exception as e:
-            logger.error(f"Piper TTS generation failed: {type(e).__name__}: {e}", exc_info=True)
+            logger.error("Piper TTS generation failed: %s: %s", type(e).__name__, e, exc_info=True)
             return Result.failure(tts_engine_error(f"Audio generation failed: {e!s}"))
 
-    async def generate_audio_data_async(self, text_to_speak: str) -> Result[bytes]:
-        """Async wrapper for Piper TTS - calls sync method in thread pool.
-
-        Piper is a local engine and doesn't have native async support.
-        """
+    async def synthesize_async(self, text: str) -> Result[Sequence[SynthesizedSegment]]:
+        """Async wrapper - Piper is local and has no native async support."""
         import asyncio
 
-        return await asyncio.to_thread(self.generate_audio_data, text_to_speak)
+        return await asyncio.to_thread(self.synthesize, text)
 
     def supports_ssml(self) -> bool:
         """Return True if this engine supports SSML markup."""
@@ -305,55 +311,80 @@ class PiperTTSProvider(ITTSEngine):
             normalize_audio=False,
         )
 
-    def _generate_with_python_lib(self, text: str) -> bytes:
-        """Generate using the Piper Python library.
+    def _synthesize_with_python_lib(self, text: str) -> list[SynthesizedSegment]:
+        """Synthesize one segment per sentence using the Piper Python library.
 
-        Piper emits one audio chunk per sentence and applies no inter-sentence silence,
-        so the gaps are written here. Note this deliberately differs from piper's own
-        CLI, which only gaps *within* one synthesize() call: our callers concatenate
-        these blobs, so a trailing gap is what keeps the seam between two chunks from
-        running two sentences together.
+        Each sentence is handed to Piper separately so the returned segment carries
+        the exact text that produced it. Piper may split a sentence further; those
+        sub-chunks are joined back into the one segment we asked for.
         """
         try:
-            from io import BytesIO
-            import wave
-
             if self.voice_instance is None:
                 raise Exception("Voice instance not initialized")
 
             syn_config = self._build_synthesis_config()
+            sentences = self.segmenter.split_into_sentences(text) or [text]
 
-            # Materialize before opening the wave writer: raising inside the `with` would
-            # be masked by Wave_write.close() failing on unset params, replacing the real
-            # error with a confusing "# channels not specified".
-            chunks = list(self.voice_instance.synthesize(text, syn_config))
-            if not chunks:
+            segments: list[SynthesizedSegment] = []
+            for sentence in sentences:
+                if not sentence.strip():
+                    continue
+
+                chunks = list(self.voice_instance.synthesize(sentence, syn_config))
+                if not chunks:
+                    logger.debug("Piper produced no audio for sentence: %r", sentence[:60])
+                    continue
+
+                first = chunks[0]
+                segments.append(
+                    SynthesizedSegment(
+                        text=sentence,
+                        pcm=b"".join(chunk.audio_int16_bytes for chunk in chunks),
+                        sample_rate=first.sample_rate,
+                        sample_width=first.sample_width,
+                        channels=first.sample_channels,
+                    )
+                )
+
+            if not segments:
                 raise Exception("Piper produced no audio chunks")
 
-            first = chunks[0]
-            # 16-bit silence sized to the configured inter-sentence gap
-            silence_bytes = bytes(
-                int(first.sample_rate * self.config.sentence_silence) * first.sample_width * first.sample_channels
-            )
-
-            audio_buffer = BytesIO()
-            with wave.open(audio_buffer, "wb") as wav_file:
-                wav_file.setframerate(first.sample_rate)
-                wav_file.setsampwidth(first.sample_width)
-                wav_file.setnchannels(first.sample_channels)
-
-                for chunk in chunks:
-                    wav_file.writeframes(chunk.audio_int16_bytes)
-                    if silence_bytes:
-                        wav_file.writeframes(silence_bytes)
-
-            return audio_buffer.getvalue()
+            return segments
 
         except Exception as e:
             # Loud on purpose: a silent fall-through here means every chunk pays for a
             # subprocess and a full model reload, which is easy to miss.
             logger.warning("Piper Python library generation failed, falling back to command line: %s", e)
-            return self._generate_with_command_line(text)
+            return self._synthesize_with_command_line(text)
+
+    def _synthesize_with_command_line(self, text: str) -> list[SynthesizedSegment]:
+        """Synthesize via the CLI, which can only return one undifferentiated segment.
+
+        The CLI emits a finished WAV with no sentence boundaries, so timing on this
+        path is necessarily coarser than the library path.
+        """
+        wav_bytes = self._generate_with_command_line(text)
+        segment = self._segment_from_wav(text, wav_bytes)
+        return [segment] if segment else []
+
+    @staticmethod
+    def _segment_from_wav(text: str, wav_bytes: bytes) -> SynthesizedSegment | None:
+        """Unwrap a WAV container into a segment."""
+        import io
+        import wave
+
+        try:
+            with wave.open(io.BytesIO(wav_bytes), "rb") as wav_file:
+                return SynthesizedSegment(
+                    text=text,
+                    pcm=wav_file.readframes(wav_file.getnframes()),
+                    sample_rate=wav_file.getframerate(),
+                    sample_width=wav_file.getsampwidth(),
+                    channels=wav_file.getnchannels(),
+                )
+        except (wave.Error, EOFError) as e:
+            logger.error("Piper CLI produced audio that could not be read as WAV: %s", e)
+            return None
 
     def _generate_with_command_line(self, text: str) -> bytes:
         """Generate using command line."""
@@ -379,8 +410,6 @@ class PiperTTSProvider(ITTSEngine):
                 str(self.config.noise_scale),
                 "--noise_w",
                 str(self.config.noise_w),
-                "--sentence_silence",
-                str(self.config.sentence_silence),
             ]
 
             if self.config_path and Path(self.config_path).exists():

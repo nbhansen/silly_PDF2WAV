@@ -21,8 +21,6 @@ class GeminiConfig:
     min_request_interval: float = 2.0
     max_retries: int = 3
     base_retry_delay: int = 16
-    use_measurement_mode: bool = False
-    measurement_mode_interval: float = 0.8
 
 
 @dataclass(frozen=True)
