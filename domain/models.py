@@ -109,6 +109,45 @@ class CleanupResult:
 
 
 @dataclass(frozen=True)
+class SynthesizedSegment:
+    """One stretch of speech and the text that produced it.
+
+    This is what TTS engines return. Keeping the text/audio correspondence intact
+    is the point: durations here are measured, not estimated, so read-along timing
+    does not have to guess at how a blob of audio divides between its sentences.
+
+    `pcm` is raw samples with no container - assembling those into a playable file,
+    and deciding what silence goes between them, belongs to AudioAssembler.
+    """
+
+    text: str
+    pcm: bytes
+    sample_rate: int
+    sample_width: int  # bytes per sample
+    channels: int
+
+    @property
+    def frame_size(self) -> int:
+        """Bytes per frame across all channels."""
+        return self.sample_width * self.channels
+
+    @property
+    def duration(self) -> float:
+        """Measured duration in seconds."""
+        if not self.frame_size or not self.sample_rate:
+            return 0.0
+        return (len(self.pcm) / self.frame_size) / self.sample_rate
+
+    def matches_format(self, other: "SynthesizedSegment") -> bool:
+        """Whether two segments can be concatenated without resampling."""
+        return (
+            self.sample_rate == other.sample_rate
+            and self.sample_width == other.sample_width
+            and self.channels == other.channels
+        )
+
+
+@dataclass(frozen=True)
 class TextSegment:
     """Represents a segment of text with timing information."""
 

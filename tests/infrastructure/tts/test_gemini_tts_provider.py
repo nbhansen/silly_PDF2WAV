@@ -79,7 +79,7 @@ class TestGeminiTTSProviderInitialization:
             mock_client_class.side_effect = ValueError("bad key")
 
             provider = GeminiTTSProvider(model_name="gemini-1.5-flash", api_key="bad", voice_name="Kore")
-            result = provider.generate_audio_data("Hello")
+            result = provider.synthesize("Hello")
 
             assert result.is_failure
             assert result.error is not None
@@ -98,18 +98,18 @@ class TestGeminiTTSProviderInterfaces:
 class TestGeminiTTSProviderTextValidation:
     """Test text input validation for TTS generation."""
 
-    def test_generate_audio_data_rejects_empty_text(self, basic_gemini_provider: GeminiTTSProvider) -> None:
+    def test_synthesize_rejects_empty_text(self, basic_gemini_provider: GeminiTTSProvider) -> None:
         """Should reject empty text input."""
-        result = basic_gemini_provider.generate_audio_data("")
+        result = basic_gemini_provider.synthesize("")
 
         assert result.is_failure
         assert result.error is not None
         assert result.error.code == ErrorCode.TTS_ENGINE_ERROR
         assert "Empty text provided" in str(result.error.details)
 
-    def test_generate_audio_data_rejects_whitespace_only(self, basic_gemini_provider: GeminiTTSProvider) -> None:
+    def test_synthesize_rejects_whitespace_only(self, basic_gemini_provider: GeminiTTSProvider) -> None:
         """Should reject whitespace-only text."""
-        result = basic_gemini_provider.generate_audio_data("   \n\t  ")
+        result = basic_gemini_provider.synthesize("   \n\t  ")
 
         assert result.is_failure
         assert result.error is not None
@@ -119,7 +119,7 @@ class TestGeminiTTSProviderTextValidation:
     def test_empty_text_error_consistency(self, basic_gemini_provider: GeminiTTSProvider) -> None:
         """Should consistently reject all empty inputs."""
         for empty_input in ["", "   ", "\n\n", "\t\t", "  \n  \t  "]:
-            result = basic_gemini_provider.generate_audio_data(empty_input)
+            result = basic_gemini_provider.synthesize(empty_input)
             assert result.is_failure
             assert result.error is not None
             assert result.error.code == ErrorCode.TTS_ENGINE_ERROR
@@ -129,38 +129,8 @@ class TestGeminiTTSProviderTextValidation:
 class TestGeminiTTSProviderSyncGeneration:
     """Test synchronous TTS generation with a mocked client."""
 
-    def test_generate_audio_data_success(self, basic_gemini_provider: GeminiTTSProvider) -> None:
+    def test_synthesize_success(self, basic_gemini_provider: GeminiTTSProvider) -> None:
         """Should return audio bytes from the API response."""
-        provider = basic_gemini_provider
-        mock_client = Mock()
-        mock_client.models.generate_content.return_value = make_audio_response(b"mp3_bytes")
-        provider.client = mock_client
-
-        result = provider.generate_audio_data("Hello, this is a test.")
-
-        assert result.is_success
-        assert result.value == b"mp3_bytes"
-        mock_client.models.generate_content.assert_called_once()
-        call_kwargs = mock_client.models.generate_content.call_args.kwargs
-        assert call_kwargs["model"] == "gemini-1.5-flash"
-        # Text is sent with the delivery directive prefixed - Gemini's only prosody control
-        assert call_kwargs["contents"] == f"{DEFAULT_STYLE_PROMPT}\n\nHello, this is a test."
-
-    def test_generate_audio_data_handles_unicode(self, basic_gemini_provider: GeminiTTSProvider) -> None:
-        """Should pass Unicode text through to the API."""
-        provider = basic_gemini_provider
-        mock_client = Mock()
-        mock_client.models.generate_content.return_value = make_audio_response(b"audio")
-        provider.client = mock_client
-
-        unicode_text = "Héllo wörld! 你好世界 🌍"
-        result = provider.generate_audio_data(unicode_text)
-
-        assert result.is_success
-        assert mock_client.models.generate_content.call_args.kwargs["contents"].endswith(unicode_text)
-
-    def test_generate_audio_data_wraps_pcm_in_wav(self, basic_gemini_provider: GeminiTTSProvider) -> None:
-        """PCM responses should get a WAV header."""
         provider = basic_gemini_provider
         mock_client = Mock()
         mock_client.models.generate_content.return_value = make_audio_response(
@@ -168,20 +138,60 @@ class TestGeminiTTSProviderSyncGeneration:
         )
         provider.client = mock_client
 
-        result = provider.generate_audio_data("Hello")
+        result = provider.synthesize("Hello, this is a test.")
 
         assert result.is_success
         assert result.value is not None
-        assert result.value[:4] == b"RIFF"
+        # Gemini has no sentence structure, so the whole chunk is one segment
+        assert len(result.value) == 1
+        assert result.value[0].text == "Hello, this is a test."
+        mock_client.models.generate_content.assert_called_once()
+        call_kwargs = mock_client.models.generate_content.call_args.kwargs
+        assert call_kwargs["model"] == "gemini-1.5-flash"
+        # Text is sent with the delivery directive prefixed - Gemini's only prosody control
+        assert call_kwargs["contents"] == f"{DEFAULT_STYLE_PROMPT}\n\nHello, this is a test."
 
-    def test_generate_audio_data_handles_api_exception(self, basic_gemini_provider: GeminiTTSProvider) -> None:
+    def test_synthesize_handles_unicode(self, basic_gemini_provider: GeminiTTSProvider) -> None:
+        """Should pass Unicode text through to the API."""
+        provider = basic_gemini_provider
+        mock_client = Mock()
+        mock_client.models.generate_content.return_value = make_audio_response(
+            b"\x00\x01" * 100, mime_type="audio/pcm;rate=24000"
+        )
+        provider.client = mock_client
+
+        unicode_text = "Héllo wörld! 你好世界 🌍"
+        result = provider.synthesize(unicode_text)
+
+        assert result.is_success
+        assert mock_client.models.generate_content.call_args.kwargs["contents"].endswith(unicode_text)
+
+    def test_pcm_returned_as_raw_samples(self, basic_gemini_provider: GeminiTTSProvider) -> None:
+        """PCM stays raw - wrapping it in a container is AudioAssembler's job now."""
+        provider = basic_gemini_provider
+        mock_client = Mock()
+        pcm = b"\x00\x01" * 100
+        mock_client.models.generate_content.return_value = make_audio_response(pcm, mime_type="audio/pcm;rate=24000")
+        provider.client = mock_client
+
+        result = provider.synthesize("Hello")
+
+        assert result.is_success
+        assert result.value is not None
+        segment = result.value[0]
+        assert segment.pcm == pcm
+        assert segment.sample_rate == 24000
+        assert segment.sample_width == 2
+        assert segment.channels == 1
+
+    def test_synthesize_handles_api_exception(self, basic_gemini_provider: GeminiTTSProvider) -> None:
         """API exceptions should become failure Results, not raise."""
         provider = basic_gemini_provider
         mock_client = Mock()
         mock_client.models.generate_content.side_effect = RuntimeError("quota exceeded")
         provider.client = mock_client
 
-        result = provider.generate_audio_data("Hello")
+        result = provider.synthesize("Hello")
 
         assert result.is_failure
         assert result.error is not None
@@ -192,26 +202,28 @@ class TestGeminiTTSProviderAsyncGeneration:
     """Test async TTS generation with a mocked client."""
 
     @pytest.mark.asyncio
-    async def test_generate_audio_data_async_success(self, basic_gemini_provider: GeminiTTSProvider) -> None:
+    async def test_synthesize_async_success(self, basic_gemini_provider: GeminiTTSProvider) -> None:
         """Should generate audio asynchronously via the aio client."""
         provider = basic_gemini_provider
         mock_client = Mock()
 
+        pcm = b"\x00\x01" * 100
+
         async def fake_generate(**_kwargs: object) -> SimpleNamespace:
-            return make_audio_response(b"async_audio")
+            return make_audio_response(pcm, mime_type="audio/pcm;rate=24000")
 
         mock_client.aio.models.generate_content = fake_generate
         provider.client = mock_client
 
-        result = await provider.generate_audio_data_async("Test text for async generation")
+        result = await provider.synthesize_async("Test text for async generation")
 
         assert result.is_success
-        assert result.value == b"async_audio"
+        assert result.value is not None
+        assert result.value[0].pcm == pcm
+        assert result.value[0].text == "Test text for async generation"
 
     @pytest.mark.asyncio
-    async def test_generate_audio_data_async_handles_api_exception(
-        self, basic_gemini_provider: GeminiTTSProvider
-    ) -> None:
+    async def test_synthesize_async_handles_api_exception(self, basic_gemini_provider: GeminiTTSProvider) -> None:
         """Async API exceptions should become failure Results."""
         provider = basic_gemini_provider
         mock_client = Mock()
@@ -222,7 +234,7 @@ class TestGeminiTTSProviderAsyncGeneration:
         mock_client.aio.models.generate_content = fake_generate
         provider.client = mock_client
 
-        result = await provider.generate_audio_data_async("Test text")
+        result = await provider.synthesize_async("Test text")
 
         assert result.is_failure
         assert result.error is not None
@@ -235,7 +247,7 @@ class TestGeminiTTSProviderResponseParsing:
     def test_no_candidates_is_failure(self, basic_gemini_provider: GeminiTTSProvider) -> None:
         """Empty candidate list should be a failure."""
         empty_response: Any = SimpleNamespace(candidates=[])
-        result = basic_gemini_provider._extract_audio_from_response(empty_response)
+        result = basic_gemini_provider._segments_from_response("Hello", empty_response)
 
         assert result.is_failure
         assert result.error is not None
@@ -244,7 +256,7 @@ class TestGeminiTTSProviderResponseParsing:
     def test_empty_content_is_failure(self, basic_gemini_provider: GeminiTTSProvider) -> None:
         """Candidate without content parts should be a failure."""
         response: Any = SimpleNamespace(candidates=[SimpleNamespace(content=SimpleNamespace(parts=[]))])
-        result = basic_gemini_provider._extract_audio_from_response(response)
+        result = basic_gemini_provider._segments_from_response("Hello", response)
 
         assert result.is_failure
         assert result.error is not None
@@ -254,24 +266,29 @@ class TestGeminiTTSProviderResponseParsing:
         """Parts without audio data should be a failure."""
         part = SimpleNamespace(inline_data=SimpleNamespace(mime_type="text/plain", data=b"not audio"))
         response: Any = SimpleNamespace(candidates=[SimpleNamespace(content=SimpleNamespace(parts=[part]))])
-        result = basic_gemini_provider._extract_audio_from_response(response)
+        result = basic_gemini_provider._segments_from_response("Hello", response)
 
         assert result.is_failure
         assert result.error is not None
         assert "No audio data" in str(result.error.details)
 
     def test_pcm_sample_rate_parsed_from_mime_type(self, basic_gemini_provider: GeminiTTSProvider) -> None:
-        """Sample rate in the PCM mime type should be honored in the WAV header."""
-        import io
-        import wave
-
+        """Sample rate in the PCM mime type should reach the segment."""
         response: Any = make_audio_response(b"\x00\x01" * 400, mime_type="audio/pcm;rate=16000")
-        result = basic_gemini_provider._extract_audio_from_response(response)
+        result = basic_gemini_provider._segments_from_response("Hello", response)
 
         assert result.is_success
         assert result.value is not None
-        with wave.open(io.BytesIO(result.value), "rb") as wav_file:
-            assert wav_file.getframerate() == 16000
+        assert result.value[0].sample_rate == 16000
+
+    def test_missing_sample_rate_falls_back_to_default(self, basic_gemini_provider: GeminiTTSProvider) -> None:
+        """A PCM mime type with no rate should not crash."""
+        response: Any = make_audio_response(b"\x00\x01" * 400, mime_type="audio/pcm")
+        result = basic_gemini_provider._segments_from_response("Hello", response)
+
+        assert result.is_success
+        assert result.value is not None
+        assert result.value[0].sample_rate == 24000
 
 
 class TestGeminiTTSProviderStylePrompt:
@@ -314,12 +331,12 @@ class TestGeminiTTSProviderStylePrompt:
         mock_client = Mock()
 
         async def fake_generate(**kwargs: object) -> SimpleNamespace:
-            return make_audio_response(b"audio")
+            return make_audio_response(b"\x00\x01" * 100, mime_type="audio/pcm;rate=24000")
 
         mock_client.aio.models.generate_content = Mock(side_effect=fake_generate)
         provider.client = mock_client
 
-        result = await provider.generate_audio_data_async("Body text.")
+        result = await provider.synthesize_async("Body text.")
 
         assert result.is_success
         contents = mock_client.aio.models.generate_content.call_args.kwargs["contents"]

@@ -315,8 +315,8 @@ class TestRealProviderInteraction:
                     if tts_engine:
                         # Test interface compliance (ITTSEngine)
                         assert isinstance(tts_engine, ITTSEngine)
-                        assert hasattr(tts_engine, "generate_audio_data")
-                        assert hasattr(tts_engine, "generate_audio_data_async")
+                        assert hasattr(tts_engine, "synthesize")
+                        assert hasattr(tts_engine, "synthesize_async")
                         assert hasattr(tts_engine, "supports_ssml")
 
                         # Test interface methods work
@@ -361,17 +361,29 @@ class TestRealExternalServicesIntegration:
 
     def test_real_piper_generates_audio(self, real_piper_tts) -> None:
         """Should generate actual audio with real Piper TTS."""
-        test_text = "Hello, this is a test of Piper text to speech."
-        result = real_piper_tts.generate_audio_data(test_text)
+        test_text = "Hello, this is a test of Piper text to speech. Here is a second sentence."
+        result = real_piper_tts.synthesize(test_text)
 
         # Should return Result pattern
         assert hasattr(result, "is_success")
         if result.is_success:
-            audio_data = result.value
-            assert audio_data is not None
-            assert len(audio_data) > 0
-            # WAV files start with RIFF header
-            assert audio_data[:4] == b"RIFF", "Expected WAV audio format"
+            segments = result.value
+            assert segments is not None
+            assert len(segments) > 0
+
+            for segment in segments:
+                assert segment.pcm, "Segment carries no audio"
+                assert segment.duration > 0, "Segment has no measurable duration"
+                assert segment.text.strip(), "Segment carries no text"
+                # Raw samples, not a container - wrapping is AudioAssembler's job
+                assert segment.pcm[:4] != b"RIFF", "Expected raw PCM, not a WAV container"
+
+            # Longer sentences must take longer, which the old even split could not express
+            if len(segments) > 1:
+                longest = max(segments, key=lambda s: len(s.text))
+                shortest = min(segments, key=lambda s: len(s.text))
+                if longest.text != shortest.text:
+                    assert longest.duration > shortest.duration
 
     def test_real_file_manager_saves_and_retrieves(self, real_file_manager) -> None:
         """Should save and retrieve files with real FileManager."""

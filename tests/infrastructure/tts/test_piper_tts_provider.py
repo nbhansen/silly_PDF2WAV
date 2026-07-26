@@ -13,7 +13,33 @@ import pytest
 
 from domain.config.tts_config import PiperConfig
 from domain.errors import ErrorCode, Result
+from domain.models import SynthesizedSegment
 from infrastructure.tts.piper_tts_provider import PiperTTSProvider
+from infrastructure.tts.text_segmenter import TextSegmenter
+
+
+def _piper_chunk(frames: int = 100, sample_rate: int = 100) -> Mock:
+    """A stand-in for piper's AudioChunk: 16-bit mono at a cheap sample rate."""
+    chunk = Mock()
+    chunk.sample_rate = sample_rate
+    chunk.sample_width = 2
+    chunk.sample_channels = 1
+    chunk.audio_int16_bytes = b"\x01\x00" * frames
+    return chunk
+
+
+def _wav_bytes(frames: int = 100, sample_rate: int = 100) -> bytes:
+    """A minimal but valid mono 16-bit WAV, for stubbing the CLI's output file."""
+    import io
+    import wave
+
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(sample_rate)
+        wav.writeframes(b"\x01\x00" * frames)
+    return buffer.getvalue()
 
 
 @pytest.fixture
@@ -80,7 +106,7 @@ class TestPiperTTSProviderInitialization:
     @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
     @patch("subprocess.run")
     def test_init_with_missing_model_files_defers_error(self, mock_run: Mock, temp_models_dir: str) -> None:
-        """Should defer error for missing model files to generate_audio_data call."""
+        """Should defer error for missing model files to synthesize call."""
         # Make Piper command line available so it proceeds to model check
         mock_run.return_value = Mock(returncode=0)
 
@@ -99,7 +125,7 @@ class TestPiperTTSProviderInitialization:
         assert "not found" in provider._initialization_error.lower()
 
         # Error should be returned on first generate call
-        result = provider.generate_audio_data("Test text")
+        result = provider.synthesize("Test text")
         assert result.is_failure
         assert result.error is not None
         # Error details should contain the actual error message
@@ -200,12 +226,12 @@ class TestPiperTTSProviderTextValidation:
 
     @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
     @patch("subprocess.run")
-    def test_generate_audio_data_rejects_empty_text(self, mock_run: Mock, basic_piper_config: PiperConfig) -> None:
+    def test_synthesize_rejects_empty_text(self, mock_run: Mock, basic_piper_config: PiperConfig) -> None:
         """Should reject empty text input."""
         mock_run.return_value = Mock(returncode=0)
         provider = PiperTTSProvider(basic_piper_config)
 
-        result = provider.generate_audio_data("")
+        result = provider.synthesize("")
 
         assert result.is_failure
         assert result.error is not None
@@ -213,12 +239,12 @@ class TestPiperTTSProviderTextValidation:
 
     @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
     @patch("subprocess.run")
-    def test_generate_audio_data_rejects_whitespace_only(self, mock_run: Mock, basic_piper_config: PiperConfig) -> None:
+    def test_synthesize_rejects_whitespace_only(self, mock_run: Mock, basic_piper_config: PiperConfig) -> None:
         """Should reject whitespace-only text."""
         mock_run.return_value = Mock(returncode=0)
         provider = PiperTTSProvider(basic_piper_config)
 
-        result = provider.generate_audio_data("   \n\t  ")
+        result = provider.synthesize("   \n\t  ")
 
         assert result.is_failure
         assert result.error is not None
@@ -226,7 +252,7 @@ class TestPiperTTSProviderTextValidation:
 
     @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
     @patch("subprocess.run")
-    def test_generate_audio_data_rejects_error_messages(self, mock_run: Mock, basic_piper_config: PiperConfig) -> None:
+    def test_synthesize_rejects_error_messages(self, mock_run: Mock, basic_piper_config: PiperConfig) -> None:
         """Should reject error message text."""
         mock_run.return_value = Mock(returncode=0)
         provider = PiperTTSProvider(basic_piper_config)
@@ -238,7 +264,7 @@ class TestPiperTTSProviderTextValidation:
         ]
 
         for error_text in error_texts:
-            result = provider.generate_audio_data(error_text)
+            result = provider.synthesize(error_text)
 
             assert result.is_failure
             assert result.error is not None
@@ -246,15 +272,13 @@ class TestPiperTTSProviderTextValidation:
 
     @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
     @patch("subprocess.run")
-    def test_generate_audio_data_rejects_ssml_only_content(
-        self, mock_run: Mock, basic_piper_config: PiperConfig
-    ) -> None:
+    def test_synthesize_rejects_ssml_only_content(self, mock_run: Mock, basic_piper_config: PiperConfig) -> None:
         """Should reject content that becomes empty after SSML removal."""
         mock_run.return_value = Mock(returncode=0)
         provider = PiperTTSProvider(basic_piper_config)
 
         ssml_only = "<break time='2s'/><silence duration='1s'/>"
-        result = provider.generate_audio_data(ssml_only)
+        result = provider.synthesize(ssml_only)
 
         assert result.is_failure
         assert result.error is not None
@@ -266,13 +290,13 @@ class TestPiperTTSProviderAvailabilityChecking:
 
     @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
     @patch("subprocess.run")
-    def test_generate_audio_data_fails_when_unavailable(self, mock_run: Mock, basic_piper_config: PiperConfig) -> None:
+    def test_synthesize_fails_when_unavailable(self, mock_run: Mock, basic_piper_config: PiperConfig) -> None:
         """Should fail gracefully when Piper is not available."""
         # Mock command line check to fail
         mock_run.side_effect = FileNotFoundError("piper command not found")
 
         provider = PiperTTSProvider(basic_piper_config)
-        result = provider.generate_audio_data("Test text")
+        result = provider.synthesize("Test text")
 
         assert result.is_failure
         assert result.error is not None
@@ -316,7 +340,7 @@ class TestPiperTTSProviderCommandLineGeneration:
         mock_stat.return_value = stat_result
 
         # Mock file reading
-        fake_audio_data = b"RIFF\x24\x08\x00\x00WAVEfmt "  # WAV header
+        fake_audio_data = _wav_bytes(frames=100)  # real WAV, since the provider unwraps it
         mock_file_handle = Mock()
         mock_file_handle.read.return_value = fake_audio_data
         mock_open.return_value.__enter__.return_value = mock_file_handle
@@ -327,10 +351,14 @@ class TestPiperTTSProviderCommandLineGeneration:
             provider = PiperTTSProvider(custom_piper_config)
 
         # Test generation
-        result = provider.generate_audio_data("Hello, this is a test.")
+        result = provider.synthesize("Hello, this is a test.")
 
         assert result.is_success
-        assert result.value == fake_audio_data
+        assert result.value is not None
+        # The CLI emits a finished WAV with no sentence boundaries, so it unwraps to
+        # exactly one segment carrying the whole text
+        assert len(result.value) == 1
+        assert result.value[0].text == "Hello, this is a test."
 
         # Verify command construction
         mock_run.assert_called()
@@ -345,10 +373,12 @@ class TestPiperTTSProviderCommandLineGeneration:
         assert "0.8" in cmd  # custom length scale
         assert "--speaker" in cmd
         assert "1" in cmd  # custom speaker ID
-        # All prosody settings must reach the CLI, not just length_scale (issue #59)
+        # Voice-shaping settings must reach the CLI, not just length_scale (issue #59).
+        # Inter-sentence silence is deliberately absent: gaps are AudioAssembler's job
+        # now, so the engine must not add its own (issue #64).
         assert "--noise_scale" in cmd
         assert "--noise_w" in cmd
-        assert "--sentence_silence" in cmd
+        assert "--sentence_silence" not in cmd
 
     @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
     @patch("subprocess.run")
@@ -363,7 +393,7 @@ class TestPiperTTSProviderCommandLineGeneration:
 
         mock_run.side_effect = TimeoutExpired("piper", 30)
 
-        result = provider.generate_audio_data("Test text")
+        result = provider.synthesize("Test text")
 
         assert result.is_failure
         assert result.error is not None
@@ -383,7 +413,7 @@ class TestPiperTTSProviderCommandLineGeneration:
         # Mock command failure
         mock_run.return_value = Mock(returncode=1, stderr="Model not found", stdout="", args=["piper"])
 
-        result = provider.generate_audio_data("Test text")
+        result = provider.synthesize("Test text")
 
         assert result.is_failure
         assert result.error is not None
@@ -397,22 +427,23 @@ class TestPiperTTSProviderAsyncGeneration:
     @pytest.mark.asyncio
     @patch("infrastructure.tts.piper_tts_provider.PIPER_VOICE_AVAILABLE", False)
     @patch("subprocess.run")
-    async def test_generate_audio_data_async_calls_sync_method(
-        self, mock_run: Mock, basic_piper_config: PiperConfig
-    ) -> None:
+    async def test_synthesize_async_calls_sync_method(self, mock_run: Mock, basic_piper_config: PiperConfig) -> None:
         """Should call sync method in thread pool."""
         # Mock successful piper availability
         mock_run.return_value = Mock(returncode=0)
         provider = PiperTTSProvider(basic_piper_config)
 
         # Mock sync method to avoid actual TTS generation
-        with patch.object(provider, "generate_audio_data") as mock_sync:
-            mock_sync.return_value = Result.success(b"fake_audio")
+        segment = SynthesizedSegment(
+            text="Test text", pcm=b"\x00\x00" * 10, sample_rate=100, sample_width=2, channels=1
+        )
+        with patch.object(provider, "synthesize") as mock_sync:
+            mock_sync.return_value = Result.success([segment])
 
-            result = await provider.generate_audio_data_async("Test text")
+            result = await provider.synthesize_async("Test text")
 
             assert result.is_success
-            assert result.value == b"fake_audio"
+            assert result.value == [segment]
             mock_sync.assert_called_once_with("Test text")
 
 
@@ -553,10 +584,12 @@ class TestPiperTTSProviderRealWorldScenarios:
         # Create long text (5000 characters)
         long_text = "This is a very long text. " * 200
 
-        with patch.object(provider, "_generate_with_command_line") as mock_generate:
-            mock_generate.return_value = b"audio_data"
+        with patch.object(provider, "_synthesize_with_command_line") as mock_generate:
+            mock_generate.return_value = [
+                SynthesizedSegment(text=long_text, pcm=b"\x00\x00" * 10, sample_rate=100, sample_width=2, channels=1)
+            ]
 
-            result = provider.generate_audio_data(long_text)
+            result = provider.synthesize(long_text)
 
             # Should process without timeout errors
             mock_generate.assert_called_once_with(long_text)
@@ -570,10 +603,12 @@ class TestPiperTTSProviderRealWorldScenarios:
 
         unicode_text = "Héllo wörld! 你好世界 🌍"
 
-        with patch.object(provider, "_generate_with_command_line") as mock_generate:
-            mock_generate.return_value = b"audio_data"
+        with patch.object(provider, "_synthesize_with_command_line") as mock_generate:
+            mock_generate.return_value = [
+                SynthesizedSegment(text=unicode_text, pcm=b"\x00\x00" * 10, sample_rate=100, sample_width=2, channels=1)
+            ]
 
-            result = provider.generate_audio_data(unicode_text)
+            result = provider.synthesize(unicode_text)
 
             # Should process Unicode text
             mock_generate.assert_called_once_with(unicode_text)
@@ -650,85 +685,79 @@ class TestPiperSynthesisConfig:
         assert syn_config.noise_w_scale == config.noise_w
 
 
-class TestPiperPythonLibraryAudioAssembly:
-    """Test WAV assembly on the Piper Python-library path.
+class TestPiperSegmentProduction:
+    """Test that the Python-library path returns one segment per sentence.
 
-    Covers the silence placement that survives concatenation, and the zero-chunk
-    error path that used to be masked by the wave writer.
+    Gap policy and container writing live in AudioAssembler now (issue #64); what
+    the provider owes its caller is segments whose text matches their audio.
     """
 
     @staticmethod
-    def _provider(config: PiperConfig, chunks: list[Mock]) -> PiperTTSProvider:
-        """Provider wired to a fake voice yielding the given chunks."""
+    def _provider(config: PiperConfig, chunks_per_call: int = 1, frames: int = 100) -> PiperTTSProvider:
+        """Provider wired to a fake voice yielding `chunks_per_call` chunks per call."""
         with patch.object(PiperTTSProvider, "_check_piper_availability"):
             provider = PiperTTSProvider.__new__(PiperTTSProvider)
         provider.config = config
+        provider.segmenter = TextSegmenter()
+
+        def fake_synthesize(text: str, syn_config: object) -> object:
+            return iter([_piper_chunk(frames) for _ in range(chunks_per_call)])
+
         voice = Mock()
-        voice.synthesize.return_value = iter(chunks)
+        voice.synthesize.side_effect = fake_synthesize
         provider.voice_instance = voice  # type: ignore[assignment]
         return provider
 
-    @staticmethod
-    def _chunk(frames: int = 100) -> Mock:
-        """One sentence of 16-bit mono audio at 100 Hz, for cheap frame math."""
-        chunk = Mock()
-        chunk.sample_rate = 100
-        chunk.sample_width = 2
-        chunk.sample_channels = 1
-        chunk.audio_int16_bytes = b"\x01\x00" * frames
-        return chunk
+    def test_one_segment_per_sentence_with_matching_text(self, temp_models_dir: str) -> None:
+        """Each segment must carry the exact sentence that produced its audio."""
+        provider = self._provider(PiperConfig(download_dir=temp_models_dir))
+
+        segments = provider._synthesize_with_python_lib("First sentence. Second sentence. Third sentence.")
+
+        assert [s.text for s in segments] == ["First sentence.", "Second sentence.", "Third sentence."]
+
+    def test_segment_duration_is_measured_from_samples(self, temp_models_dir: str) -> None:
+        """Duration comes from the sample count, not an estimate."""
+        provider = self._provider(PiperConfig(download_dir=temp_models_dir), frames=50)
+
+        segments = provider._synthesize_with_python_lib("One sentence.")
+
+        # 50 frames at 100 Hz
+        assert segments[0].duration == pytest.approx(0.5)
+
+    def test_sub_chunks_are_joined_into_one_segment(self, temp_models_dir: str) -> None:
+        """If Piper splits a sentence further, the pieces rejoin under the text we asked for."""
+        provider = self._provider(PiperConfig(download_dir=temp_models_dir), chunks_per_call=3, frames=50)
+
+        segments = provider._synthesize_with_python_lib("One sentence.")
+
+        assert len(segments) == 1
+        assert segments[0].text == "One sentence."
+        assert segments[0].duration == pytest.approx(1.5)  # 3 x 50 frames at 100 Hz
+
+    def test_provider_writes_no_silence_of_its_own(self, temp_models_dir: str) -> None:
+        """sentence_silence must not leak into the engine's audio (issue #64)."""
+        config = PiperConfig(download_dir=temp_models_dir, sentence_silence=5.0)
+        provider = self._provider(config, frames=100)
+
+        segments = provider._synthesize_with_python_lib("One sentence.")
+
+        # Exactly the speech frames - a huge gap setting changes nothing here
+        assert len(segments[0].pcm) == 100 * 2
 
     def test_zero_chunks_reports_the_real_error(self, temp_models_dir: str) -> None:
-        """The raise must not happen inside the wave writer's context manager.
+        """The failure must name the cause, not a wave-header side effect."""
+        with patch.object(PiperTTSProvider, "_check_piper_availability"):
+            provider = PiperTTSProvider.__new__(PiperTTSProvider)
+        provider.config = PiperConfig(download_dir=temp_models_dir)
+        provider.segmenter = TextSegmenter()
+        voice = Mock()
+        voice.synthesize.return_value = iter([])
+        provider.voice_instance = voice  # type: ignore[assignment]
 
-        Raising in there means Wave_write.close() fails on unset params and replaces
-        the real message with a confusing "# channels not specified".
-        """
-        provider = self._provider(PiperConfig(download_dir=temp_models_dir), [])
-
-        with patch.object(provider, "_generate_with_command_line", side_effect=Exception("cli disabled")):
+        with patch.object(provider, "_synthesize_with_command_line", side_effect=Exception("cli disabled")):
             try:
-                provider._generate_with_python_lib("text")
+                provider._synthesize_with_python_lib("text")
             except Exception as exc:
-                # The CLI fallback error is what surfaces, but the *cause* must be ours
                 assert "channels not specified" not in str(exc.__context__)
                 assert "no audio chunks" in str(exc.__context__)
-
-    def test_trailing_silence_survives_chunk_concatenation(self, temp_models_dir: str) -> None:
-        """A gap after the last sentence is what keeps concatenated seams apart.
-
-        Callers synthesize ~3000-char chunks separately and concatenate them, so
-        gapping only *between* sentences leaves two sentences running together at
-        every chunk boundary.
-        """
-        import io
-        import wave
-
-        config = PiperConfig(download_dir=temp_models_dir, sentence_silence=0.5)
-        provider = self._provider(config, [self._chunk(frames=100)])
-
-        with wave.open(io.BytesIO(provider._generate_with_python_lib("One sentence.")), "rb") as wav:
-            # 100 frames of speech + 0.5s at 100 Hz = 50 frames of trailing silence
-            assert wav.getnframes() == 150
-
-    def test_silence_written_between_every_sentence(self, temp_models_dir: str) -> None:
-        """Three sentences at 0.5s should gap after each one."""
-        import io
-        import wave
-
-        config = PiperConfig(download_dir=temp_models_dir, sentence_silence=0.5)
-        provider = self._provider(config, [self._chunk(frames=100) for _ in range(3)])
-
-        with wave.open(io.BytesIO(provider._generate_with_python_lib("Three. Short. Sentences.")), "rb") as wav:
-            assert wav.getnframes() == 3 * (100 + 50)
-
-    def test_zero_sentence_silence_writes_no_padding(self, temp_models_dir: str) -> None:
-        """sentence_silence=0 must produce exactly the speech frames."""
-        import io
-        import wave
-
-        config = PiperConfig(download_dir=temp_models_dir, sentence_silence=0.0)
-        provider = self._provider(config, [self._chunk(frames=100) for _ in range(2)])
-
-        with wave.open(io.BytesIO(provider._generate_with_python_lib("Two. Sentences.")), "rb") as wav:
-            assert wav.getnframes() == 200

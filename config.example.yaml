@@ -25,8 +25,12 @@ tts:
     # Speech speed (1.0 = normal, 0.8 = slower, 1.2 = faster)
     length_scale: 1.0
 
-    # Pause inserted between sentences, in seconds. This is the main cadence
+    # Pause inserted after every sentence, in seconds. This is the main cadence
     # control - raise it for a slower, more deliberate read.
+    #
+    # Applied when the audio is assembled rather than by the engine, so it is
+    # honoured identically between sentences and at chunk boundaries, and the
+    # read-along timeline accounts for it exactly.
     sentence_silence: 0.2
 
     # Synthesis variability. noise_scale affects tone, noise_w affects the

@@ -70,9 +70,10 @@ class ServiceContainer(IServiceContainer):
         """Build all core service factories upfront (immutable pattern)."""
         from application.services.document_service import DocumentProcessingService
         from application.services.progress_store import ThreadSafeProgressStore
+        from domain.audio.audio_assembler import AudioAssembler
         from domain.audio.audio_engine import AudioEngine
         from domain.audio.duration_measurer import AudioDurationMeasurer
-        from domain.audio.timing_engine import ITimingEngine, TimingEngine, TimingMode
+        from domain.audio.timing_engine import ITimingEngine, TimingEngine
         from domain.document.document_engine import DocumentEngine
         from domain.interfaces import (
             IAudioDurationMeasurer,
@@ -116,18 +117,20 @@ class ServiceContainer(IServiceContainer):
                 enable_cleaning=self.config.text_processing.enable_cleaning,
                 enable_plain_english=True,
             ),
-            # Timing Engine
+            # Audio Assembler - single owner of gap policy and container writing.
+            # The gap is engine-independent policy; it reads from the Piper block only
+            # because that is where the setting has always lived.
+            AudioAssembler: lambda: AudioAssembler(
+                sentence_gap=self.config.piper.sentence_silence if self.config.piper else 0.2
+            ),
+            # Timing Engine - shares the assembler so the timeline matches the audio
             ITimingEngine: lambda: TimingEngine(
                 tts_engine=self.get("tts_engine"),
                 file_manager=self.get(FileManager),
-                duration_measurer=self.get(IAudioDurationMeasurer),
-                text_pipeline=self.get(ITextPipeline),
-                mode=(
-                    TimingMode.MEASUREMENT
-                    if self.config.gemini and self.config.gemini.use_measurement_mode
-                    else TimingMode.ESTIMATION
+                assembler=self.get(AudioAssembler),
+                request_interval=(
+                    self.config.tts.request_delay_seconds if self.config.tts.engine.value == "gemini" else 0.0
                 ),
-                measurement_interval=self.config.gemini.measurement_mode_interval if self.config.gemini else 10.0,
             ),
             # Audio Engine
             IAudioEngine: lambda: AudioEngine(
@@ -135,6 +138,7 @@ class ServiceContainer(IServiceContainer):
                 file_manager=self.get(FileManager),
                 timing_engine=self.get(ITimingEngine),
                 duration_measurer=self.get(IAudioDurationMeasurer),
+                assembler=self.get(AudioAssembler),
                 max_concurrent=self.config.performance.audio_concurrent_chunks,
                 audio_target_chunk_size=self.config.text_processing.audio_target_chunk_size,
                 audio_max_chunk_size=self.config.text_processing.audio_max_chunk_size,

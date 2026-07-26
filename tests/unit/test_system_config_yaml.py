@@ -39,7 +39,6 @@ class TestSystemConfigYAMLLoading:
                 "gemini": {
                     "model_name": "test-model",
                     "voice_name": "Aoede",
-                    "use_measurement_mode": True,
                 },
                 "piper": {"model_name": "en_US-test-high", "models_dir": "test_models", "length_scale": 1.2},
             },
@@ -63,7 +62,6 @@ class TestSystemConfigYAMLLoading:
         assert config.gemini.model_name == "test-model"
         assert config.gemini.voice_name == "Aoede"
         assert config.tts.request_delay_seconds == 1.5
-        assert config.gemini.use_measurement_mode is True
         assert config.gemini.api_key == "test-api-key-123"
 
         # Text processing

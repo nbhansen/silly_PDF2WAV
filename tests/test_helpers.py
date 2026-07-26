@@ -1,5 +1,7 @@
 # tests/test_helpers.py
+from collections.abc import Sequence
 from pathlib import Path
+import re
 import tempfile
 
 from domain.audio.timing_engine import ITimingEngine
@@ -8,7 +10,32 @@ from domain.interfaces import (
     ILLMProvider,
     ITTSEngine,
 )
-from domain.models import PageRange, ProcessingRequest, TimedAudioResult, TimingMetadata
+from domain.models import (
+    PageRange,
+    ProcessingRequest,
+    SynthesizedSegment,
+    TimedAudioResult,
+    TimingMetadata,
+)
+
+
+def fake_segments(text: str, sample_rate: int = 100) -> list[SynthesizedSegment]:
+    """Fake segments for a piece of text, one per sentence.
+
+    Durations scale with sentence length, so tests can tell a short sentence from
+    a long one - which is exactly what the old even-split timing could not do.
+    """
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()] or [text]
+    return [
+        SynthesizedSegment(
+            text=sentence,
+            pcm=b"\x01\x00" * max(1, len(sentence)),
+            sample_rate=sample_rate,
+            sample_width=2,
+            channels=1,
+        )
+        for sentence in sentences
+    ]
 
 
 class FakeTTSEngine(ITTSEngine):
@@ -18,16 +45,16 @@ class FakeTTSEngine(ITTSEngine):
         self.should_fail = should_fail
         self.generated_texts: list[str] = []
 
-    def generate_audio_data(self, text_to_speak: str) -> Result[bytes]:
-        """Generate fake audio data for testing."""
-        self.generated_texts.append(text_to_speak)
+    def synthesize(self, text: str) -> Result[Sequence[SynthesizedSegment]]:
+        """Produce one fake segment per sentence, sized by sentence length."""
+        self.generated_texts.append(text)
         if self.should_fail:
             return Result.failure(tts_engine_error("TTS generation failed"))
-        return Result.success(f"audio_data_for_{len(text_to_speak)}_chars".encode())
+        return Result.success(fake_segments(text))
 
-    async def generate_audio_data_async(self, text_to_speak: str) -> Result[bytes]:
+    async def synthesize_async(self, text: str) -> Result[Sequence[SynthesizedSegment]]:
         """Async version for interface compliance."""
-        return self.generate_audio_data(text_to_speak)
+        return self.synthesize(text)
 
     def supports_ssml(self) -> bool:
         """Return whether this engine supports SSML."""

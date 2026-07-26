@@ -17,7 +17,16 @@ from application.config.processing_configs import LLMConfig, OCRConfig, Performa
 from application.config.system_config import SystemConfig
 from domain.config.tts_config import PiperConfig, TTSConfig, TTSEngine
 from domain.errors import Result
-from domain.models import PageRange, PDFInfo, ProcessingRequest, TextSegment, TimedAudioResult, TimingMetadata
+from domain.models import (
+    PageRange,
+    PDFInfo,
+    ProcessingRequest,
+    SynthesizedSegment,
+    TextSegment,
+    TimedAudioResult,
+    TimingMetadata,
+)
+from tests.test_helpers import fake_segments
 
 # === Core Test Fixtures ===
 
@@ -101,12 +110,14 @@ def mock_tts_engine():
     """Professional mock TTS engine with realistic behavior."""
     mock = MagicMock()
 
-    def generate_audio_side_effect(text: str) -> Result[bytes]:
-        # Simulate realistic audio generation
-        audio_size = len(text) * 10  # 10 bytes per character
-        return Result.success(b"fake_audio_" + b"x" * audio_size)
+    def synthesize_side_effect(text: str) -> Result[list[SynthesizedSegment]]:
+        return Result.success(fake_segments(text))
 
-    mock.generate_audio_data.side_effect = generate_audio_side_effect
+    async def synthesize_async_side_effect(text: str) -> Result[list[SynthesizedSegment]]:
+        return Result.success(fake_segments(text))
+
+    mock.synthesize.side_effect = synthesize_side_effect
+    mock.synthesize_async.side_effect = synthesize_async_side_effect
     mock.supports_ssml.return_value = True
 
     return mock

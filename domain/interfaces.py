@@ -5,10 +5,19 @@ implementations, facilitating testing and modularity.
 """
 
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from typing import Any
 
 from .errors import Result
-from .models import CleanupStats, PageRange, PDFInfo, PdfPageText, ProcessingRequest, TimedAudioResult
+from .models import (
+    CleanupStats,
+    PageRange,
+    PDFInfo,
+    PdfPageText,
+    ProcessingRequest,
+    SynthesizedSegment,
+    TimedAudioResult,
+)
 
 # --- Core Service Interfaces ---
 
@@ -89,24 +98,30 @@ class IPdfTextExtractor(ABC):
 
 
 class ITTSEngine(ABC):
-    """Interface for a Text-to-Speech engine."""
+    """Interface for a Text-to-Speech engine.
+
+    Engines return segments, not a finished audio file. Engines that synthesize
+    sentence by sentence (Piper) return one segment per sentence, so the text and
+    its audio stay associated and timing can be measured rather than estimated.
+    Engines with no internal structure (Gemini) return a single segment.
+
+    Turning segments into a playable file - inter-sentence silence, level
+    handling, container format - is AudioAssembler's job, not an engine's.
+    """
 
     @abstractmethod
-    def generate_audio_data(self, text_to_speak: str) -> Result[bytes]:
-        """Generates raw audio data from text.
+    def synthesize(self, text: str) -> Result[Sequence[SynthesizedSegment]]:
+        """Synthesize text into one or more segments.
 
         Returns:
-            Result[bytes]: Success with audio content or failure with error.
+            Result[Sequence[SynthesizedSegment]]: Segments in playback order, or failure.
         """
 
     @abstractmethod
-    async def generate_audio_data_async(self, text_to_speak: str) -> Result[bytes]:
-        """Generates raw audio data from text asynchronously.
+    async def synthesize_async(self, text: str) -> Result[Sequence[SynthesizedSegment]]:
+        """Synthesize text asynchronously.
 
-        For engines that don't support native async, this can wrap the sync method.
-
-        Returns:
-            Result[bytes]: Success with audio content or failure with error.
+        Engines without native async support may wrap the sync method.
         """
 
     @abstractmethod

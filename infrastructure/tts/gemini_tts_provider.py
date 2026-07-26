@@ -1,6 +1,7 @@
 # infrastructure/tts/gemini_tts_provider.py
 """Gemini TTS Provider implementation using Google Gen AI SDK."""
 
+from collections.abc import Sequence
 import io
 import logging
 import wave
@@ -10,6 +11,7 @@ from google.genai import types
 
 from domain.errors import Result, tts_engine_error
 from domain.interfaces import ITTSEngine
+from domain.models import SynthesizedSegment
 
 logger = logging.getLogger(__name__)
 
@@ -70,8 +72,12 @@ class GeminiTTSProvider(ITTSEngine):
             return text
         return f"{self.style_prompt}\n\n{text}"
 
-    def generate_audio_data(self, text: str) -> Result[bytes]:
-        """Generate audio data from text using Gemini."""
+    def synthesize(self, text: str) -> Result[Sequence[SynthesizedSegment]]:
+        """Synthesize text into a single segment.
+
+        Gemini returns one undifferentiated stretch of audio with no sentence
+        boundaries, so there is exactly one segment covering the whole text.
+        """
         # Check for deferred initialization errors
         if self._initialization_error:
             logger.error("Gemini TTS initialization failed: %s", self._initialization_error)
@@ -100,14 +106,14 @@ class GeminiTTSProvider(ITTSEngine):
             response = self.client.models.generate_content(model=self.model_name, contents=prompt, config=config)
             logger.debug("Gemini API call successful, extracting audio from response")
 
-            return self._extract_audio_from_response(response)
+            return self._segments_from_response(text, response)
 
         except Exception as e:
             logger.exception("Gemini TTS generation failed")
             return Result.failure(tts_engine_error(f"Gemini TTS failed: {e}"))
 
-    async def generate_audio_data_async(self, text: str) -> Result[bytes]:
-        """Generate audio data asynchronously."""
+    async def synthesize_async(self, text: str) -> Result[Sequence[SynthesizedSegment]]:
+        """Synthesize asynchronously using Gemini's async client."""
         # Check for deferred initialization errors
         if self._initialization_error:
             logger.error("Gemini TTS initialization failed: %s", self._initialization_error)
@@ -133,14 +139,16 @@ class GeminiTTSProvider(ITTSEngine):
                 model=self.model_name, contents=prompt, config=config
             )
 
-            return self._extract_audio_from_response(response)
+            return self._segments_from_response(text, response)
 
         except Exception as e:
             logger.exception("Gemini Async TTS generation failed")
             return Result.failure(tts_engine_error(f"Gemini Async TTS failed: {e}"))
 
-    def _extract_audio_from_response(self, response: types.GenerateContentResponse) -> Result[bytes]:
-        """Extract audio bytes from Gemini response."""
+    def _segments_from_response(
+        self, text: str, response: types.GenerateContentResponse
+    ) -> Result[Sequence[SynthesizedSegment]]:
+        """Build a single segment from a Gemini response."""
         num_candidates = len(response.candidates) if response.candidates else 0
         logger.debug("Extracting audio from response (candidates=%d)", num_candidates)
         if not response.candidates:
@@ -164,35 +172,54 @@ class GeminiTTSProvider(ITTSEngine):
                     part.inline_data.mime_type,
                     len(audio_data),
                 )
-                # If PCM, add WAV header
                 if "pcm" in part.inline_data.mime_type:
-                    # Extract sample rate if possible, otherwise default to 24000
-                    sample_rate = 24000
-                    if "rate=" in part.inline_data.mime_type:
-                        try:
-                            rate_str = part.inline_data.mime_type.split("rate=")[1]
-                            sample_rate = int(rate_str.split(";")[0])
-                        except (IndexError, ValueError):
-                            pass
+                    sample_rate = self._parse_sample_rate(part.inline_data.mime_type)
+                    logger.debug("PCM audio detected (sample_rate=%d)", sample_rate)
+                    return Result.success(
+                        [
+                            SynthesizedSegment(
+                                text=text,
+                                pcm=audio_data,
+                                sample_rate=sample_rate,
+                                sample_width=2,  # Gemini PCM is 16-bit
+                                channels=1,
+                            )
+                        ]
+                    )
 
-                    logger.debug("PCM audio detected, adding WAV header (sample_rate=%d)", sample_rate)
-                    return Result.success(self._add_wav_header(audio_data, sample_rate))
-
-                return Result.success(audio_data)
+                # Anything else arrives as an encoded container we cannot treat as PCM
+                return self._segment_from_container(text, audio_data)
 
         return Result.failure(tts_engine_error("No audio data found in Gemini response"))
 
-    def _add_wav_header(
-        self, pcm_data: bytes, sample_rate: int = 24000, channels: int = 1, bit_depth: int = 16
-    ) -> bytes:
-        """Add WAV header to raw PCM data."""
-        with io.BytesIO() as wav_io:
-            with wave.open(wav_io, "wb") as wav_file:
-                wav_file.setnchannels(channels)
-                wav_file.setsampwidth(bit_depth // 8)
-                wav_file.setframerate(sample_rate)
-                wav_file.writeframes(pcm_data)
-            return wav_io.getvalue()
+    @staticmethod
+    def _parse_sample_rate(mime_type: str, default: int = 24000) -> int:
+        """Read the sample rate out of a PCM mime type, falling back to the default."""
+        if "rate=" not in mime_type:
+            return default
+        try:
+            return int(mime_type.split("rate=")[1].split(";")[0])
+        except (IndexError, ValueError):
+            return default
+
+    @staticmethod
+    def _segment_from_container(text: str, audio_data: bytes) -> Result[Sequence[SynthesizedSegment]]:
+        """Unwrap a WAV container into a segment; other formats are unsupported."""
+        try:
+            with wave.open(io.BytesIO(audio_data), "rb") as wav_file:
+                return Result.success(
+                    [
+                        SynthesizedSegment(
+                            text=text,
+                            pcm=wav_file.readframes(wav_file.getnframes()),
+                            sample_rate=wav_file.getframerate(),
+                            sample_width=wav_file.getsampwidth(),
+                            channels=wav_file.getnchannels(),
+                        )
+                    ]
+                )
+        except (wave.Error, EOFError) as e:
+            return Result.failure(tts_engine_error(f"Gemini returned audio in an unsupported format: {e}"))
 
     def supports_ssml(self) -> bool:
         """Whether this engine supports SSML."""
